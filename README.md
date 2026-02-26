@@ -119,4 +119,4 @@ All IDs are UUIDs. Dates stored as `YYYY-MM-DD` strings. Foreign keys with CASCA
 
 ## License
 
-Private project. All rights reserved.
+Licensed under the [Apache License 2.0](LICENSE).
