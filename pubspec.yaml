@@ -1,0 +1,63 @@
+name: calligraphy_assistant
+description: "书法私教助手"
+publish_to: 'none'
+version: 1.0.1+2
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # 数据库
+  sqflite: ^2.3.3
+  path: ^1.9.0
+
+  # 状态管理
+  flutter_riverpod: ^2.5.1
+
+  # 导航
+  go_router: ^14.2.0
+
+  # UI 组件
+  table_calendar: ^3.1.2
+  fl_chart: ^0.68.0
+
+  # 导出
+  pdf: ^3.11.1
+  printing: ^5.13.1
+  excel: ^4.0.6
+  share_plus: ^12.0.1
+
+  # 文件与权限
+  path_provider: ^2.1.3
+  permission_handler: ^11.3.1
+  image_picker: ^1.1.2
+  file_picker: ^8.1.2
+
+  # 工具
+  intl: ^0.20.2
+  uuid: ^4.4.2
+  restart_app: ^1.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: NotoSansSC
+      fonts:
+        - asset: assets/fonts/NotoSansSC-Regular.ttf
+    - family: MaShanZheng
+      fonts:
+        - asset: assets/fonts/MaShanZheng-Regular.ttf
+
+  assets:
+    - assets/fonts/
