@@ -5,13 +5,12 @@ import '../../../core/models/attendance.dart';
 import '../../../core/models/payment.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/fee_summary_provider.dart';
-import '../../../core/providers/insight_provider.dart';
-import '../../../core/providers/metrics_provider.dart';
-import '../../../core/providers/revenue_provider.dart';
+import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../core/utils/fee_calculator.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
+import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/attendance_edit_sheet.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../export/screens/export_config_screen.dart';
@@ -82,12 +81,8 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   }
 
   Future<void> _refresh() async {
+    invalidateAfterAttendanceChange(ref);
     ref.invalidate(studentProvider);
-    ref.invalidate(attendanceProvider);
-    ref.invalidate(feeSummaryProvider);
-    ref.invalidate(metricsProvider);
-    ref.invalidate(revenueProvider);
-    ref.invalidate(insightProvider);
     setState(() {
       _page = 0;
       _records = [];
@@ -114,6 +109,9 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
 
     final feeAsync = ref.watch(
       feeSummaryProvider(FeeSummaryParams(widget.studentId, from: from, to: to)),
+    );
+    final allTimeFeeAsync = ref.watch(
+      feeSummaryProvider(FeeSummaryParams(widget.studentId)),
     );
 
     return Scaffold(
@@ -160,24 +158,54 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   ),
                   error: (e, _) => Text('加载失败: $e'),
                   data: (fee) {
-                    final balanceColor = fee.balance < 0
-                        ? kRed
-                        : fee.balance > 0
-                            ? kGreen
-                            : kInkSecondary;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('本月费用', style: theme.textTheme.titleMedium),
+                        Text('本月出勤费用', style: theme.textTheme.titleMedium),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             _FeeItem('应收', fee.totalReceivable),
                             _FeeItem('已收', fee.totalReceived),
-                            _FeeItem('余额', fee.balance, color: balanceColor),
+                            _FeeItem('余额', fee.balance,
+                                color: fee.balance < 0
+                                    ? kRed
+                                    : fee.balance > 0
+                                        ? kGreen
+                                        : kInkSecondary),
                           ],
                         ),
+                        allTimeFeeAsync.whenOrNull(
+                          data: (allFee) {
+                            final balanceColor = allFee.balance < 0
+                                ? kRed
+                                : allFee.balance > 0
+                                    ? kGreen
+                                    : kInkSecondary;
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Row(
+                                children: [
+                                  Text('累计余额', style: theme.textTheme.bodySmall),
+                                  const SizedBox(width: 4),
+                                  Tooltip(
+                                    message: '累计余额 = 全部已收 - 全部应收\n正数 = 预存款，负数 = 欠费',
+                                    child: Icon(Icons.info_outline, size: 14, color: kInkSecondary),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '¥${allFee.balance.toStringAsFixed(2)}',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontFamily: 'NotoSansSC',
+                                      color: balanceColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ) ?? const SizedBox.shrink(),
                       ],
                     );
                   },
@@ -233,6 +261,14 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   title: Text('¥${p.amount.toStringAsFixed(2)}'),
                   subtitle: p.note != null && p.note!.isNotEmpty ? Text(p.note!) : null,
                   trailing: Text(p.paymentDate),
+                  onLongPress: () async {
+                    final ok = await AppToast.showConfirm(
+                        context, '确认删除该笔缴费记录（¥${p.amount.toStringAsFixed(2)}）？');
+                    if (!ok) return;
+                    await ref.read(paymentDaoProvider).delete(p.id);
+                    invalidateAfterPaymentChange(ref);
+                    _loadPayments();
+                  },
                 ),
               ),
             const SizedBox(height: 16),

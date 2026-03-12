@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/models/class_template.dart';
-import '../../../core/database/dao/class_template_dao.dart';
 import '../../../core/providers/class_template_provider.dart';
-import '../../../core/providers/database_provider.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -36,7 +34,7 @@ class TemplateScreen extends ConsumerWidget {
                         final ok = await AppToast.showConfirm(
                             context, '确认删除模板"${t.name}"？');
                         if (!ok) return;
-                        await ClassTemplateDao(ref.read(databaseProvider))
+                        await ref.read(classTemplateDaoProvider)
                             .delete(t.id);
                         ref.read(classTemplateProvider.notifier).reload();
                       },
@@ -130,6 +128,11 @@ class TemplateScreen extends ConsumerWidget {
                   final startStr = _fmtTime(startTime);
                   final endStr = _fmtTime(endTime);
 
+                  if (endStr.compareTo(startStr) <= 0) {
+                    AppToast.showError(stCtx, '结束时间必须晚于开始时间');
+                    return;
+                  }
+
                   // 检查重复
                   final existing = ref.read(classTemplateProvider).valueOrNull ?? [];
                   final dup = existing.any((e) =>
@@ -141,7 +144,7 @@ class TemplateScreen extends ConsumerWidget {
                     return;
                   }
 
-                  final dao = ClassTemplateDao(ref.read(databaseProvider));
+                  final dao = ref.read(classTemplateDaoProvider);
                   final now = DateTime.now().millisecondsSinceEpoch;
                   if (t == null) {
                     await dao.insert(ClassTemplate(

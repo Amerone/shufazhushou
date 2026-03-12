@@ -107,11 +107,11 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
               return Positioned(
                 bottom: 5,
                 child: Container(
-                  width: 7,
-                  height: 7,
+                  width: 16,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: color,
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               );

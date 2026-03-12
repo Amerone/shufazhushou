@@ -17,7 +17,7 @@ class StatisticsRange {
 String _pad(int n) => n.toString().padLeft(2, '0');
 String _fmt(DateTime d) => '${d.year}-${_pad(d.month)}-${_pad(d.day)}';
 
-StatisticsRange _buildRange(StatisticsPeriod period) {
+StatisticsRange buildStatisticsRange(StatisticsPeriod period) {
   final now = DateTime.now();
   switch (period) {
     case StatisticsPeriod.week:
@@ -36,4 +36,4 @@ StatisticsRange _buildRange(StatisticsPeriod period) {
 }
 
 final statisticsPeriodProvider =
-    StateProvider<StatisticsRange>((ref) => _buildRange(StatisticsPeriod.month));
+    StateProvider<StatisticsRange>((ref) => buildStatisticsRange(StatisticsPeriod.month));

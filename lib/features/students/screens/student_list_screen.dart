@@ -22,7 +22,9 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('学生'),
+        title: asyncStudents.whenOrNull(
+          data: (list) => Text('学生 (${list.length})'),
+        ) ?? const Text('学生'),
         actions: [
           IconButton(
             icon: const Icon(Icons.upload_file),
@@ -103,16 +105,25 @@ class _StudentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = meta.student;
     final theme = Theme.of(context);
-    return ListTile(
-      title: Text(displayNames[s.id] ?? s.name),
-      subtitle: Text('¥${s.pricePerClass.toStringAsFixed(0)}/节  ${s.status == 'active' ? '在读' : '休学'}'),
-      trailing: meta.lastAttendanceDate != null
-          ? Text(
-              meta.lastAttendanceDate!,
-              style: theme.textTheme.bodySmall,
-            )
-          : null,
-      onTap: () => context.push('/students/${s.id}'),
+    final isSuspended = s.status != 'active';
+    return Opacity(
+      opacity: isSuspended ? 0.55 : 1.0,
+      child: ListTile(
+        leading: isSuspended
+            ? const Icon(Icons.pause_circle_outline, color: Colors.grey)
+            : null,
+        title: Text(displayNames[s.id] ?? s.name),
+        subtitle: Text(isSuspended
+            ? '¥${s.pricePerClass.toStringAsFixed(0)}/节  休学'
+            : '¥${s.pricePerClass.toStringAsFixed(0)}/节  在读'),
+        trailing: meta.lastAttendanceDate != null
+            ? Text(
+                meta.lastAttendanceDate!,
+                style: theme.textTheme.bodySmall,
+              )
+            : null,
+        onTap: () => context.push('/students/${s.id}'),
+      ),
     );
   }
 }

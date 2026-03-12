@@ -35,22 +35,22 @@ class InsightNotifier extends AsyncNotifier<List<Insight>> {
     // Clean up expired dismissed insights
     await dismissedDao.deleteExpired();
 
+    // Batch load all data (~4 queries instead of N*3)
     final students = await studentDao.getAll();
     final displayNames = buildDisplayNameMap(students);
+    final allAttendance = await attendanceDao.getAllGroupedByStudent();
+    final allPayments = await paymentDao.getTotalByAllStudents();
+    final dismissedKeys = await dismissedDao.getAllActiveKeys();
+
     final insights = <Insight>[];
 
     for (final student in students) {
-      // Lazy cache for attendance records per student
-      List<dynamic>? records;
+      final records = allAttendance[student.id] ?? [];
+      final received = allPayments[student.id] ?? 0.0;
 
       // 欠费提醒
-      final dismissed = await dismissedDao.find('debt', student.id);
-      if (dismissed == null) {
-        records ??= await attendanceDao
-            .getByStudentAndDateRange(student.id, null, null);
+      if (!dismissedKeys.contains('debt:${student.id}')) {
         final receivable = records.fold<double>(0, (s, a) => s + a.feeAmount);
-        final received =
-            await paymentDao.getTotalByStudentAndDateRange(student.id, null, null);
         final balance = received - receivable;
         if (balance < 0) {
           insights.add(Insight(
@@ -64,11 +64,7 @@ class InsightNotifier extends AsyncNotifier<List<Insight>> {
 
       // 流失预警
       if (student.status == 'active') {
-        final churnDismissed =
-            await dismissedDao.find('churn', student.id);
-        if (churnDismissed == null) {
-          records ??= await attendanceDao.getByStudentAndDateRange(
-              student.id, null, null);
+        if (!dismissedKeys.contains('churn:${student.id}')) {
           final lastActive = records
               .where((r) => r.status == 'present' || r.status == 'late')
               .map((r) => r.date)
@@ -88,11 +84,7 @@ class InsightNotifier extends AsyncNotifier<List<Insight>> {
       }
 
       // 试听转化
-      final trialDismissed =
-          await dismissedDao.find('trial', student.id);
-      if (trialDismissed == null) {
-        records ??= await attendanceDao
-            .getByStudentAndDateRange(student.id, null, null);
+      if (!dismissedKeys.contains('trial:${student.id}')) {
         final hasTrial = records.any((r) => r.status == 'trial');
         final hasFormal = records
             .any((r) => r.status == 'present' || r.status == 'late');
@@ -108,8 +100,7 @@ class InsightNotifier extends AsyncNotifier<List<Insight>> {
     }
 
     // 高峰提示（全局，不关联学生）
-    final peakDismissed = await dismissedDao.find('peak', null);
-    if (peakDismissed == null) {
+    if (!dismissedKeys.contains('peak:')) {
       final now = DateTime.now();
       final weekStart =
           now.subtract(Duration(days: now.weekday - 1));

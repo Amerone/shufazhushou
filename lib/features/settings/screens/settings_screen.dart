@@ -7,26 +7,30 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/database/database_helper.dart';
-import '../../../core/providers/attendance_provider.dart';
-import '../../../core/providers/class_template_provider.dart';
-import '../../../core/providers/contribution_provider.dart';
-import '../../../core/providers/fee_summary_provider.dart';
-import '../../../core/providers/insight_provider.dart';
-import '../../../core/providers/metrics_provider.dart';
-import '../../../core/providers/revenue_provider.dart';
+import '../../../core/providers/invalidation_helper.dart';
+import '../../../core/providers/package_info_provider.dart';
 import '../../../core/providers/settings_provider.dart';
-import '../../../core/providers/student_provider.dart';
 import '../../../core/utils/seed_test_data.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  int _versionTapCount = 0;
+  bool _devMode = false;
+
+  @override
+  Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
+    final pkgInfo = ref.watch(packageInfoProvider);
+    final versionStr = pkgInfo.whenOrNull(data: (info) => info.version) ?? '';
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
@@ -46,7 +50,7 @@ class SettingsScreen extends ConsumerWidget {
                 title: const Text('老师姓名'),
                 subtitle: Text(settings['teacher_name'] ?? kDefaultTeacherName),
                 trailing: const Icon(Icons.edit),
-                onTap: () => _editTeacherName(context, ref, settings['teacher_name'] ?? kDefaultTeacherName),
+                onTap: () => _editTeacherName(settings['teacher_name'] ?? kDefaultTeacherName),
               ),
               const Divider(),
               ListTile(
@@ -88,31 +92,41 @@ class SettingsScreen extends ConsumerWidget {
                 title: const Text('默认寄语'),
                 subtitle: Text(settings['default_message_template'] ?? '未设置'),
                 trailing: const Icon(Icons.edit),
-                onTap: () => _editMessage(context, ref, settings['default_message_template'] ?? ''),
+                onTap: () => _editMessage(settings['default_message_template'] ?? ''),
               ),
               const Divider(),
               ListTile(
                 title: const Text('下载导入模板'),
                 trailing: const Icon(Icons.download),
-                onTap: () => _downloadTemplate(context),
+                onTap: () => _downloadTemplate(),
               ),
+              if (_devMode) ...[
+                const Divider(),
+                ListTile(
+                  title: const Text('生成测试数据'),
+                  subtitle: const Text('插入 20 名学生 x 250 条出勤记录'),
+                  trailing: const Icon(Icons.science),
+                  onTap: () => _seedTestData(),
+                ),
+                ListTile(
+                  title: Text('清除所有数据', style: TextStyle(color: kRed)),
+                  subtitle: const Text('删除全部学生、出勤、缴费等记录'),
+                  trailing: const Icon(Icons.delete_forever, color: kRed),
+                  onTap: () => _clearAllData(),
+                ),
+              ],
               const Divider(),
               ListTile(
-                title: const Text('生成测试数据'),
-                subtitle: const Text('插入 20 名学生 x 250 条出勤记录'),
-                trailing: const Icon(Icons.science),
-                onTap: () => _seedTestData(context, ref),
-              ),
-              ListTile(
-                title: Text('清除所有数据', style: TextStyle(color: kRed)),
-                subtitle: const Text('删除全部学生、出勤、缴费等记录'),
-                trailing: const Icon(Icons.delete_forever, color: kRed),
-                onTap: () => _clearAllData(context, ref),
-              ),
-              const Divider(),
-              const ListTile(
-                title: Text('关于'),
-                subtitle: Text('书法助手 v1.0.0'),
+                title: const Text('关于'),
+                subtitle: Text('书法助手 v$versionStr'),
+                onTap: () {
+                  if (_devMode) return;
+                  _versionTapCount++;
+                  if (_versionTapCount >= 5) {
+                    setState(() => _devMode = true);
+                    AppToast.showSuccess(context, '已进入开发者模式');
+                  }
+                },
               ),
             ],
           );
@@ -121,7 +135,7 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _editTeacherName(BuildContext context, WidgetRef ref, String current) {
+  void _editTeacherName(String current) {
     final ctrl = TextEditingController(text: current);
     showDialog(
       context: context,
@@ -142,7 +156,7 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _editMessage(BuildContext context, WidgetRef ref, String current) {
+  void _editMessage(String current) {
     final ctrl = TextEditingController(text: current);
     showDialog(
       context: context,
@@ -163,52 +177,42 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _seedTestData(BuildContext context, WidgetRef ref) async {
+  Future<void> _seedTestData() async {
     final confirmed = await AppToast.showConfirm(context, '将插入 20 名学生和约 5000 条出勤记录，确定继续吗？');
     if (!confirmed) return;
 
     try {
       final db = await DatabaseHelper.instance.database;
       await SeedTestData.run(db);
-      _invalidateAll(ref);
-      if (context.mounted) AppToast.showSuccess(context, '测试数据已生成');
+      invalidateAll(ref);
+      if (mounted) AppToast.showSuccess(context, '测试数据已生成');
     } catch (e) {
-      if (context.mounted) AppToast.showError(context, e.toString());
+      if (mounted) AppToast.showError(context, e.toString());
     }
   }
 
-  Future<void> _clearAllData(BuildContext context, WidgetRef ref) async {
+  Future<void> _clearAllData() async {
     final confirmed = await AppToast.showConfirm(context, '将删除所有数据且不可恢复，确定继续吗？');
     if (!confirmed) return;
 
     try {
       final db = await DatabaseHelper.instance.database;
-      await db.delete('attendance');
-      await db.delete('payments');
-      await db.delete('dismissed_insights');
-      await db.delete('class_templates');
-      await db.delete('settings');
-      await db.delete('students');
-      _invalidateAll(ref);
-      if (context.mounted) AppToast.showSuccess(context, '所有数据已清除');
+      await db.transaction((txn) async {
+        await txn.delete('attendance');
+        await txn.delete('payments');
+        await txn.delete('dismissed_insights');
+        await txn.delete('class_templates');
+        await txn.delete('settings');
+        await txn.delete('students');
+      });
+      invalidateAll(ref);
+      if (mounted) AppToast.showSuccess(context, '所有数据已清除');
     } catch (e) {
-      if (context.mounted) AppToast.showError(context, e.toString());
+      if (mounted) AppToast.showError(context, e.toString());
     }
   }
 
-  void _invalidateAll(WidgetRef ref) {
-    ref.invalidate(studentProvider);
-    ref.invalidate(attendanceProvider);
-    ref.invalidate(feeSummaryProvider);
-    ref.invalidate(metricsProvider);
-    ref.invalidate(revenueProvider);
-    ref.invalidate(contributionProvider);
-    ref.invalidate(insightProvider);
-    ref.invalidate(settingsProvider);
-    ref.invalidate(classTemplateProvider);
-  }
-
-  Future<void> _downloadTemplate(BuildContext context) async {
+  Future<void> _downloadTemplate() async {
     try {
       final excel = Excel.createExcel();
       final sheet = excel['Sheet1'];
@@ -227,7 +231,7 @@ class SettingsScreen extends ConsumerWidget {
       await file.writeAsBytes(bytes);
       await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
     } catch (e) {
-      if (context.mounted) AppToast.showError(context, e.toString());
+      if (mounted) AppToast.showError(context, e.toString());
     }
   }
 }

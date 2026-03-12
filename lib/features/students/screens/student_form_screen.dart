@@ -3,12 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/models/student.dart';
-import '../../../core/providers/attendance_provider.dart';
-import '../../../core/providers/contribution_provider.dart';
 import '../../../core/providers/fee_summary_provider.dart';
-import '../../../core/providers/insight_provider.dart';
-import '../../../core/providers/metrics_provider.dart';
-import '../../../core/providers/revenue_provider.dart';
+import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../shared/utils/toast.dart';
 
@@ -101,6 +97,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
       }
 
       await ref.read(studentProvider.notifier).reload();
+      if (_isEdit) ref.invalidate(feeSummaryProvider);
       if (mounted) context.pop();
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
@@ -117,12 +114,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
     try {
       await ref.read(studentDaoProvider).delete(widget.studentId!);
       await ref.read(studentProvider.notifier).reload();
-      ref.invalidate(attendanceProvider);
-      ref.invalidate(feeSummaryProvider);
-      ref.invalidate(metricsProvider);
-      ref.invalidate(revenueProvider);
-      ref.invalidate(contributionProvider);
-      ref.invalidate(insightProvider);
+      invalidateAfterStudentDelete(ref);
       if (mounted) context.pop();
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());

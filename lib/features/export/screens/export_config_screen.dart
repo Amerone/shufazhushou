@@ -3,12 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../../core/database/dao/attendance_dao.dart';
-import '../../../core/database/dao/payment_dao.dart';
 import '../../../core/models/attendance.dart';
 import '../../../core/models/payment.dart';
 import '../../../core/models/seal_config.dart';
-import '../../../core/providers/database_provider.dart';
+import '../../../core/providers/attendance_provider.dart';
+import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../core/utils/excel_exporter.dart';
@@ -49,11 +48,10 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
   }
 
   Future<_ExportData> _loadData() async {
-    final db = ref.read(databaseProvider);
     final from = _fmt(_from);
     final to = _fmt(_to);
-    final records = await AttendanceDao(db).getByStudentAndDateRange(widget.studentId, from, to);
-    final payments = await PaymentDao(db).getByStudent(widget.studentId);
+    final records = await ref.read(attendanceDaoProvider).getByStudentAndDateRange(widget.studentId, from, to);
+    final payments = await ref.read(paymentDaoProvider).getByStudent(widget.studentId);
     return _ExportData(records: records, payments: payments);
   }
 

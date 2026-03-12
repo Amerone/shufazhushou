@@ -54,4 +54,19 @@ class PaymentDao {
       ORDER BY month
     ''', [from, to]);
   }
+
+  /// Returns total payment amount per student for all students.
+  Future<Map<String, double>> getTotalByAllStudents() async {
+    final db = await _db.database;
+    final rows = await db.rawQuery('''
+      SELECT student_id, COALESCE(SUM(amount), 0) AS total
+      FROM payments
+      GROUP BY student_id
+    ''');
+    final result = <String, double>{};
+    for (final row in rows) {
+      result[row['student_id'] as String] = (row['total'] as num).toDouble();
+    }
+    return result;
+  }
 }

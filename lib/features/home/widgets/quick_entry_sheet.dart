@@ -5,10 +5,7 @@ import '../../../core/models/attendance.dart';
 import '../../../core/models/student.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/class_template_provider.dart';
-import '../../../core/providers/fee_summary_provider.dart';
-import '../../../core/providers/insight_provider.dart';
-import '../../../core/providers/metrics_provider.dart';
-import '../../../core/providers/revenue_provider.dart';
+import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../core/utils/fee_calculator.dart';
 import '../../../shared/constants.dart';
@@ -32,6 +29,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   String _endTime = '10:00';
   late DateTime _date;
   bool _saving = false;
+  bool _showSuspended = false;
 
   static const _statuses = [
     ('present', '出勤'),
@@ -51,10 +49,21 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
 
   Future<void> _save() async {
     if (_saving) return;
+    if (_endTime.compareTo(_startTime) <= 0) {
+      AppToast.showError(context, '结束时间必须晚于开始时间');
+      return;
+    }
     setState(() => _saving = true);
     try {
       final dao = ref.read(attendanceDaoProvider);
       final students = ref.read(studentProvider).valueOrNull ?? [];
+      final existingIds = students.map((m) => m.student.id).toSet();
+      // Remove IDs for students that no longer exist
+      _selectedIds.retainAll(existingIds);
+      if (_selectedIds.isEmpty) {
+        if (mounted) AppToast.showError(context, '没有可保存的学生');
+        return;
+      }
       final selectedStudents =
           students.where((m) => _selectedIds.contains(m.student.id)).toList();
 
@@ -84,16 +93,11 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           AttendanceStatus.values.firstWhere((e) => e.name == _status);
       final now = DateTime.now().millisecondsSinceEpoch;
 
+      final records = <Attendance>[];
       for (final m in selectedStudents) {
-        // 覆盖：先删除冲突记录
-        final oldId = conflictIds[m.student.id];
-        if (oldId != null) {
-          await dao.delete(oldId);
-        }
-
         final price = m.student.pricePerClass;
         final fee = FeeCalculator.calcFee(statusEnum, price);
-        final record = Attendance(
+        records.add(Attendance(
           id: const Uuid().v4(),
           studentId: m.student.id,
           date: _dateStr(),
@@ -104,17 +108,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           feeAmount: fee,
           createdAt: now,
           updatedAt: now,
-        );
-        await dao.insert(record);
+        ));
       }
 
-      ref.invalidate(attendanceProvider);
-      ref.invalidate(metricsProvider);
-      ref.invalidate(revenueProvider);
-      ref.invalidate(insightProvider);
-      ref.invalidate(feeSummaryProvider);
+      await dao.batchInsertWithConflictReplace(records, conflictIds);
 
-      if (mounted) Navigator.of(context).pop();
+      invalidateAfterAttendanceChange(ref);
+
+      if (mounted) {
+        AppToast.showSuccess(context, '已保存 ${selectedStudents.length} 条出勤记录');
+        Navigator.of(context).pop();
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -171,14 +175,20 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
 
   Widget _buildStep0(ScrollController controller) {
     final students = ref.watch(studentProvider).valueOrNull ?? [];
-    final filtered = _searchQuery.isEmpty
+    final activeStudents = _showSuspended
         ? students
-        : students.where((m) {
+        : students.where((m) => m.student.status == 'active').toList();
+    final filtered = _searchQuery.isEmpty
+        ? activeStudents
+        : activeStudents.where((m) {
             return m.student.name.contains(_searchQuery) ||
                 (m.student.parentPhone?.contains(_searchQuery) ?? false);
           }).toList();
 
     final displayNames = buildDisplayNameMap(filtered.map((m) => m.student).toList());
+    final filteredIds = filtered.map((m) => m.student.id).toSet();
+    final allFilteredSelected = filteredIds.isNotEmpty &&
+        filteredIds.every((id) => _selectedIds.contains(id));
 
     return Column(
       children: [
@@ -193,7 +203,40 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
             onChanged: (v) => setState(() => _searchQuery = v.trim()),
           ),
         ),
-        const SizedBox(height: 8),
+        if (filtered.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 8, right: 16),
+            child: Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    if (allFilteredSelected) {
+                      _selectedIds.removeAll(filteredIds);
+                    } else {
+                      _selectedIds.addAll(filteredIds);
+                    }
+                  }),
+                  icon: Icon(
+                    allFilteredSelected
+                        ? Icons.deselect
+                        : Icons.select_all,
+                    size: 20,
+                  ),
+                  label: Text(allFilteredSelected ? '取消全选' : '全选'),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () => setState(() => _showSuspended = !_showSuspended),
+                  icon: Icon(
+                    _showSuspended ? Icons.visibility_off : Icons.visibility,
+                    size: 20,
+                  ),
+                  label: Text(_showSuspended ? '隐藏休学' : '显示休学'),
+                ),
+              ],
+            ),
+          ),
+        if (filtered.isEmpty) const SizedBox(height: 8),
         Expanded(
           child: ListView.builder(
             controller: controller,
@@ -344,7 +387,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton(
-                onPressed: () => setState(() => _step = 2),
+                onPressed: () {
+                  if (_endTime.compareTo(_startTime) <= 0) {
+                    AppToast.showError(context, '结束时间必须晚于开始时间');
+                    return;
+                  }
+                  setState(() => _step = 2);
+                },
                 child: const Text('下一步'),
               ),
             ),

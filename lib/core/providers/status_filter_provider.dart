@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../database/dao/attendance_dao.dart';
 import '../models/attendance.dart';
-import 'database_provider.dart';
+import 'attendance_provider.dart';
 import 'statistics_period_provider.dart';
 
 // null = 未筛选（显示全部）
@@ -15,6 +14,6 @@ final filteredAttendanceProvider = FutureProvider<List<Attendance>>((ref) async 
   if (status == null) return [];
 
   final range = ref.watch(statisticsPeriodProvider);
-  final dao = AttendanceDao(ref.read(databaseProvider));
+  final dao = ref.read(attendanceDaoProvider);
   return dao.getByDateRangeAndStatus(range.from, range.to, status);
 });

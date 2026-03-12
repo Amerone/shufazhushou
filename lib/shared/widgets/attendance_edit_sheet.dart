@@ -2,10 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/attendance.dart';
 import '../../core/providers/attendance_provider.dart';
-import '../../core/providers/fee_summary_provider.dart';
-import '../../core/providers/insight_provider.dart';
-import '../../core/providers/metrics_provider.dart';
-import '../../core/providers/revenue_provider.dart';
+import '../../core/providers/invalidation_helper.dart';
 import '../../core/utils/fee_calculator.dart';
 import '../constants.dart';
 import '../theme.dart';
@@ -56,6 +53,10 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
 
   Future<void> _save() async {
     if (_saving) return;
+    if (_endTime.compareTo(_startTime) <= 0) {
+      AppToast.showError(context, '结束时间必须晚于开始时间');
+      return;
+    }
     setState(() => _saving = true);
     try {
       final dao = ref.read(attendanceDaoProvider);
@@ -106,11 +107,7 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
   }
 
   void _invalidate() {
-    ref.invalidate(attendanceProvider);
-    ref.invalidate(feeSummaryProvider);
-    ref.invalidate(metricsProvider);
-    ref.invalidate(revenueProvider);
-    ref.invalidate(insightProvider);
+    invalidateAfterAttendanceChange(ref);
   }
 
   @override

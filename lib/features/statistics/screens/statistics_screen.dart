@@ -1,17 +1,11 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../../core/database/dao/attendance_dao.dart';
-import '../../../core/database/dao/student_dao.dart';
 import '../../../core/models/student.dart';
-import '../../../core/providers/contribution_provider.dart';
-import '../../../core/providers/database_provider.dart';
-import '../../../core/providers/heatmap_provider.dart';
-import '../../../core/providers/insight_provider.dart';
-import '../../../core/providers/metrics_provider.dart';
-import '../../../core/providers/revenue_provider.dart';
+import '../../../core/providers/attendance_provider.dart';
+import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/statistics_period_provider.dart';
-import '../../../core/providers/status_distribution_provider.dart';
+import '../../../core/providers/student_provider.dart';
 import '../../../core/utils/excel_exporter.dart';
 import '../../../shared/utils/toast.dart';
 import '../widgets/contribution_chart.dart';
@@ -40,12 +34,7 @@ class StatisticsScreen extends ConsumerWidget {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(metricsProvider);
-          ref.invalidate(revenueProvider);
-          ref.invalidate(contributionProvider);
-          ref.invalidate(statusDistributionProvider);
-          ref.invalidate(heatmapProvider);
-          ref.invalidate(insightProvider);
+          invalidateStatistics(ref);
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
@@ -76,11 +65,10 @@ class StatisticsScreen extends ConsumerWidget {
 
   Future<void> _exportAttendance(BuildContext context, WidgetRef ref) async {
     final range = ref.read(statisticsPeriodProvider);
-    final db = ref.read(databaseProvider);
 
     try {
-      final records = await AttendanceDao(db).getByDateRange(range.from, range.to);
-      final students = await StudentDao(db).getAll();
+      final records = await ref.read(attendanceDaoProvider).getByDateRange(range.from, range.to);
+      final students = await ref.read(studentDaoProvider).getAll();
       final nameMap = buildDisplayNameMap(students);
 
       final path = await ExcelExporter.exportAllAttendance(

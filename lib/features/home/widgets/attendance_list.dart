@@ -1,10 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/attendance_provider.dart';
-import '../../../core/providers/fee_summary_provider.dart';
-import '../../../core/providers/insight_provider.dart';
-import '../../../core/providers/metrics_provider.dart';
-import '../../../core/providers/revenue_provider.dart';
+import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
@@ -64,11 +61,7 @@ class AttendanceList extends ConsumerWidget {
                   final confirm = await AppToast.showConfirm(context, '确认删除此出勤记录？');
                   if (!confirm) return;
                   await ref.read(attendanceDaoProvider).delete(r.id);
-                  ref.invalidate(attendanceProvider);
-                  ref.invalidate(feeSummaryProvider);
-                  ref.invalidate(metricsProvider);
-                  ref.invalidate(revenueProvider);
-                  ref.invalidate(insightProvider);
+                  invalidateAfterAttendanceChange(ref);
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

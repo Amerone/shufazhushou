@@ -20,6 +20,22 @@ class AttendanceDao {
     await db.delete('attendance', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Batch insert attendance records within a transaction.
+  /// For each record, deletes any conflicting record (by id) before inserting.
+  Future<void> batchInsertWithConflictReplace(
+      List<Attendance> records, Map<String, String> conflictIds) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      for (final record in records) {
+        final oldId = conflictIds[record.studentId];
+        if (oldId != null) {
+          await txn.delete('attendance', where: 'id = ?', whereArgs: [oldId]);
+        }
+        await txn.insert('attendance', record.toMap());
+      }
+    });
+  }
+
   Future<List<Attendance>> getByDate(String date) async {
     final db = await _db.database;
     final rows = await db.query('attendance', where: 'date = ?', whereArgs: [date]);
@@ -159,5 +175,17 @@ class AttendanceDao {
       WHERE date >= ? AND date <= ?
     ''', [from, to]);
     return rows.first;
+  }
+
+  /// Returns all attendance records grouped by student_id.
+  Future<Map<String, List<Attendance>>> getAllGroupedByStudent() async {
+    final db = await _db.database;
+    final rows = await db.query('attendance', orderBy: 'date DESC');
+    final result = <String, List<Attendance>>{};
+    for (final row in rows) {
+      final record = Attendance.fromMap(row);
+      result.putIfAbsent(record.studentId, () => []).add(record);
+    }
+    return result;
   }
 }

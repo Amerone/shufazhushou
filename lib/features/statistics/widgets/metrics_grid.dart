@@ -22,8 +22,15 @@ class MetricsGrid extends ConsumerWidget {
           ],
           selected: {period.period},
           onSelectionChanged: (s) {
-            ref.read(statisticsPeriodProvider.notifier).state = _buildRange(s.first);
+            ref.read(statisticsPeriodProvider.notifier).state = buildStatisticsRange(s.first);
           },
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            '${period.from} ~ ${period.to}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: kInkSecondary),
+          ),
         ),
         const SizedBox(height: 12),
         asyncMetrics.when(
@@ -83,34 +90,5 @@ class _MetricCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-StatisticsRange _buildRange(StatisticsPeriod period) {
-  final now = DateTime.now();
-
-  String pad(int n) => n.toString().padLeft(2, '0');
-  String fmt(DateTime d) => '${d.year}-${pad(d.month)}-${pad(d.day)}';
-
-  switch (period) {
-    case StatisticsPeriod.week:
-      final start = now.subtract(Duration(days: now.weekday - 1));
-      return StatisticsRange(
-        period: period,
-        from: fmt(start),
-        to: fmt(start.add(const Duration(days: 6))),
-      );
-    case StatisticsPeriod.month:
-      return StatisticsRange(
-        period: period,
-        from: '${now.year}-${pad(now.month)}-01',
-        to: '${now.year}-${pad(now.month)}-${DateTime(now.year, now.month + 1, 0).day}',
-      );
-    case StatisticsPeriod.year:
-      return StatisticsRange(
-        period: period,
-        from: '${now.year}-01-01',
-        to: '${now.year}-12-31',
-      );
   }
 }

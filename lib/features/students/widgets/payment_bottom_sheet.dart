@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/models/payment.dart';
 import '../../../core/providers/fee_summary_provider.dart';
-import '../../../core/providers/insight_provider.dart';
-import '../../../core/providers/revenue_provider.dart';
+import '../../../core/providers/invalidation_helper.dart';
 import '../../../shared/constants.dart' show formatDate;
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
@@ -47,9 +46,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
       );
 
       await ref.read(paymentDaoProvider).insert(payment);
-      ref.invalidate(feeSummaryProvider);
-      ref.invalidate(revenueProvider);
-      ref.invalidate(insightProvider);
+      invalidateAfterPaymentChange(ref);
 
       if (mounted) Navigator.of(context).pop();
     } catch (e) {

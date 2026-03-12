@@ -46,4 +46,17 @@ class DismissedInsightDao {
       ],
     );
   }
+
+  /// Returns all active (non-expired) dismissed insights as a set of 'type:studentId' keys.
+  Future<Set<String>> getAllActiveKeys() async {
+    final db = await _db.database;
+    final rows = await db.query('dismissed_insights');
+    final result = <String>{};
+    for (final row in rows) {
+      final type = row['insight_type'] as String;
+      final studentId = row['student_id'] as String?;
+      result.add('$type:${studentId ?? ''}');
+    }
+    return result;
+  }
 }

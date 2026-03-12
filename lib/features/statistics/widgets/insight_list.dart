@@ -2,9 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
-import '../../../core/database/dao/dismissed_insight_dao.dart';
 import '../../../core/models/dismissed_insight.dart';
-import '../../../core/providers/database_provider.dart';
 import '../../../core/providers/insight_provider.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
@@ -47,7 +45,11 @@ class InsightList extends ConsumerWidget {
           children: insights.map((insight) {
             return Card(
               child: ListTile(
-                title: Text('${_typeLabel[insight.type] ?? ''} · ${insight.studentName}'),
+                title: Text(
+                  insight.studentName.isEmpty
+                      ? (_typeLabel[insight.type] ?? '')
+                      : '${_typeLabel[insight.type] ?? ''} · ${insight.studentName}',
+                ),
                 subtitle: Text(insight.message),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -59,7 +61,7 @@ class InsightList extends ConsumerWidget {
                       ),
                     TextButton(
                       onPressed: () async {
-                        await DismissedInsightDao(ref.read(databaseProvider)).insert(
+                        await ref.read(dismissedInsightDaoProvider).insert(
                           DismissedInsight(
                             id: const Uuid().v4(),
                             insightType: insight.type.name,
