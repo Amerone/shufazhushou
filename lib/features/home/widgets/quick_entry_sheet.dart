@@ -318,15 +318,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
             Expanded(
               child: InkWell(
                 onTap: () async {
-                  final parts = _startTime.split(':');
                   final t = await showTimeWheelPicker(
                     context: context,
-                    initialTime: TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1])),
+                    initialTime: parseTime(_startTime),
                     label: '开始时间',
                   );
                   if (t != null) {
                     setState(() {
-                      _startTime = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+                      _startTime = formatTime(t);
                     });
                   }
                 },
@@ -340,15 +339,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
             Expanded(
               child: InkWell(
                 onTap: () async {
-                  final parts = _endTime.split(':');
                   final t = await showTimeWheelPicker(
                     context: context,
-                    initialTime: TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1])),
+                    initialTime: parseTime(_endTime),
                     label: '结束时间',
                   );
                   if (t != null) {
                     setState(() {
-                      _endTime = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+                      _endTime = formatTime(t);
                     });
                   }
                 },

@@ -65,11 +65,13 @@ class InsightNotifier extends AsyncNotifier<List<Insight>> {
       // 流失预警
       if (student.status == 'active') {
         if (!dismissedKeys.contains('churn:${student.id}')) {
-          final lastActive = records
+          final activeDates = records
               .where((r) => r.status == 'present' || r.status == 'late')
-              .map((r) => r.date)
-              .fold<String?>('', (a, b) => (a == null || b.compareTo(a) > 0) ? b : a);
-          if (lastActive != null && lastActive.isNotEmpty) {
+              .map((r) => r.date);
+          final lastActive = activeDates.isEmpty
+              ? null
+              : activeDates.reduce((a, b) => b.compareTo(a) > 0 ? b : a);
+          if (lastActive != null) {
             final last = DateTime.parse(lastActive);
             if (DateTime.now().difference(last).inDays >= kChurnDays) {
               insights.add(Insight(

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/models/seal_config.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/seal_stamp_widget.dart';
@@ -91,7 +92,7 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
                       ),
                       const SizedBox(height: 26),
                       Text(
-                        '院城墨点',
+                        kDefaultInstitutionName,
                         style: TextStyle(
                           fontFamily: 'MaShanZheng',
                           fontSize: 44,
@@ -109,7 +110,7 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
                       ),
                       const SizedBox(height: 14),
                       const Text(
-                        '执笔有境  观心成章',
+                        kDefaultInstitutionMotto,
                         style: TextStyle(
                           fontFamily: 'MaShanZheng',
                           fontSize: 18,

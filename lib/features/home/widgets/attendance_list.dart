@@ -4,7 +4,6 @@ import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../shared/constants.dart';
-import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/attendance_edit_sheet.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -44,8 +43,8 @@ class AttendanceList extends ConsumerWidget {
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (_, i) {
             final r = records[i];
-            final status = kStatusLabel[r.status] ?? r.status;
-            final statusColor = kStatusColor[r.status] ?? kInkSecondary;
+            final status = statusLabel(r.status);
+            final sColor = statusColor(r.status);
 
             return Material(
               color: theme.colorScheme.surface.withValues(alpha: 0.9),
@@ -71,7 +70,7 @@ class AttendanceList extends ConsumerWidget {
                         width: 8,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.85),
+                          color: sColor.withValues(alpha: 0.85),
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
@@ -95,13 +94,13 @@ class AttendanceList extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.12),
+                          color: sColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           status,
                           style: TextStyle(
-                            color: statusColor,
+                            color: sColor,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),

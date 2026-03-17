@@ -12,6 +12,12 @@ class BackupHelper {
   }
 
   static Future<String> backup() async {
+    // Flush WAL to ensure the .db file contains all data
+    try {
+      final db = await DatabaseHelper.instance.database;
+      await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+    } catch (_) {}
+
     final dbPath = p.join(await getDatabasesPath(), 'calligraphy_assistant.db');
     final downloadsDir = Directory('/storage/emulated/0/Download/书法助手备份');
     await downloadsDir.create(recursive: true);
@@ -25,23 +31,51 @@ class BackupHelper {
   /// Throws on error.
   static Future<bool> restore() async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['db'],
-      withData: false,
+      type: FileType.any,
     );
     if (result == null) return false;
     final srcPath = result.files.single.path;
     if (srcPath == null) return false;
 
-    final dbPath = p.join(await getDatabasesPath(), 'calligraphy_assistant.db');
+    // Validate SQLite file header
+    final srcFile = File(srcPath);
+    final raf = await srcFile.open(mode: FileMode.read);
+    try {
+      final header = await raf.read(16);
+      if (header.length < 15 ||
+          String.fromCharCodes(header.take(15)) != 'SQLite format 3') {
+        throw Exception('所选文件不是有效的数据库备份');
+      }
+    } finally {
+      await raf.close();
+    }
+
+    final dbPath =
+        p.join(await getDatabasesPath(), 'calligraphy_assistant.db');
+
+    // Ensure databases directory exists (critical after app reinstall)
+    final dbDir = Directory(p.dirname(dbPath));
+    if (!await dbDir.exists()) {
+      await dbDir.create(recursive: true);
+    }
+
     // Close DB before overwrite
     try {
       final db = await DatabaseHelper.instance.database;
+      await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
       await db.close();
     } catch (_) {
       // DB may not be open yet, ignore
     }
     DatabaseHelper.instance.resetForRestore();
+
+    // Delete WAL and SHM journal files — they belong to the old database
+    // and will corrupt the restored database if left in place.
+    for (final suffix in ['-wal', '-shm', '-journal']) {
+      final f = File('$dbPath$suffix');
+      if (await f.exists()) await f.delete();
+    }
+
     await File(srcPath).copy(dbPath);
     return true;
   }

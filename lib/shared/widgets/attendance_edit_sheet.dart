@@ -180,18 +180,14 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
               Expanded(
                 child: InkWell(
                   onTap: () async {
-                    final parts = _startTime.split(':');
                     final picked = await showTimeWheelPicker(
                       context: context,
-                      initialTime: TimeOfDay(
-                        hour: int.parse(parts[0]),
-                        minute: int.parse(parts[1]),
-                      ),
+                      initialTime: parseTime(_startTime),
                       label: '开始时间',
                     );
                     if (picked != null) {
                       setState(() {
-                        _startTime = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                        _startTime = formatTime(picked);
                       });
                     }
                   },
@@ -205,18 +201,14 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
               Expanded(
                 child: InkWell(
                   onTap: () async {
-                    final parts = _endTime.split(':');
                     final picked = await showTimeWheelPicker(
                       context: context,
-                      initialTime: TimeOfDay(
-                        hour: int.parse(parts[0]),
-                        minute: int.parse(parts[1]),
-                      ),
+                      initialTime: parseTime(_endTime),
                       label: '结束时间',
                     );
                     if (picked != null) {
                       setState(() {
-                        _endTime = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                        _endTime = formatTime(picked);
                       });
                     }
                   },

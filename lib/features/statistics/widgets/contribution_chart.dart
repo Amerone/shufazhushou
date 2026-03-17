@@ -133,7 +133,7 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
                         children: [
                           Container(width: 10, height: 10, color: e.value),
                           const SizedBox(width: 4),
-                          Text(kStatusLabel[e.key] ?? e.key, style: theme.textTheme.bodySmall),
+                          Text(kStatusLabel[e.key] ?? e.key.name, style: theme.textTheme.bodySmall),
                         ],
                       ),
                     )
@@ -158,7 +158,7 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
       'trial': ((item['trialCount'] as num?) ?? 0).toDouble(),
     }.entries) {
       if (entry.value > 0) {
-        parts.add(_Segment(entry.value / total, kStatusColor[entry.key] ?? kInkSecondary));
+        parts.add(_Segment(entry.value / total, statusColor(entry.key)));
       }
     }
 
@@ -220,8 +220,8 @@ class StatusPieChart extends ConsumerWidget {
 
                 return PieChartSectionData(
                   value: count.toDouble(),
-                  color: kStatusColor[status] ?? kInkSecondary,
-                  title: '${kStatusLabel[status] ?? status}\n$count',
+                  color: statusColor(status),
+                  title: '${statusLabel(status)}\n$count',
                   radius: isSelected ? 70 : 60,
                   titleStyle: const TextStyle(fontSize: 10, color: Colors.white),
                 );

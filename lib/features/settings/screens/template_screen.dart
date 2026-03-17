@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/models/class_template.dart';
 import '../../../core/providers/class_template_provider.dart';
+import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -53,8 +54,8 @@ class TemplateScreen extends ConsumerWidget {
 
   void _showForm(BuildContext context, WidgetRef ref, ClassTemplate? t) {
     final nameCtrl = TextEditingController(text: t?.name ?? '');
-    TimeOfDay startTime = _parseTime(t?.startTime ?? '09:00');
-    TimeOfDay endTime = _parseTime(t?.endTime ?? '10:00');
+    TimeOfDay startTime = parseTime(t?.startTime ?? '09:00');
+    TimeOfDay endTime = parseTime(t?.endTime ?? '10:00');
 
     showModalBottomSheet(
       context: context,
@@ -93,7 +94,7 @@ class TemplateScreen extends ConsumerWidget {
                     },
                     child: InputDecorator(
                       decoration: const InputDecoration(labelText: '开始时间'),
-                      child: Text(_fmtTime(startTime)),
+                      child: Text(formatTime(startTime)),
                     ),
                   ),
                 ),
@@ -110,7 +111,7 @@ class TemplateScreen extends ConsumerWidget {
                     },
                     child: InputDecorator(
                       decoration: const InputDecoration(labelText: '结束时间'),
-                      child: Text(_fmtTime(endTime)),
+                      child: Text(formatTime(endTime)),
                     ),
                   ),
                 ),
@@ -125,8 +126,8 @@ class TemplateScreen extends ConsumerWidget {
                     AppToast.showError(stCtx, '请输入模板名称');
                     return;
                   }
-                  final startStr = _fmtTime(startTime);
-                  final endStr = _fmtTime(endTime);
+                  final startStr = formatTime(startTime);
+                  final endStr = formatTime(endTime);
 
                   if (endStr.compareTo(startStr) <= 0) {
                     AppToast.showError(stCtx, '结束时间必须晚于开始时间');
@@ -173,12 +174,4 @@ class TemplateScreen extends ConsumerWidget {
       ),
     );
   }
-
-  static TimeOfDay _parseTime(String s) {
-    final parts = s.split(':');
-    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-  }
-
-  static String _fmtTime(TimeOfDay t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 }

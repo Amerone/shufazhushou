@@ -33,7 +33,7 @@ class ExcelExporter {
         TextCellValue(r.date),
         TextCellValue(r.startTime),
         TextCellValue(r.endTime),
-        TextCellValue(kStatusLabel[r.status] ?? r.status),
+        TextCellValue(statusLabel(r.status)),
         DoubleCellValue(r.priceSnapshot),
         DoubleCellValue(r.feeAmount),
         TextCellValue(r.note ?? ''),
@@ -70,7 +70,8 @@ class ExcelExporter {
 
     excel.delete('Sheet1');
 
-    final bytes = excel.encode()!;
+    final bytes = excel.encode();
+    if (bytes == null) throw Exception('Excel 编码失败');
     final dir = await getTemporaryDirectory();
     final path = p.join(dir.path, '${student.name}_${from}_$to.xlsx');
     await File(path).writeAsBytes(bytes);
@@ -94,7 +95,8 @@ class ExcelExporter {
 
     excel.delete('Sheet1');
 
-    final bytes = excel.encode()!;
+    final bytes = excel.encode();
+    if (bytes == null) throw Exception('Excel 编码失败');
     final dir = await getTemporaryDirectory();
     final path = p.join(dir.path, '出勤汇总_${from}_$to.xlsx');
     await File(path).writeAsBytes(bytes);
@@ -183,7 +185,7 @@ class ExcelExporter {
         TextCellValue(r.startTime),
         TextCellValue(r.endTime),
         TextCellValue(name),
-        TextCellValue(kStatusLabel[r.status] ?? r.status),
+        TextCellValue(statusLabel(r.status)),
         DoubleCellValue(r.feeAmount),
         TextCellValue(r.note ?? ''),
       ]);

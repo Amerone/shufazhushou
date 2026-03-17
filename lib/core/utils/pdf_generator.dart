@@ -8,16 +8,9 @@ import '../models/seal_config.dart';
 import '../models/student.dart';
 import '../models/attendance.dart';
 import '../models/payment.dart';
+import '../../shared/constants.dart';
 
 class PdfGenerator {
-  static const _statusLabel = {
-    'present': '出勤',
-    'late': '迟到',
-    'leave': '请假',
-    'absent': '缺勤',
-    'trial': '试听',
-  };
-
   // 宣纸暖色
   static const _paperColor = PdfColor.fromInt(0xFFF5F1E8);
   // 印章红
@@ -34,6 +27,7 @@ class PdfGenerator {
     required String message,
     required bool watermark,
     required SealConfig sealConfig,
+    String institutionName = kDefaultInstitutionName,
   }) async {
     final fontData = await rootBundle.load('assets/fonts/NotoSansSC-Regular.ttf');
     final ttf = pw.Font.ttf(fontData);
@@ -54,7 +48,7 @@ class PdfGenerator {
           child: pw.Opacity(
             opacity: 0.12,
             child: pw.Text(
-              '院城墨点，仅供${student.name}家长核对',
+              '$institutionName，仅供${student.name}家长核对',
               style: pw.TextStyle(font: calliFont, fontSize: 36),
             ),
           ),
@@ -225,7 +219,7 @@ class PdfGenerator {
                 ...records.map((r) => pw.TableRow(children: [
                   _cell(r.date, style),
                   _cell('${r.startTime}–${r.endTime}', style),
-                  _cell(_statusLabel[r.status] ?? r.status, style),
+                  _cell(statusLabel(r.status), style),
                   _cell('¥${r.feeAmount.toStringAsFixed(0)}', style),
                 ])),
               ],

@@ -60,6 +60,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   Future<void> _loadPayments() async {
     final dao = ref.read(paymentDaoProvider);
     final list = await dao.getByStudent(widget.studentId);
+    if (!mounted) return;
     setState(() => _payments = list);
   }
 
@@ -70,6 +71,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       final dao = ref.read(attendanceDaoProvider);
       final batch = await dao.getByStudentPaged(
           widget.studentId, _pageSize, _page * _pageSize);
+      if (!mounted) return;
       setState(() {
         _records = [..._records, ...batch];
         _hasMore = batch.length == _pageSize;
@@ -339,13 +341,13 @@ class _AttendanceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = kStatusColor[record.status] ?? kInkSecondary;
+    final sColor = statusColor(record.status);
     return ListTile(
       leading: Container(
         width: 4,
         height: 32,
         decoration: BoxDecoration(
-          color: statusColor,
+          color: sColor,
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -354,12 +356,12 @@ class _AttendanceTile extends StatelessWidget {
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: statusColor.withValues(alpha: 0.12),
+          color: sColor.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
-          kStatusLabel[record.status] ?? record.status,
-          style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w600),
+          statusLabel(record.status),
+          style: TextStyle(color: sColor, fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
       onTap: onTap,
