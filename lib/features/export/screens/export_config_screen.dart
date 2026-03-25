@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
@@ -15,6 +15,7 @@ import '../../../core/utils/pdf_generator.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
+import '../../../shared/widgets/glass_card.dart';
 
 class ExportConfigScreen extends ConsumerStatefulWidget {
   final String studentId;
@@ -144,15 +145,14 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: EdgeInsets.only(
+    return GlassCard(
+      margin: EdgeInsets.only(
         left: 16,
         right: 16,
         top: 8,
         bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 16,
       ),
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -161,22 +161,24 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
             child: Container(
               width: 36,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 12),
+              margin: const EdgeInsets.only(bottom: 24),
               decoration: BoxDecoration(
                 color: kInkSecondary.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
-          Text('生成报告', style: theme.textTheme.titleLarge?.copyWith(fontSize: 21)),
-          const SizedBox(height: 12),
+          Text(
+            '生成报告',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('开始', style: theme.textTheme.bodySmall),
-                  subtitle: Text(_fmt(_from)),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () async {
                     final d = await showDatePicker(
                       context: context,
@@ -186,14 +188,24 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                     );
                     if (d != null) setState(() => _from = d);
                   },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: '开始时间',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      fillColor: Colors.white.withValues(alpha: 0.5),
+                    ),
+                    child: Text(_fmt(_from), style: const TextStyle(fontSize: 16)),
+                  ),
                 ),
               ),
-              const Text(' - '),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(Icons.arrow_forward_outlined, size: 16, color: kInkSecondary),
+              ),
               Expanded(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('结束', style: theme.textTheme.bodySmall),
-                  subtitle: Text(_fmt(_to)),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () async {
                     final d = await showDatePicker(
                       context: context,
@@ -203,23 +215,37 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                     );
                     if (d != null) setState(() => _to = d);
                   },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: '结束时间',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      fillColor: Colors.white.withValues(alpha: 0.5),
+                    ),
+                    child: Text(_fmt(_to), style: const TextStyle(fontSize: 16)),
+                  ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 24),
           TextField(
             controller: _msgCtrl,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: '寄语',
               counterText: '',
               hintText: '如：本月表现优秀，继续加油！',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.5),
             ),
             maxLength: 200,
             maxLines: 3,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: const [
               _PresetChip('本月表现优秀，继续加油！'),
               _PresetChip('进步明显，期待更好的作品'),
@@ -227,17 +253,21 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
               _PresetChip('笔法渐入佳境，望持之以恒'),
             ].map((chip) => ActionChip(
               label: Text(chip.text, style: const TextStyle(fontSize: 12)),
+              backgroundColor: Colors.white.withValues(alpha: 0.5),
+              side: BorderSide(color: kInkSecondary.withValues(alpha: 0.2)),
               onPressed: () {
                 _msgCtrl.text = chip.text;
                 setState(() {});
               },
             )).toList(),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 24),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('启用水印'),
+            title: const Text('启用水印', style: TextStyle(fontWeight: FontWeight.w500)),
+            subtitle: const Text('导出PDF时包含水印', style: TextStyle(fontSize: 12, color: kInkSecondary)),
             value: _watermark,
+            activeThumbColor: kPrimaryBlue,
             onChanged: (v) async {
               if (!v) {
                 final ok = await AppToast.showConfirm(context, '确认关闭水印？');
@@ -246,30 +276,48 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
               setState(() => _watermark = v);
             },
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                   onPressed: _loading ? null : _previewPdf,
-                  child: const Text('预览 PDF'),
+                  icon: const Icon(Icons.preview_outlined),
+                  label: const Text('预览 PDF'),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: ElevatedButton(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                   onPressed: _loading ? null : _sharePdf,
-                  child: const Text('分享 PDF'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _loading ? null : _exportExcel,
-                  child: const Text('导出 Excel'),
+                  icon: const Icon(Icons.share_outlined),
+                  label: const Text('分享 PDF'),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                side: BorderSide(color: kGreen.withValues(alpha: 0.5)),
+                foregroundColor: kGreen,
+              ),
+              onPressed: _loading ? null : _exportExcel,
+              icon: const Icon(Icons.table_view_outlined),
+              label: const Text('导出 Excel'),
+            ),
           ),
         ],
       ),
