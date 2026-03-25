@@ -1,13 +1,17 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../../../core/models/student.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/statistics_period_provider.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../core/utils/excel_exporter.dart';
+import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
+import '../../../shared/widgets/ink_wash_background.dart';
+import '../../../shared/widgets/page_header.dart';
 import '../widgets/contribution_chart.dart';
 import '../widgets/insight_list.dart';
 import '../widgets/metrics_grid.dart';
@@ -22,41 +26,58 @@ class StatisticsScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('统计'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.file_download_outlined),
-            tooltip: '导出出勤汇总',
-            onPressed: () => _exportAttendance(context, ref),
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          invalidateStatistics(ref);
-        },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      backgroundColor: Colors.transparent,
+      body: InkWashBackground(
+        child: Column(
           children: [
-            const RepaintBoundary(child: MetricsGrid()),
-            const SizedBox(height: 24),
-            Text('收入趋势', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            const RepaintBoundary(child: RevenueChart()),
-            const SizedBox(height: 24),
-            const RepaintBoundary(child: ContributionChart()),
-            const SizedBox(height: 24),
-            Text('状态分布', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            const RepaintBoundary(child: StatusPieChart()),
-            const StatusFilteredList(),
-            const SizedBox(height: 24),
-            const RepaintBoundary(child: TimeHeatmap()),
-            const SizedBox(height: 24),
-            Text('智能洞察', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            const InsightList(),
+            PageHeader(
+              title: '统计',
+              trailing: IconButton(
+                icon: const Icon(Icons.file_download_outlined, color: kPrimaryBlue),
+                tooltip: '导出出勤汇总',
+                onPressed: () => _exportAttendance(context, ref),
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                color: kSealRed,
+                onRefresh: () async {
+                  invalidateStatistics(ref);
+                },
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                  children: [
+                    const RepaintBoundary(child: MetricsGrid()),
+                    const SizedBox(height: 32),
+                    Text(
+                      '收入趋势', 
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 12),
+                    const RepaintBoundary(child: RevenueChart()),
+                    const SizedBox(height: 32),
+                    const RepaintBoundary(child: ContributionChart()),
+                    const SizedBox(height: 32),
+                    Text(
+                      '状态分布', 
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 12),
+                    const RepaintBoundary(child: StatusPieChart()),
+                    const StatusFilteredList(),
+                    const SizedBox(height: 32),
+                    const RepaintBoundary(child: TimeHeatmap()),
+                    const SizedBox(height: 32),
+                    Text(
+                      '智能洞察', 
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 12),
+                    const InsightList(),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
