@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../shared/constants.dart' show formatDate;
 import '../../../shared/theme.dart';
+import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../widgets/attendance_calendar.dart';
 import '../widgets/attendance_list.dart';
@@ -113,40 +114,38 @@ class _DateSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: kPrimaryBlue.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: kSealRed.withValues(alpha: 0.12),
-              border: Border.all(color: kSealRed.withValues(alpha: 0.3), width: 0.8),
+              borderRadius: BorderRadius.circular(12),
+              color: kSealRed.withValues(alpha: 0.1),
+              border: Border.all(color: kSealRed.withValues(alpha: 0.2), width: 1),
             ),
-            child: const Icon(Icons.auto_stories_outlined, size: 19, color: kSealRed),
+            child: const Icon(Icons.auto_stories_outlined, size: 22, color: kSealRed),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(dateLabel, style: theme.textTheme.titleMedium),
-                const SizedBox(height: 2),
-                Text(summaryText, style: theme.textTheme.bodySmall),
+                Text(
+                  dateLabel,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  summaryText,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: kInkSecondary.withValues(alpha: 0.8),
+                  ),
+                ),
               ],
             ),
           ),
