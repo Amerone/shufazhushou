@@ -22,6 +22,19 @@ class PaymentDao {
     return rows.map(Payment.fromMap).toList();
   }
 
+  Future<List<Payment>> getByStudentAndDateRange(
+      String studentId, String? from, String? to) async {
+    final db = await _db.database;
+    final rows = await db.rawQuery('''
+      SELECT * FROM payments
+      WHERE student_id = ?
+        AND (? IS NULL OR payment_date >= ?)
+        AND (? IS NULL OR payment_date <= ?)
+      ORDER BY payment_date DESC
+    ''', [studentId, from, from, to, to]);
+    return rows.map(Payment.fromMap).toList();
+  }
+
   Future<double> getTotalByStudent(String studentId) async {
     final db = await _db.database;
     final rows = await db.rawQuery(
