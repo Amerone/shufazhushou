@@ -360,7 +360,7 @@ class BackupScreen extends ConsumerWidget {
                                               await SharePlus.instance.share(
                                                 ShareParams(
                                                   files: [XFile(path)],
-                                                  text: '书法助手数据备份',
+                                                  text: '墨韵数据备份',
                                                 ),
                                               );
                                             }

@@ -350,7 +350,7 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: '书法助手',
+      title: '墨韵',
       theme: buildAppTheme(),
       routerConfig: _router,
       locale: const Locale('zh', 'CN'),

@@ -315,7 +315,7 @@ class PdfGenerator {
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
                         pw.Text(
-                          '$institutionName · 书法助手',
+                          '$institutionName · 墨韵',
                           style: footerStyle,
                         ),
                         pw.Text(

@@ -482,7 +482,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           children: [
                             _SettingsTile(
                               icon: Icons.info_outline,
-                              title: '书法助手',
+                              title: '墨韵',
                               subtitle: _devMode
                                   ? '版本 $versionStr · 开发者模式已开启'
                                   : '版本 $versionStr · 连续点击 5 次可开启开发者模式',
