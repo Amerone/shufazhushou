@@ -31,11 +31,13 @@ Color statusColor(String status) {
   return e != null ? kStatusColor[e]! : kInkSecondary;
 }
 
-enum InsightType { debt, churn, peak, trial }
+enum InsightType { debt, renewal, churn, peak, trial, progress }
 
 const kPeakThreshold = 3;
 const kChurnDays = 21;
 const kBackupWarningDays = 7;
+const kBalanceAlertAmountThreshold = 300.0;
+const kBalanceAlertLessonThreshold = 3.0;
 
 const kDefaultTeacherName = '梁老师';
 const kDefaultInstitutionName = '院城墨点';

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/home/screens/launch_screen.dart';
 import 'features/settings/screens/backup_screen.dart';
+import 'features/settings/screens/ai_settings_screen.dart';
 import 'features/settings/screens/seal_stamp_screen.dart';
 import 'features/settings/screens/settings_screen.dart';
 import 'features/settings/screens/signature_screen.dart';
@@ -63,6 +64,7 @@ final _router = GoRouter(
                 GoRoute(path: 'templates', builder: (ctx, s) => const TemplateScreen()),
                 GoRoute(path: 'signature', builder: (ctx, s) => const SignatureScreen()),
                 GoRoute(path: 'backup', builder: (ctx, s) => const BackupScreen()),
+                GoRoute(path: 'ai', builder: (ctx, s) => const AiSettingsScreen()),
                 GoRoute(path: 'seal', builder: (ctx, s) => const SealStampScreen()),
               ],
             ),
@@ -79,17 +81,40 @@ class _ScaffoldWithNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
+      extendBody: true,
       body: shell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: shell.currentIndex,
-        onDestinationSelected: shell.goBranch,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: '首页'),
-          NavigationDestination(icon: Icon(Icons.people_outline), label: '学生'),
-          NavigationDestination(icon: Icon(Icons.bar_chart_outlined), label: '统计'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), label: '设置'),
-        ],
+      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(26),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.shadow.withValues(alpha: 0.08),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: NavigationBar(
+              height: 72,
+              selectedIndex: shell.currentIndex,
+              onDestinationSelected: shell.goBranch,
+              destinations: const [
+                NavigationDestination(icon: Icon(Icons.home_outlined), label: '首页'),
+                NavigationDestination(icon: Icon(Icons.people_outline), label: '学生'),
+                NavigationDestination(icon: Icon(Icons.bar_chart_outlined), label: '统计'),
+                NavigationDestination(icon: Icon(Icons.settings_outlined), label: '设置'),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

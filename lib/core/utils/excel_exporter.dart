@@ -28,6 +28,15 @@ class ExcelExporter {
       TextCellValue('费用'),
       TextCellValue('备注'),
     ]);
+    detail
+        .cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0))
+        .value = TextCellValue('课堂重点');
+    detail
+        .cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0))
+        .value = TextCellValue('课后练习');
+    detail
+        .cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0))
+        .value = TextCellValue('进步评分');
     for (final r in records) {
       final row = [
         TextCellValue(r.date),
@@ -38,6 +47,11 @@ class ExcelExporter {
         DoubleCellValue(r.feeAmount),
         TextCellValue(r.note ?? ''),
       ];
+      row.addAll([
+        TextCellValue(_formatLessonFocusTags(r)),
+        TextCellValue(r.homePracticeNote ?? ''),
+        TextCellValue(_formatProgressSummary(r)),
+      ]);
       detail.appendRow(row);
       // 条件格式：旷课行标红，请假行标灰
       final rowIdx = detail.maxRows - 1;
@@ -47,7 +61,7 @@ class ExcelExporter {
               ? ExcelColor.fromHexString('#EEEEEE')
               : null;
       if (bgColor != null) {
-        for (int col = 0; col < 7; col++) {
+        for (int col = 0; col < row.length; col++) {
           final cell = detail.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: rowIdx));
           cell.cellStyle = CellStyle(backgroundColorHex: bgColor);
         }
@@ -171,6 +185,16 @@ class ExcelExporter {
       TextCellValue('备注'),
     ]);
 
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0))
+        .value = TextCellValue('课堂重点');
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0))
+        .value = TextCellValue('课后练习');
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0))
+        .value = TextCellValue('进步评分');
+
     final sorted = List<Attendance>.from(records)
       ..sort((a, b) {
         final d = a.date.compareTo(b.date);
@@ -188,7 +212,32 @@ class ExcelExporter {
         TextCellValue(statusLabel(r.status)),
         DoubleCellValue(r.feeAmount),
         TextCellValue(r.note ?? ''),
+        TextCellValue(_formatLessonFocusTags(r)),
+        TextCellValue(r.homePracticeNote ?? ''),
+        TextCellValue(_formatProgressSummary(r)),
       ]);
     }
+  }
+
+  static String _formatLessonFocusTags(Attendance record) {
+    if (record.lessonFocusTags.isEmpty) return '';
+    return record.lessonFocusTags.join('、');
+  }
+
+  static String _formatProgressSummary(Attendance record) {
+    final scores = record.progressScores;
+    if (scores == null || scores.isEmpty) return '';
+
+    final parts = <String>[];
+    if (scores.strokeQuality != null) {
+      parts.add('笔画 ${scores.strokeQuality!.toStringAsFixed(1)}');
+    }
+    if (scores.structureAccuracy != null) {
+      parts.add('结构 ${scores.structureAccuracy!.toStringAsFixed(1)}');
+    }
+    if (scores.rhythmConsistency != null) {
+      parts.add('节奏 ${scores.rhythmConsistency!.toStringAsFixed(1)}');
+    }
+    return parts.join(' / ');
   }
 }

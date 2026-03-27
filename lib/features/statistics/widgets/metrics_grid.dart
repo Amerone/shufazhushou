@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/metrics_provider.dart';
-import '../../../core/providers/statistics_period_provider.dart';
 import '../../../shared/theme.dart';
 
 class MetricsGrid extends ConsumerWidget {
@@ -10,84 +9,95 @@ class MetricsGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncMetrics = ref.watch(metricsProvider);
-    final period = ref.watch(statisticsPeriodProvider);
 
-    return Column(
-      children: [
-        SegmentedButton<StatisticsPeriod>(
-          segments: const [
-            ButtonSegment(value: StatisticsPeriod.week, label: Text('周')),
-            ButtonSegment(value: StatisticsPeriod.month, label: Text('月')),
-            ButtonSegment(value: StatisticsPeriod.year, label: Text('年')),
-          ],
-          selected: {period.period},
-          onSelectionChanged: (s) {
-            ref.read(statisticsPeriodProvider.notifier).state = buildStatisticsRange(s.first);
-          },
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            '${period.from} ~ ${period.to}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: kInkSecondary),
-          ),
-        ),
-        const SizedBox(height: 12),
-        asyncMetrics.when(
-          loading: () => const CircularProgressIndicator(),
-          error: (e, _) => Text('加载失败: $e'),
-          data: (m) {
-            final total = m.presentCount + m.lateCount + m.absentCount;
-            final attendRate = total > 0 ? (m.presentCount + m.lateCount) / total * 100 : 0.0;
-            final screenWidth = MediaQuery.of(context).size.width;
-            final aspectRatio = screenWidth < 360 ? 1.6 : 2.0;
+    return asyncMetrics.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Text('加载失败: $e'),
+      data: (m) {
+        final total = m.presentCount + m.lateCount + m.absentCount;
+        final attendRate = total > 0 ? (m.presentCount + m.lateCount) / total * 100 : 0.0;
+        final metricItems = [
+          _MetricData('收入', '¥${m.totalFee.toStringAsFixed(0)}', Icons.payments_outlined, kPrimaryBlue),
+          _MetricData('出勤节数', '${m.presentCount + m.lateCount}节', Icons.event_available_outlined, kGreen),
+          _MetricData('活跃人数', '${m.activeStudentCount}人', Icons.groups_2_outlined, kSealRed),
+          _MetricData('出勤率', '${attendRate.toStringAsFixed(1)}%', Icons.trending_up_outlined, kOrange),
+        ];
 
-            return GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: aspectRatio,
-              children: [
-                _MetricCard('收入', '¥${m.totalFee.toStringAsFixed(0)}'),
-                _MetricCard('出勤节数', '${m.presentCount + m.lateCount}节'),
-                _MetricCard('活跃人数', '${m.activeStudentCount}人'),
-                _MetricCard('出勤率', '${attendRate.toStringAsFixed(1)}%'),
-              ],
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final columns = width >= 840 ? 4 : width >= 520 ? 2 : 1;
+            final itemWidth = (width - 12 * (columns - 1)) / columns;
+
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: metricItems
+                  .map(
+                    (item) => SizedBox(
+                      width: itemWidth,
+                      child: _MetricCard(data: item),
+                    ),
+                  )
+                  .toList(),
             );
           },
-        ),
-      ],
+        );
+      },
     );
   }
 }
 
-class _MetricCard extends StatelessWidget {
+class _MetricData {
   final String label;
   final String value;
-  const _MetricCard(this.label, this.value);
+  final IconData icon;
+  final Color color;
+
+  const _MetricData(this.label, this.value, this.icon, this.color);
+}
+
+class _MetricCard extends StatelessWidget {
+  final _MetricData data;
+
+  const _MetricCard({required this.data});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(label, style: theme.textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontFamily: 'NotoSansSC',
-                fontSize: 20,
-                color: kPrimaryBlue,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: data.color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: data.color.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(12),
             ),
-          ],
-        ),
+            child: Icon(data.icon, color: data.color, size: 20),
+          ),
+          const SizedBox(height: 14),
+          Text(data.label, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 6),
+          Text(
+            data.value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontFamily: 'NotoSansSC',
+              fontSize: 20,
+              color: data.color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

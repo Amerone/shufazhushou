@@ -1,6 +1,6 @@
 class DismissedInsight {
   final String id;
-  final String insightType; // debt | churn | peak | trial
+  final String insightType; // debt | renewal | churn | peak | trial | progress
   final String? studentId;
   final int dismissedAt;
 

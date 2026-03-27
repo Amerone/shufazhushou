@@ -4,7 +4,7 @@
 
 - 引擎：SQLite（通过 sqflite）
 - 数据库文件名：`calligraphy_assistant.db`
-- 当前版本：`3`
+- 当前版本：`4`
 
 ---
 
@@ -20,6 +20,7 @@ CREATE TABLE students (
   parent_phone TEXT,                     -- 家长电话
   price_per_class REAL NOT NULL DEFAULT 0, -- 当前单价（元/节）
   status      TEXT NOT NULL DEFAULT 'active', -- active | suspended
+  note        TEXT,                      -- 学生长期备注
   created_at  INTEGER NOT NULL,          -- Unix 毫秒时间戳
   updated_at  INTEGER NOT NULL
 );
@@ -28,6 +29,7 @@ CREATE TABLE students (
 **说明：**
 - `price_per_class` 仅为"当前单价"，修改不影响历史出勤记录
 - `status`: `active`=在读，`suspended`=休学
+- `note` 用于保存长期跟进备注，不替代单次课堂反馈
 
 ---
 
@@ -44,6 +46,9 @@ CREATE TABLE attendance (
   price_snapshot REAL NOT NULL DEFAULT 0, -- 记录时的单价快照
   fee_amount     REAL NOT NULL DEFAULT 0, -- 本条记录产生的费用
   note           TEXT,                   -- 备注（如"横画进步"）
+  lesson_focus_tags TEXT,                -- 课堂重点标签 JSON 数组
+  home_practice_note TEXT,               -- 课后练习建议
+  progress_scores_json TEXT,             -- 结构化进步评分 JSON
   created_at     INTEGER NOT NULL,
   updated_at     INTEGER NOT NULL,
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
@@ -66,6 +71,9 @@ CREATE INDEX idx_attendance_date ON attendance(date);
 **说明：**
 - `price_snapshot` 在录入时从 `students.price_per_class` 复制，此后独立存储
 - 修改出勤状态时重新计算该条 `fee_amount`，不影响其他记录
+- `lesson_focus_tags` 保存结构化课堂重点，例如 `["控笔","结构"]`
+- `home_practice_note` 保存课后练习建议，供家长沟通和导出使用
+- `progress_scores_json` 保存结构化评分，当前支持 `stroke_quality`、`structure_accuracy`、`rhythm_consistency`
 
 ---
 
@@ -122,6 +130,10 @@ CREATE TABLE settings (
 | `default_message_template` | String | 默认寄语模板文本 |
 | `last_backup_at` | int | 上次备份的 Unix 毫秒时间戳 |
 | `teacher_name` | String | 老师姓名（用于 PDF 签名区） |
+| `qwen_api_key` | String | Qwen / DashScope API Key |
+| `qwen_base_url` | String | Qwen 请求端点 |
+| `qwen_model` | String | Qwen 模型标识，默认预置为 `qwen3-vl-plus` |
+| `qwen_system_prompt` | String | 默认视觉分析系统提示词 |
 
 ---
 
@@ -130,13 +142,18 @@ CREATE TABLE settings (
 ```sql
 CREATE TABLE dismissed_insights (
   id           TEXT PRIMARY KEY,         -- UUID
-  insight_type TEXT NOT NULL,            -- debt | churn | peak | trial
+  insight_type TEXT NOT NULL,            -- debt | renewal | churn | peak | trial | progress
   student_id   TEXT,                     -- 关联学生（可为空，如高峰提示）
   dismissed_at INTEGER NOT NULL
 );
 ```
 
 **说明：** 用于"忽略"按钮，避免已处理的洞察反复出现。
+
+当前建议的忽略有效期策略：
+- `debt`、`renewal`：`3` 天后恢复
+- `churn`、`peak`、`trial`：`7` 天后恢复
+- `progress`：`14` 天后恢复
 
 ---
 
@@ -189,7 +206,7 @@ SELECT DISTINCT student_id FROM attendance WHERE status IN ('present','late');
 
 ```dart
 // database_helper.dart 关键逻辑
-static const int _version = 1;
+static const int _version = 4;
 static const String _dbName = 'calligraphy_assistant.db';
 
 Future<Database> _initDB() async {
@@ -211,9 +228,22 @@ Future _onCreate(Database db, int version) async {
 }
 
 Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-  // 后续版本迭代时在此添加 ALTER TABLE 语句
+  if (oldVersion < 4) {
+    await _addColumnIfMissing(db, 'attendance', 'lesson_focus_tags TEXT');
+    await _addColumnIfMissing(db, 'attendance', 'home_practice_note TEXT');
+    await _addColumnIfMissing(db, 'attendance', 'progress_scores_json TEXT');
+  }
 }
 ```
+
+### v4 迁移补充
+
+- `students.note` 在 v2 引入，当前也建议通过列存在检查做幂等升级
+- `dismissed_insights` 在 v3 引入，用于忽略已处理洞察
+- `attendance.lesson_focus_tags`：课堂重点标签 JSON 数组
+- `attendance.home_practice_note`：课后练习建议
+- `attendance.progress_scores_json`：结构化进步评分 JSON
+- 升级过程使用 `PRAGMA table_info` 检查列是否存在，避免重复升级时报错
 
 ---
 

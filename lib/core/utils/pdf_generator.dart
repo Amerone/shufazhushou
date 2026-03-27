@@ -230,6 +230,52 @@ class PdfGenerator {
     ));
 
     // Page 3: 费用结算
+    final feedbackRecords = records
+        .where((record) => _hasStructuredFeedback(record))
+        .toList(growable: false);
+    if (feedbackRecords.isNotEmpty) {
+      pdf.addPage(pw.Page(
+        build: (ctx) => pw.Stack(children: [
+          paperBackground(),
+          ?watermarkWidget,
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('课堂反馈摘要', style: pw.TextStyle(font: calliFont, fontSize: 20)),
+                pw.SizedBox(height: 12),
+                pw.Table(
+                  border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFEDE8DC)),
+                      children: [
+                        _cell('日期/时间', bold),
+                        _cell('课堂重点', bold),
+                        _cell('课后练习', bold),
+                        _cell('进步评分', bold),
+                      ],
+                    ),
+                    ...feedbackRecords.map(
+                      (record) => pw.TableRow(
+                        children: [
+                          _cell('${record.date}\n${record.startTime}-${record.endTime}', style),
+                          _cell(_formatLessonFocusTags(record), style),
+                          _cell(record.homePracticeNote ?? '', style),
+                          _cell(_formatProgressSummary(record), style),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ]),
+      ));
+    }
+
     final totalFee = records.fold<double>(0, (s, r) => s + r.feeAmount);
     final totalPaid = payments.fold<double>(0, (s, pay) => s + pay.amount);
     final balance = totalPaid - totalFee;
@@ -314,5 +360,33 @@ class PdfGenerator {
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       child: pw.Text(text, style: style),
     );
+  }
+
+  static bool _hasStructuredFeedback(Attendance record) {
+    return record.lessonFocusTags.isNotEmpty ||
+        (record.homePracticeNote?.trim().isNotEmpty ?? false) ||
+        !(record.progressScores?.isEmpty ?? true);
+  }
+
+  static String _formatLessonFocusTags(Attendance record) {
+    if (record.lessonFocusTags.isEmpty) return '';
+    return record.lessonFocusTags.join('、');
+  }
+
+  static String _formatProgressSummary(Attendance record) {
+    final scores = record.progressScores;
+    if (scores == null || scores.isEmpty) return '';
+
+    final parts = <String>[];
+    if (scores.strokeQuality != null) {
+      parts.add('笔画 ${scores.strokeQuality!.toStringAsFixed(1)}');
+    }
+    if (scores.structureAccuracy != null) {
+      parts.add('结构 ${scores.structureAccuracy!.toStringAsFixed(1)}');
+    }
+    if (scores.rhythmConsistency != null) {
+      parts.add('节奏 ${scores.rhythmConsistency!.toStringAsFixed(1)}');
+    }
+    return parts.join(' / ');
   }
 }

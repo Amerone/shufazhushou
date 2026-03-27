@@ -19,20 +19,24 @@ class PageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final topPadding = MediaQuery.of(context).padding.top;
+    final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
+      color: kInkSecondary.withValues(alpha: 0.9),
+      height: 1.45,
+    );
 
     return Container(
       padding: EdgeInsets.only(
-        top: topPadding + 16,
-        bottom: 16,
+        top: topPadding + 18,
+        bottom: 18,
         left: 24,
         right: 24,
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (onBack != null) ...[
             Container(
-              margin: const EdgeInsets.only(right: 16),
+              margin: const EdgeInsets.only(right: 16, top: 6),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(12),
@@ -61,18 +65,30 @@ class PageHeader extends StatelessWidget {
                   ),
                 ),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: kInkSecondary,
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.56),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: kInkSecondary.withValues(alpha: 0.14),
+                      ),
+                    ),
+                    child: Text(
+                      subtitle!,
+                      style: subtitleStyle,
                     ),
                   ),
                 ],
               ],
             ),
           ),
-          trailing,
+          if (trailing != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 12, top: 2),
+              child: trailing,
+            ),
         ].whereType<Widget>().toList(),
       ),
     );

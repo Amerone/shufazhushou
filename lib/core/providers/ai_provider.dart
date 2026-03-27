@@ -1,0 +1,27 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/qwen_vision_config.dart';
+import '../services/handwriting_analysis_service.dart';
+import '../services/qwen_vision_gateway.dart';
+import '../services/vision_analysis_gateway.dart';
+import 'settings_provider.dart';
+
+final qwenVisionConfigProvider = Provider<QwenVisionConfig>((ref) {
+  final settings = ref.watch(settingsProvider).valueOrNull ?? const <String, String>{};
+  return QwenVisionConfig.fromSettings(settings);
+});
+
+final visionAnalysisGatewayProvider = Provider<VisionAnalysisGateway?>((ref) {
+  final config = ref.watch(qwenVisionConfigProvider);
+  if (!config.isConfigured) return null;
+  final gateway = QwenVisionGateway(config: config);
+  ref.onDispose(gateway.dispose);
+  return gateway;
+});
+
+final handwritingAnalysisServiceProvider =
+    Provider<HandwritingAnalysisService?>((ref) {
+  final gateway = ref.watch(visionAnalysisGatewayProvider);
+  if (gateway == null) return null;
+  return HandwritingAnalysisService(gateway: gateway);
+});

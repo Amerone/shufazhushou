@@ -53,25 +53,58 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
             .entries
             .map((e) => FlSpot(e.key.toDouble(), receivedMap[e.value] ?? 0))
             .toList();
+        final totalReceivable = receivableMap.values.fold<double>(0, (sum, item) => sum + item);
+        final totalReceived = receivedMap.values.fold<double>(0, (sum, item) => sum + item);
 
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _RevenueSummary(
+                  label: '累计应收',
+                  value: '¥${totalReceivable.toStringAsFixed(0)}',
+                  color: kPrimaryBlue,
+                ),
+                _RevenueSummary(
+                  label: '累计实收',
+                  value: '¥${totalReceived.toStringAsFixed(0)}',
+                  color: kGreen,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             SizedBox(
-              height: 200,
+              height: 220,
               child: LineChart(
                 LineChartData(
                   lineTouchData: const LineTouchData(enabled: true),
+                  minY: 0,
                   lineBarsData: [
                     if (_showReceivable)
                       LineChartBarData(
                         spots: spots1,
                         color: kPrimaryBlue,
+                        isCurved: true,
+                        barWidth: 3,
+                        belowBarData: BarAreaData(
+                          show: true,
+                          color: kPrimaryBlue.withValues(alpha: 0.08),
+                        ),
                         dotData: const FlDotData(show: false),
                       ),
                     if (_showReceived)
                       LineChartBarData(
                         spots: spots2,
                         color: kGreen,
+                        isCurved: true,
+                        barWidth: 3,
+                        belowBarData: BarAreaData(
+                          show: true,
+                          color: kGreen.withValues(alpha: 0.08),
+                        ),
                         dotData: const FlDotData(show: false),
                       ),
                   ],
@@ -97,18 +130,26 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
                     topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   ),
-                  gridData: const FlGridData(show: false),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                      color: kInkSecondary.withValues(alpha: 0.12),
+                      strokeWidth: 1,
+                    ),
+                  ),
                   borderData: FlBorderData(show: false),
                 ),
               ),
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
               children: [
                 _Legend('应收', kPrimaryBlue, _showReceivable, () {
                   setState(() => _showReceivable = !_showReceivable);
                 }),
-                const SizedBox(width: 16),
                 _Legend('实收', kGreen, _showReceived, () {
                   setState(() => _showReceived = !_showReceived);
                 }),
@@ -117,6 +158,46 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
           ],
         );
       },
+    );
+  }
+}
+
+class _RevenueSummary extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _RevenueSummary({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: color,
+              fontFamily: 'NotoSansSC',
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

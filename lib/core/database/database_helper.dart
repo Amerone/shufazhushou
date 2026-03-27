@@ -20,7 +20,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'calligraphy_assistant.db');
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: (db) async {
@@ -54,6 +54,9 @@ class DatabaseHelper {
         price_snapshot REAL NOT NULL DEFAULT 0,
         fee_amount REAL NOT NULL DEFAULT 0,
         note TEXT,
+        lesson_focus_tags TEXT,
+        home_practice_note TEXT,
+        progress_scores_json TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
@@ -104,7 +107,7 @@ class DatabaseHelper {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      await db.execute('ALTER TABLE students ADD COLUMN note TEXT');
+      await _addColumnIfMissing(db, 'students', 'note TEXT');
     }
     if (oldVersion < 3) {
       await db.execute('DROP TABLE IF EXISTS fee_adjustments');
@@ -117,5 +120,22 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 4) {
+      await _addColumnIfMissing(db, 'attendance', 'lesson_focus_tags TEXT');
+      await _addColumnIfMissing(db, 'attendance', 'home_practice_note TEXT');
+      await _addColumnIfMissing(db, 'attendance', 'progress_scores_json TEXT');
+    }
+  }
+
+  Future<void> _addColumnIfMissing(
+    Database db,
+    String tableName,
+    String columnSql,
+  ) async {
+    final columnName = columnSql.split(' ').first.trim();
+    final columnRows = await db.rawQuery('PRAGMA table_info($tableName)');
+    final exists = columnRows.any((row) => row['name'] == columnName);
+    if (exists) return;
+    await db.execute('ALTER TABLE $tableName ADD COLUMN $columnSql');
   }
 }

@@ -21,6 +21,11 @@ class SettingsDao {
     );
   }
 
+  Future<void> delete(String key) async {
+    final db = await _db.database;
+    await db.delete('settings', where: 'key = ?', whereArgs: [key]);
+  }
+
   Future<Map<String, String>> getAll() async {
     final db = await _db.database;
     final rows = await db.query('settings');

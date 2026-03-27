@@ -40,12 +40,20 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('时段热力图', style: theme.textTheme.titleMedium),
-            if (_tooltip != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(_tooltip!, style: theme.textTheme.bodySmall),
-              ),
+            Text(
+              _tooltip ?? '点击任一色块可查看对应星期和小时的人次分布。',
+              style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: const [
+                _HeatLevelChip(label: '低频', opacity: 0.08),
+                _HeatLevelChip(label: '中频', opacity: 0.4),
+                _HeatLevelChip(label: '高频', opacity: 0.85),
+              ],
+            ),
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -92,7 +100,7 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                                 margin: const EdgeInsets.all(1),
                                 decoration: BoxDecoration(
                                   color: kPrimaryBlue.withValues(alpha: opacity),
-                                  borderRadius: BorderRadius.circular(3),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                               ),
                             );
@@ -107,6 +115,28 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
           ],
         );
       },
+    );
+  }
+}
+
+class _HeatLevelChip extends StatelessWidget {
+  final String label;
+  final double opacity;
+
+  const _HeatLevelChip({
+    required this.label,
+    required this.opacity,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: kPrimaryBlue.withValues(alpha: opacity),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(label, style: Theme.of(context).textTheme.bodySmall),
     );
   }
 }

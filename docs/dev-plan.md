@@ -246,7 +246,7 @@ Future<Map<String, String>> getAll()
 Future<void> insert(DismissedInsight record)
 Future<DismissedInsight?> find(String insightType, String? studentId)
 Future<void> deleteByStudentAndType(String insightType, String? studentId)
-Future<void> deleteExpired() // 清理过期记录（高峰提示 > 7 天）
+Future<void> deleteExpired() // 按类型策略清理过期记录
 ```
 
 ---

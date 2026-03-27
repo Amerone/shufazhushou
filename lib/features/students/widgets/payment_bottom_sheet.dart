@@ -1,15 +1,18 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+
 import '../../../core/models/payment.dart';
 import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../shared/constants.dart' show formatDate;
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
+import '../../../shared/widgets/glass_card.dart';
 
 class PaymentBottomSheet extends ConsumerStatefulWidget {
   final String studentId;
+
   const PaymentBottomSheet({super.key, required this.studentId});
 
   @override
@@ -34,6 +37,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
     if (!_formKey.currentState!.validate()) return;
     if (_saving) return;
 
+    FocusScope.of(context).unfocus();
     setState(() => _saving = true);
     try {
       final payment = Payment(
@@ -59,69 +63,120 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 8,
-        bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 16,
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: kInkSecondary.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.zero,
+        child: GlassCard(
+          margin: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 8,
+            bottom: bottomInset + MediaQuery.of(context).padding.bottom + 16,
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: kInkSecondary.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
-              ),
+                Text(
+                  '记录缴费',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '录入本次收款金额和备注，保存后会自动刷新学员余额。',
+                  style: theme.textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _amountCtrl,
+                  decoration: InputDecoration(
+                    labelText: '缴费金额',
+                    hintText: '例如：600',
+                    prefixText: '¥ ',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.5),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return '请输入缴费金额';
+                    final n = double.tryParse(v.trim());
+                    if (n == null || n <= 0) return '请输入有效的正数金额';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: _date,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (d != null) setState(() => _date = d);
+                  },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: '缴费日期',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      fillColor: Colors.white.withValues(alpha: 0.5),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(formatDate(_date))),
+                        const Icon(Icons.calendar_today_outlined, size: 18),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _noteCtrl,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: '备注',
+                    hintText: '可填写收款说明、优惠信息或转账渠道。',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.5),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(_saving ? '保存中...' : '保存记录'),
+                ),
+              ],
             ),
-            Text('记录缴费', style: theme.textTheme.titleLarge?.copyWith(fontSize: 21)),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _amountCtrl,
-              decoration: const InputDecoration(labelText: '金额（元）'),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return '请输入金额';
-                final n = double.tryParse(v.trim());
-                if (n == null || n <= 0) return '请输入有效正数';
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('日期：${formatDate(_date)}'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final d = await showDatePicker(
-                  context: context,
-                  initialDate: _date,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (d != null) setState(() => _date = d);
-              },
-            ),
-            TextFormField(
-              controller: _noteCtrl,
-              decoration: const InputDecoration(labelText: '备注'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _saving ? null : _save,
-              child: Text(_saving ? '保存中...' : '保存'),
-            ),
-          ],
+          ),
         ),
       ),
     );

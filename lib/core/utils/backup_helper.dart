@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
 
@@ -19,9 +20,11 @@ class BackupHelper {
     } catch (_) {}
 
     final dbPath = p.join(await getDatabasesPath(), 'calligraphy_assistant.db');
-    final downloadsDir = Directory('/storage/emulated/0/Download/书法助手备份');
-    await downloadsDir.create(recursive: true);
-    final dest = p.join(downloadsDir.path, 'backup_${_timestamp()}.db');
+    final tempDir = await getTemporaryDirectory();
+    final backupDir =
+        Directory(p.join(tempDir.path, 'calligraphy_assistant_backups'));
+    await backupDir.create(recursive: true);
+    final dest = p.join(backupDir.path, 'backup_${_timestamp()}.db');
     await File(dbPath).copy(dest);
     return dest;
   }

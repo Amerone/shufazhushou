@@ -13,6 +13,7 @@ import 'student_provider.dart';
 
 /// Invalidate providers after attendance records are created, updated, or deleted.
 void invalidateAfterAttendanceChange(WidgetRef ref) {
+  ref.invalidate(studentProvider);
   ref.invalidate(attendanceProvider);
   ref.invalidate(feeSummaryProvider);
   ref.invalidate(metricsProvider);

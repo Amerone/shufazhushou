@@ -170,7 +170,14 @@ class AttendanceDao {
         COALESCE(SUM(CASE WHEN status='present' THEN 1 ELSE 0 END), 0) AS presentCount,
         COALESCE(SUM(CASE WHEN status='late' THEN 1 ELSE 0 END), 0) AS lateCount,
         COALESCE(SUM(CASE WHEN status='absent' THEN 1 ELSE 0 END), 0) AS absentCount,
-        COALESCE(COUNT(DISTINCT student_id), 0) AS activeStudentCount
+        COALESCE(
+          COUNT(
+            DISTINCT CASE
+              WHEN status IN ('present','late','trial') THEN student_id
+            END
+          ),
+          0
+        ) AS activeStudentCount
       FROM attendance
       WHERE date >= ? AND date <= ?
     ''', [from, to]);

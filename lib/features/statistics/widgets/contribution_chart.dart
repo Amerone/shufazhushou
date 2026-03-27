@@ -50,8 +50,13 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
           children: [
             Row(
               children: [
-                Text('贡献榜单', style: theme.textTheme.titleMedium),
-                const Spacer(),
+                Expanded(
+                  child: Text(
+                    _byFee ? '按金额查看前 10 名学员贡献' : '按课次查看前 10 名学员贡献',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+                const SizedBox(width: 12),
                 SegmentedButton<bool>(
                   segments: const [
                     ButtonSegment(value: true, label: Text('金额')),
@@ -68,53 +73,88 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
                   ? ((item['totalFee'] as num?) ?? 0).toDouble()
                   : ((item['attendanceCount'] as num?) ?? 0).toDouble();
               final ratio = maxVal > 0 ? value / maxVal : 0.0;
+              final rank = top.indexOf(item) + 1;
+              final accentColor = _byFee ? kPrimaryBlue : kGreen;
 
               return GestureDetector(
                 onTap: () => context.push('/students/${item['studentId']}'),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Container(
+                  margin: EdgeInsets.only(bottom: item == top.last ? 0 : 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.56),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: accentColor.withValues(alpha: 0.1)),
+                  ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.22,
+                      Container(
+                        width: 34,
+                        height: 34,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          displayNames[item['studentId']] ?? item['studentName'] as String,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
+                          '$rank',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: accentColor,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Stack(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: kInkSecondary.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    displayNames[item['studentId']] ?? item['studentName'] as String,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _byFee ? '¥${value.toStringAsFixed(0)}' : '${value.toInt()}节',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: accentColor,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
-                            FractionallySizedBox(
-                              widthFactor: ratio,
-                              child: _byFee
-                                  ? Container(
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: kPrimaryBlue.withValues(alpha: 0.72),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    )
-                                  : _buildSegmentedBar(item, value),
+                            const SizedBox(height: 10),
+                            Stack(
+                              children: [
+                                Container(
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: kInkSecondary.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                                FractionallySizedBox(
+                                  widthFactor: ratio,
+                                  child: _byFee
+                                      ? Container(
+                                          height: 18,
+                                          decoration: BoxDecoration(
+                                            color: accentColor.withValues(alpha: 0.72),
+                                            borderRadius: BorderRadius.circular(999),
+                                          ),
+                                        )
+                                      : _buildSegmentedBar(item, value),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _byFee ? '¥${value.toStringAsFixed(0)}' : '${value.toInt()}节',
-                        style: theme.textTheme.bodySmall,
                       ),
                     ],
                   ),
@@ -147,7 +187,7 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
   }
 
   Widget _buildSegmentedBar(Map<String, dynamic> item, double total) {
-    if (total <= 0) return const SizedBox(height: 20);
+    if (total <= 0) return const SizedBox(height: 18);
 
     final parts = <_Segment>[];
     for (final entry in {
@@ -163,7 +203,7 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
     }
 
     return SizedBox(
-      height: 20,
+      height: 18,
       child: Row(
         children: parts
             .map(
@@ -259,10 +299,43 @@ class StatusFilteredList extends ConsumerWidget {
           itemCount: records.length,
           itemBuilder: (_, i) {
             final r = records[i];
-            return ListTile(
-              dense: true,
-              title: Text(nameMap[r.studentId] ?? r.studentId),
-              subtitle: Text('${r.date}  ${r.startTime}-${r.endTime}'),
+            final color = statusColor(selected);
+            return Container(
+              margin: EdgeInsets.only(bottom: i == records.length - 1 ? 0 : 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.56),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          nameMap[r.studentId] ?? r.studentId,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${r.date}  ${r.startTime}-${r.endTime}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
