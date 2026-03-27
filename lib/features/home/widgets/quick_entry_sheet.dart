@@ -1,4 +1,6 @@
 ﻿import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/models/attendance.dart';
@@ -11,6 +13,7 @@ import '../../../core/providers/student_provider.dart';
 import '../../../core/utils/fee_calculator.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
+import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/time_wheel_picker.dart';
@@ -149,6 +152,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       invalidateAfterAttendanceChange(ref);
 
       if (mounted) {
+        await InteractionFeedback.seal(context);
         AppToast.showSuccess(context, '已保存 ${selectedStudents.length} 条出勤记录');
         Navigator.of(context).pop();
       }
@@ -273,19 +277,25 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 label: allFilteredSelected ? '取消全选' : '全选',
                 onTap: filtered.isEmpty
                     ? null
-                    : () => setState(() {
+                    : () {
+                        unawaited(InteractionFeedback.selection(context));
+                        setState(() {
                           if (allFilteredSelected) {
                             _selectedIds.removeAll(filteredIds);
                           } else {
                             _selectedIds.addAll(filteredIds);
                           }
-                        }),
+                        });
+                      },
               ),
               const SizedBox(width: 8),
               _QuickActionChip(
                 icon: _showSuspended ? Icons.visibility_off : Icons.visibility,
                 label: _showSuspended ? '隐藏休学' : '显示休学',
-                onTap: () => setState(() => _showSuspended = !_showSuspended),
+                onTap: () {
+                  unawaited(InteractionFeedback.selection(context));
+                  setState(() => _showSuspended = !_showSuspended);
+                },
               ),
               const Spacer(),
               Container(
@@ -339,26 +349,32 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                       ),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(18),
-                        onTap: () => setState(() {
-                          if (selected) {
-                            _selectedIds.remove(m.student.id);
-                          } else {
-                            _selectedIds.add(m.student.id);
-                          }
-                        }),
+                        onTap: () {
+                          unawaited(InteractionFeedback.selection(context));
+                          setState(() {
+                            if (selected) {
+                              _selectedIds.remove(m.student.id);
+                            } else {
+                              _selectedIds.add(m.student.id);
+                            }
+                          });
+                        },
                         child: Padding(
                           padding: const EdgeInsets.all(14),
                           child: Row(
                             children: [
                               Checkbox(
                                 value: selected,
-                                onChanged: (v) => setState(() {
-                                  if (v == true) {
-                                    _selectedIds.add(m.student.id);
-                                  } else {
-                                    _selectedIds.remove(m.student.id);
-                                  }
-                                }),
+                                onChanged: (v) {
+                                  unawaited(InteractionFeedback.selection(context));
+                                  setState(() {
+                                    if (v == true) {
+                                      _selectedIds.add(m.student.id);
+                                    } else {
+                                      _selectedIds.remove(m.student.id);
+                                    }
+                                  });
+                                },
                               ),
                               Expanded(
                                 child: Column(
@@ -409,7 +425,12 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           child: SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _selectedIds.isEmpty ? null : () => setState(() => _step = 1),
+              onPressed: _selectedIds.isEmpty
+                  ? null
+                  : () {
+                      unawaited(InteractionFeedback.selection(context));
+                      setState(() => _step = 1);
+                    },
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -441,10 +462,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     label: Text('${t.name} ${t.startTime}-${t.endTime}'),
                     backgroundColor: Colors.white.withValues(alpha: 0.56),
                     side: BorderSide(color: kInkSecondary.withValues(alpha: 0.14)),
-                    onPressed: () => setState(() {
-                      _startTime = t.startTime;
-                      _endTime = t.endTime;
-                    }),
+                    onPressed: () {
+                      unawaited(InteractionFeedback.selection(context));
+                      setState(() {
+                        _startTime = t.startTime;
+                        _endTime = t.endTime;
+                      });
+                    },
                   ),
                 )
                 .toList(),
@@ -460,7 +484,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
               firstDate: DateTime(2020),
               lastDate: DateTime.now().add(const Duration(days: 365)),
             );
-            if (d != null) setState(() => _date = d);
+            if (d != null) {
+              await InteractionFeedback.selection(context);
+              setState(() => _date = d);
+            }
           },
           child: InputDecorator(
             decoration: InputDecoration(
@@ -490,6 +517,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     label: '开始时间',
                   );
                   if (t != null) {
+                    await InteractionFeedback.selection(context);
                     setState(() {
                       _startTime = formatTime(t);
                     });
@@ -517,6 +545,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     label: '结束时间',
                   );
                   if (t != null) {
+                    await InteractionFeedback.selection(context);
                     setState(() {
                       _endTime = formatTime(t);
                     });
@@ -546,7 +575,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 (s) => ChoiceChip(
                   label: Text(s.$2),
                   selected: _status == s.$1,
-                  onSelected: (_) => setState(() => _status = s.$1),
+                  onSelected: (_) {
+                    unawaited(InteractionFeedback.selection(context));
+                    setState(() => _status = s.$1);
+                  },
                 ),
               )
               .toList(),
@@ -563,6 +595,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   label: Text(tag),
                   selected: _lessonFocusTags.contains(tag),
                   onSelected: (selected) {
+                    unawaited(InteractionFeedback.selection(context));
                     setState(() {
                       if (selected) {
                         _lessonFocusTags.add(tag);
@@ -614,7 +647,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: () => setState(() => _step = 0),
+                onPressed: () {
+                  unawaited(InteractionFeedback.selection(context));
+                  setState(() => _step = 0);
+                },
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -630,6 +666,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     AppToast.showError(context, '结束时间必须晚于开始时间');
                     return;
                   }
+                  unawaited(InteractionFeedback.selection(context));
                   setState(() => _step = 2);
                 },
                 style: ElevatedButton.styleFrom(
@@ -884,7 +921,10 @@ class _ScoreEditor extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               TextButton(
-                onPressed: onClear,
+                onPressed: () {
+                  unawaited(InteractionFeedback.selection(context));
+                  onClear();
+                },
                 child: const Text('清空'),
               ),
             ],
@@ -895,7 +935,10 @@ class _ScoreEditor extends StatelessWidget {
             max: 5,
             divisions: 10,
             label: (value ?? 3.0).toStringAsFixed(1),
-            onChanged: onChanged,
+            onChanged: (nextValue) {
+              unawaited(InteractionFeedback.selection(context));
+              onChanged(nextValue);
+            },
           ),
         ],
       ),

@@ -1,6 +1,8 @@
 ﻿import 'dart:io';
 
-import 'package:excel/excel.dart';
+import 'dart:async';
+
+import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +17,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/utils/seed_test_data.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
+import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
@@ -57,6 +60,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           kBackupWarningDays;
                   final teacherName = settings['teacher_name'] ?? kDefaultTeacherName;
                   final watermarkEnabled = settings['default_watermark_enabled'] != 'false';
+                  final hapticsEnabled =
+                      settings[InteractionFeedback.hapticsEnabledKey] != 'false';
+                  final soundEnabled =
+                      settings[InteractionFeedback.soundEnabledKey] == 'true';
                   final hasDefaultMessage = settings['default_message_template']?.trim().isNotEmpty == true;
                   final hasSignature = settings['signature_path']?.trim().isNotEmpty == true;
                   final hasCustomTeacherName = teacherName.trim().isNotEmpty && teacherName != kDefaultTeacherName;
@@ -353,6 +360,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const SizedBox(height: 20),
                       const _SettingsSectionTitle(
+                        title: '沉浸反馈',
+                        subtitle: '让翻页、保存与导出在视觉之外，也保留一点纸墨手感。',
+                      ),
+                      const SizedBox(height: 12),
+                      GlassCard(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          children: [
+                            _SettingsSwitchTile(
+                              value: hapticsEnabled,
+                              icon: Icons.vibration_outlined,
+                              title: '启用触感反馈',
+                              subtitle: '保存、确认、时间滚轮和关键选择时给出轻微震动。',
+                              onChanged: (value) {
+                                ref.read(settingsProvider.notifier).set(
+                                      InteractionFeedback.hapticsEnabledKey,
+                                      value.toString(),
+                                    );
+                                if (value) {
+                                  unawaited(InteractionFeedback.selection(context));
+                                }
+                              },
+                            ),
+                            const Divider(height: 1, indent: 16, endIndent: 16),
+                            _SettingsSwitchTile(
+                              value: soundEnabled,
+                              icon: Icons.music_note_outlined,
+                              title: '启用轻音反馈',
+                              subtitle: '页面切换与导出完成时播放极轻的系统提示音。',
+                              onChanged: (value) {
+                                ref.read(settingsProvider.notifier).set(
+                                      InteractionFeedback.soundEnabledKey,
+                                      value.toString(),
+                                    );
+                                unawaited(InteractionFeedback.selection(context));
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const _SettingsSectionTitle(
                         title: 'AI 扩展',
                         subtitle: '预留视觉模型与远端能力配置，保持 UI 与远端网关解耦。',
                       ),
@@ -564,6 +613,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       return;
                     }
                     await onSave(value);
+                    await InteractionFeedback.seal(sheetCtx);
                     if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
                   },
                   child: const Text('保存修改'),

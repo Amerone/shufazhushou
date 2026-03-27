@@ -11,6 +11,7 @@ const kInkSecondary = Color(0xFF8B7D6B);
 const kPaperCard = Color(0xFFFCFAF5);
 
 ThemeData buildAppTheme() {
+  final inkOverlay = kPrimaryBlue.withValues(alpha: 0.08);
   final colorScheme = ColorScheme.fromSeed(
     seedColor: kPrimaryBlue,
     brightness: Brightness.light,
@@ -69,7 +70,18 @@ ThemeData buildAppTheme() {
     useMaterial3: true,
     fontFamily: 'NotoSansSC',
     scaffoldBackgroundColor: kPaper,
+    splashFactory: InkRipple.splashFactory,
+    splashColor: inkOverlay,
+    highlightColor: kPrimaryBlue.withValues(alpha: 0.04),
+    hoverColor: kPrimaryBlue.withValues(alpha: 0.03),
+    focusColor: kPrimaryBlue.withValues(alpha: 0.05),
     textTheme: textTheme,
+    pageTransitionsTheme: PageTransitionsTheme(
+      builders: {
+        for (final platform in TargetPlatform.values)
+          platform: const _InkFadePageTransitionsBuilder(),
+      },
+    ),
     appBarTheme: const AppBarTheme(
       centerTitle: false,
       backgroundColor: Colors.transparent,
@@ -87,12 +99,15 @@ ThemeData buildAppTheme() {
     ),
     cardTheme: CardThemeData(
       elevation: 0,
-      color: Colors.white.withValues(alpha: 0.86),
+      color: Colors.white.withValues(alpha: 0.8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: kInkSecondary.withValues(alpha: 0.16)),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.68)),
       ),
+      shadowColor: const Color(0xFF8B7D6B).withValues(alpha: 0.12),
       clipBehavior: Clip.antiAlias,
+      surfaceTintColor: Colors.transparent,
+      margin: EdgeInsets.zero,
     ),
     inputDecorationTheme: InputDecorationTheme(
       isDense: true,
@@ -118,6 +133,8 @@ ThemeData buildAppTheme() {
         elevation: 0,
         backgroundColor: kPrimaryBlue,
         foregroundColor: Colors.white,
+        overlayColor: Colors.white.withValues(alpha: 0.08),
+        shadowColor: Colors.transparent,
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -126,6 +143,7 @@ ThemeData buildAppTheme() {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: kPrimaryBlue,
+        overlayColor: inkOverlay,
         side: BorderSide(color: kInkSecondary.withValues(alpha: 0.34)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
@@ -135,7 +153,16 @@ ThemeData buildAppTheme() {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: kPrimaryBlue,
+        overlayColor: inkOverlay,
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        foregroundColor: kPrimaryBlue,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        overlayColor: inkOverlay,
       ),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
@@ -153,6 +180,7 @@ ThemeData buildAppTheme() {
         shape: WidgetStateProperty.all(
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
+        overlayColor: WidgetStateProperty.all(inkOverlay),
       ),
     ),
     chipTheme: ChipThemeData(
@@ -163,6 +191,7 @@ ThemeData buildAppTheme() {
       secondaryLabelStyle: const TextStyle(color: kSealRed),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       side: BorderSide(color: kInkSecondary.withValues(alpha: 0.2)),
+      surfaceTintColor: Colors.transparent,
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
@@ -183,10 +212,15 @@ ThemeData buildAppTheme() {
     listTileTheme: ListTileThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       iconColor: kPrimaryBlue.withValues(alpha: 0.88),
+      tileColor: Colors.white.withValues(alpha: 0.36),
+      selectedTileColor: kPrimaryBlue.withValues(alpha: 0.06),
     ),
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: kSealRed,
       foregroundColor: Colors.white,
+      splashColor: Colors.white.withValues(alpha: 0.12),
+      elevation: 0,
+      highlightElevation: 0,
     ),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: kPaperCard,
@@ -196,8 +230,16 @@ ThemeData buildAppTheme() {
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: Colors.white.withValues(alpha: 0.82),
-      indicatorColor: kSealRed.withValues(alpha: 0.14),
+      backgroundColor: Colors.white.withValues(alpha: 0.78),
+      indicatorColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      overlayColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.pressed)) return inkOverlay;
+        if (states.contains(WidgetState.hovered)) {
+          return kPrimaryBlue.withValues(alpha: 0.03);
+        }
+        return null;
+      }),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontFamily: 'NotoSansSC',
@@ -232,5 +274,57 @@ ThemeData buildAppTheme() {
       color: kSealRed,
     ),
     dividerColor: kInkSecondary.withValues(alpha: 0.2),
+    tabBarTheme: TabBarThemeData(
+      indicatorColor: Colors.transparent,
+      overlayColor: WidgetStateProperty.all(inkOverlay),
+      labelColor: kPrimaryBlue,
+      unselectedLabelColor: kInkSecondary,
+      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
+    ),
   );
+}
+
+class _InkFadePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _InkFadePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final fade = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    final scale = Tween<double>(begin: 0.985, end: 1.0).animate(
+      CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      ),
+    );
+    final outgoingFade = Tween<double>(begin: 1.0, end: 0.985).animate(
+      CurvedAnimation(
+        parent: secondaryAnimation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      ),
+    );
+
+    return FadeTransition(
+      opacity: fade,
+      child: ScaleTransition(
+        scale: scale,
+        child: FadeTransition(
+          opacity: outgoingFade,
+          child: child,
+        ),
+      ),
+    );
+  }
 }

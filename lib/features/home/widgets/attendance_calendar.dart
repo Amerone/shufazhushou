@@ -5,6 +5,7 @@ import '../../../core/models/attendance.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../shared/constants.dart' show formatDate;
 import '../../../shared/theme.dart';
+import '../../../shared/widgets/brush_stroke_divider.dart';
 import '../../../shared/widgets/glass_card.dart';
 
 class AttendanceCalendar extends ConsumerStatefulWidget {
@@ -52,20 +53,54 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
     });
 
     return GlassCard(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '上课日历',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '出勤月历',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const BrushStrokeDivider(
+                      width: 96,
+                      height: 12,
+                      color: kPrimaryBlue,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '短笔触标识每日整体状态，点击日期即可翻看对应课堂记录。',
+                      style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.52),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
+                ),
+                child: const Icon(
+                  Icons.calendar_month_outlined,
+                  size: 18,
+                  color: kSealRed,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            '点击日期可查看当天记录，色条用于提示出勤状态。',
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -75,7 +110,7 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
               _LegendChip(label: '缺勤', color: kRed),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           TableCalendar(
             locale: 'zh_CN',
             firstDay: DateTime(2020),
@@ -96,24 +131,34 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
             headerStyle: HeaderStyle(
               formatButtonVisible: false,
               titleCentered: true,
-              titleTextStyle: theme.textTheme.titleMedium ?? const TextStyle(),
+              titleTextStyle: (theme.textTheme.titleMedium ?? const TextStyle())
+                  .copyWith(fontWeight: FontWeight.w700),
               leftChevronIcon: const Icon(Icons.chevron_left, color: kInkSecondary),
               rightChevronIcon: const Icon(Icons.chevron_right, color: kInkSecondary),
+              headerPadding: const EdgeInsets.only(bottom: 12),
             ),
             daysOfWeekStyle: DaysOfWeekStyle(
-              weekdayStyle: theme.textTheme.bodySmall ?? const TextStyle(),
-              weekendStyle: (theme.textTheme.bodySmall ?? const TextStyle()).copyWith(color: kRed),
+              weekdayStyle: (theme.textTheme.bodySmall ?? const TextStyle()).copyWith(
+                color: kInkSecondary.withValues(alpha: 0.9),
+              ),
+              weekendStyle: (theme.textTheme.bodySmall ?? const TextStyle()).copyWith(
+                color: kRed,
+              ),
             ),
             calendarStyle: CalendarStyle(
-              cellMargin: const EdgeInsets.all(4),
+              cellMargin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               defaultTextStyle: theme.textTheme.bodyMedium ?? const TextStyle(),
-              weekendTextStyle: (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(color: kRed),
-              selectedDecoration: const BoxDecoration(
-                color: kPrimaryBlue,
+              weekendTextStyle:
+                  (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
+                color: kRed,
+              ),
+              selectedDecoration: BoxDecoration(
+                color: kPrimaryBlue.withValues(alpha: 0.94),
+                border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.18)),
                 shape: BoxShape.circle,
               ),
               todayDecoration: BoxDecoration(
-                color: kSealRed.withValues(alpha: 0.16),
+                color: kSealRed.withValues(alpha: 0.14),
                 border: Border.all(color: kSealRed.withValues(alpha: 0.4)),
                 shape: BoxShape.circle,
               ),
@@ -129,14 +174,12 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
                 if (color == null) return null;
 
                 return Positioned(
-                  bottom: 5,
-                  child: Container(
+                  bottom: 7,
+                  child: BrushStrokeDivider(
                     width: 18,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+                    height: 6,
+                    color: color,
+                    alignment: Alignment.center,
                   ),
                 );
               },
@@ -162,19 +205,18 @@ class _LegendChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: Colors.white.withValues(alpha: 0.56),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 8,
+          BrushStrokeDivider(
+            width: 18,
             height: 8,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(999),
-            ),
+            color: color,
+            alignment: Alignment.center,
           ),
           const SizedBox(width: 6),
           Text(label, style: Theme.of(context).textTheme.bodySmall),

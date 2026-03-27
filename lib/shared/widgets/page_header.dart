@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'brush_stroke_divider.dart';
 import '../theme.dart';
 
 class PageHeader extends StatelessWidget {
@@ -27,7 +28,7 @@ class PageHeader extends StatelessWidget {
     return Container(
       padding: EdgeInsets.only(
         top: topPadding + 18,
-        bottom: 18,
+        bottom: 22,
         left: 24,
         right: 24,
       ),
@@ -48,6 +49,9 @@ class PageHeader extends StatelessWidget {
                 icon: const Icon(Icons.arrow_back_ios_new, size: 18),
                 color: kPrimaryBlue,
                 onPressed: onBack,
+                splashColor: kPrimaryBlue.withValues(alpha: 0.08),
+                highlightColor: Colors.transparent,
+                hoverColor: Colors.transparent,
                 padding: const EdgeInsets.all(8),
                 constraints: const BoxConstraints(),
               ),
@@ -64,8 +68,14 @@ class PageHeader extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                const SizedBox(height: 8),
+                const BrushStrokeDivider(
+                  width: 116,
+                  height: 12,
+                  color: kPrimaryBlue,
+                ),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                     decoration: BoxDecoration(

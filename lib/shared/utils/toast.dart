@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'interaction_feedback.dart';
 
 class AppToast {
   static void showSuccess(BuildContext context, String msg) {
@@ -67,7 +68,12 @@ class AppToast {
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
-            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            onPressed: () async {
+              await InteractionFeedback.selection(dialogCtx);
+              if (dialogCtx.mounted) {
+                Navigator.of(dialogCtx).pop(true);
+              }
+            },
             child: const Text('确认'),
           ),
         ),

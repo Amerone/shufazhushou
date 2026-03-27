@@ -1,12 +1,16 @@
 ﻿import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
+import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/attendance_edit_sheet.dart';
+import '../../../shared/widgets/brush_stroke_divider.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../core/models/student.dart';
 
@@ -53,7 +57,7 @@ class AttendanceList extends ConsumerWidget {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: records.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 10),
+          separatorBuilder: (_, _) => const SizedBox(height: 14),
           itemBuilder: (_, i) {
             final r = records[i];
             final status = statusLabel(r.status);
@@ -62,19 +66,38 @@ class AttendanceList extends ConsumerWidget {
 
             return Container(
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.58),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: sColor.withValues(alpha: 0.16)),
+                color: Colors.white.withValues(alpha: 0.54),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: sColor.withValues(alpha: 0.14)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF8B7D6B).withValues(alpha: 0.06),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => AttendanceEditSheet(record: r),
-                ),
+                borderRadius: BorderRadius.circular(20),
+                overlayColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.pressed)) {
+                    return sColor.withValues(alpha: 0.08);
+                  }
+                  if (states.contains(WidgetState.hovered)) {
+                    return sColor.withValues(alpha: 0.03);
+                  }
+                  return null;
+                }),
+                onTap: () {
+                  unawaited(InteractionFeedback.selection(context));
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => AttendanceEditSheet(record: r),
+                  );
+                },
                 child: Padding(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(16),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final compact = constraints.maxWidth < 420;
@@ -83,6 +106,7 @@ class AttendanceList extends ConsumerWidget {
                           final confirm = await AppToast.showConfirm(context, '确认删除此出勤记录？');
                           if (!confirm) return;
                           await ref.read(attendanceDaoProvider).delete(r.id);
+                          await InteractionFeedback.seal(context);
                           invalidateAfterAttendanceChange(ref);
                         },
                       );
@@ -95,7 +119,7 @@ class AttendanceList extends ConsumerWidget {
                           border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
                         ),
                         child: Text(
-                          '点击编辑',
+                          '轻触可改',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: kPrimaryBlue,
                             fontWeight: FontWeight.w700,
@@ -107,11 +131,11 @@ class AttendanceList extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            width: 46,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            width: 50,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: sColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(14),
+                              color: sColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -146,7 +170,13 @@ class AttendanceList extends ConsumerWidget {
                                               fontWeight: FontWeight.w700,
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
+                                          const SizedBox(height: 6),
+                                          BrushStrokeDivider(
+                                            width: compact ? 72 : 84,
+                                            height: 10,
+                                            color: sColor,
+                                          ),
+                                          const SizedBox(height: 6),
                                           Text(
                                             '第 ${i + 1} 条记录',
                                             style: theme.textTheme.bodySmall,
@@ -178,16 +208,27 @@ class AttendanceList extends ConsumerWidget {
                                   ],
                                 ),
                                 if (r.note?.trim().isNotEmpty == true) ...[
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    r.note!,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: kInkSecondary,
-                                      height: 1.45,
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: kPrimaryBlue.withValues(alpha: 0.05),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Text(
+                                      r.note!,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: kInkSecondary,
+                                        height: 1.5,
+                                      ),
                                     ),
                                   ),
                                 ],
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 12),
                                 if (compact)
                                   Row(
                                     children: [
@@ -240,6 +281,7 @@ class _StatusBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
       ),
       child: Text(
         status,
@@ -269,8 +311,8 @@ class _MetaChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withValues(alpha: 0.74),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
       ),
       child: Row(
@@ -303,6 +345,9 @@ class _RecordActionButton extends StatelessWidget {
         icon: const Icon(Icons.delete_outline),
         color: kRed,
         visualDensity: VisualDensity.compact,
+        style: IconButton.styleFrom(
+          overlayColor: kRed.withValues(alpha: 0.12),
+        ),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -10,13 +11,16 @@ import '../../../core/models/payment.dart';
 import '../../../core/models/seal_config.dart';
 import '../../../core/models/student.dart';
 import '../../../core/providers/attendance_provider.dart';
+import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../core/utils/excel_exporter.dart';
 import '../../../core/utils/pdf_generator.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
+import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
+import '../../../shared/widgets/brush_stroke_divider.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 
@@ -128,6 +132,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       if (student == null) throw Exception('未找到当前学员，请返回详情页后重试');
 
       if (mounted) {
+        unawaited(InteractionFeedback.pageTurn(context));
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (previewCtx) => Scaffold(
@@ -183,6 +188,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                                 ),
                                 onPressed: () async {
+                                  await InteractionFeedback.seal(previewCtx);
                                   await _shareFile(previewCtx, path);
                                 },
                                 icon: const Icon(Icons.share_outlined, size: 18),
@@ -257,6 +263,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     setState(() => _loading = true);
     try {
       final path = await _buildPdf();
+      await InteractionFeedback.seal(context);
       await _shareFile(context, path);
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
@@ -286,6 +293,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       if (!shared) {
         return;
       }
+      await InteractionFeedback.seal(context);
       if (mounted) AppToast.showSuccess(context, 'Excel 已生成，请在系统分享面板中保存。');
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
@@ -299,6 +307,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       final ok = await AppToast.showConfirm(context, '确认关闭水印吗？');
       if (!ok) return;
     }
+    unawaited(InteractionFeedback.selection(context));
     setState(() => _watermark = value);
   }
 
@@ -312,7 +321,10 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
-    if (date != null) onPicked(date);
+    if (date != null) {
+      await InteractionFeedback.selection(context);
+      onPicked(date);
+    }
   }
 
   @override
@@ -347,13 +359,29 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                 child: Container(
                   width: 36,
                   height: 4,
-                  margin: const EdgeInsets.only(bottom: 24),
+                  margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
                     color: kInkSecondary.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  color: kInkSecondary,
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: kInkSecondary.withValues(alpha: 0.16)),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(
                 '导出学习报告',
                 style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -474,6 +502,21 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                               label: _watermark ? 'PDF 含水印' : 'PDF 纯净版',
                               color: _watermark ? kSealRed : kInkSecondary,
                             ),
+                            const _ExportMetaBadge(
+                              icon: Icons.grid_view_outlined,
+                              label: '乌丝栏版式',
+                              color: kPrimaryBlue,
+                            ),
+                            const _ExportMetaBadge(
+                              icon: Icons.menu_book_outlined,
+                              label: '册页札记排版',
+                              color: kGreen,
+                            ),
+                            const _ExportMetaBadge(
+                              icon: Icons.approval_outlined,
+                              label: '朱砂落款收尾',
+                              color: kSealRed,
+                            ),
                           ],
                         ),
                       ],
@@ -583,6 +626,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                         backgroundColor: Colors.white.withValues(alpha: 0.5),
                         side: BorderSide(color: kInkSecondary.withValues(alpha: 0.2)),
                         onPressed: () {
+                          unawaited(InteractionFeedback.selection(context));
                           _msgCtrl.text = message;
                           setState(() {});
                         },
@@ -731,7 +775,13 @@ class _ExportSectionHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
+                  const BrushStrokeDivider(
+                    width: 62,
+                    height: 8,
+                    color: kSealRed,
+                  ),
+                  const SizedBox(height: 6),
                   Text(subtitle, style: theme.textTheme.bodySmall),
                 ],
               ),

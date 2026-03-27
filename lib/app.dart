@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'dart:async';
 import 'package:go_router/go_router.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/home/screens/launch_screen.dart';
@@ -14,7 +15,9 @@ import 'features/students/screens/student_detail_screen.dart';
 import 'features/students/screens/student_form_screen.dart';
 import 'features/students/screens/student_import_screen.dart';
 import 'features/students/screens/student_list_screen.dart';
+import 'shared/widgets/brush_stroke_divider.dart';
 import 'shared/theme.dart';
+import 'shared/utils/interaction_feedback.dart';
 
 final _router = GoRouter(
   initialLocation: '/launch',
@@ -85,39 +88,260 @@ class _ScaffoldWithNav extends StatelessWidget {
 
     return Scaffold(
       extendBody: true,
-      body: shell,
+      body: _ShellBodyMotion(
+        index: shell.currentIndex,
+        child: shell,
+      ),
       bottomNavigationBar: SafeArea(
         top: false,
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: Container(
+        child: _BrushNavigationBar(
+          currentIndex: shell.currentIndex,
+          onSelect: shell.goBranch,
+          shadowColor: theme.colorScheme.shadow,
+        ),
+      ),
+    );
+  }
+}
+
+class _ShellBodyMotion extends StatefulWidget {
+  final int index;
+  final Widget child;
+
+  const _ShellBodyMotion({
+    required this.index,
+    required this.child,
+  });
+
+  @override
+  State<_ShellBodyMotion> createState() => _ShellBodyMotionState();
+}
+
+class _ShellBodyMotionState extends State<_ShellBodyMotion>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+      value: 1,
+    );
+    _opacity = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    _scale = Tween<double>(begin: 0.988, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _ShellBodyMotion oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index == widget.index) return;
+    unawaited(_controller.forward(from: 0));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: ScaleTransition(
+        scale: _scale,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _BrushNavigationBar extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onSelect;
+  final Color shadowColor;
+
+  const _BrushNavigationBar({
+    required this.currentIndex,
+    required this.onSelect,
+    required this.shadowColor,
+  });
+
+  static const _items = [
+    _NavItemData(
+      label: '首页',
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+    ),
+    _NavItemData(
+      label: '学生',
+      icon: Icons.people_outline,
+      selectedIcon: Icons.people_alt_rounded,
+    ),
+    _NavItemData(
+      label: '统计',
+      icon: Icons.bar_chart_outlined,
+      selectedIcon: Icons.bar_chart_rounded,
+    ),
+    _NavItemData(
+      label: '设置',
+      icon: Icons.settings_outlined,
+      selectedIcon: Icons.settings_rounded,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.88),
+            Colors.white.withValues(alpha: 0.72),
+          ],
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.7),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor.withValues(alpha: 0.08),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: const Color(0xFF8B7D6B).withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+        child: Row(
+          children: List.generate(_items.length, (index) {
+            final item = _items[index];
+            return Expanded(
+              child: _BrushNavItem(
+                data: item,
+                selected: currentIndex == index,
+                onTap: () => onSelect(index),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+class _BrushNavItem extends StatelessWidget {
+  final _NavItemData data;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _BrushNavItem({
+    required this.data,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = selected ? kPrimaryBlue : kInkSecondary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        overlayColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.pressed)) {
+            return kPrimaryBlue.withValues(alpha: 0.08);
+          }
+          if (states.contains(WidgetState.hovered)) {
+            return kPrimaryBlue.withValues(alpha: 0.03);
+          }
+          return null;
+        }),
+        onTap: () {
+          if (!selected) {
+            unawaited(InteractionFeedback.pageTurn(context));
+          }
+          onTap();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.shadow.withValues(alpha: 0.08),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
+            color: selected
+                ? Colors.white.withValues(alpha: 0.32)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected ? data.selectedIcon : data.icon,
+                size: 22,
+                color: color,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                data.label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: color,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 7),
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                opacity: selected ? 1 : 0,
+                child: BrushStrokeDivider(
+                  width: 38,
+                  height: 8,
+                  color: selected ? kSealRed : Colors.transparent,
+                  alignment: Alignment.center,
+                ),
               ),
             ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(26),
-            child: NavigationBar(
-              height: 72,
-              selectedIndex: shell.currentIndex,
-              onDestinationSelected: shell.goBranch,
-              destinations: const [
-                NavigationDestination(icon: Icon(Icons.home_outlined), label: '首页'),
-                NavigationDestination(icon: Icon(Icons.people_outline), label: '学生'),
-                NavigationDestination(icon: Icon(Icons.bar_chart_outlined), label: '统计'),
-                NavigationDestination(icon: Icon(Icons.settings_outlined), label: '设置'),
-              ],
-            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _NavItemData {
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+
+  const _NavItemData({
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+  });
 }
 
 class App extends StatelessWidget {

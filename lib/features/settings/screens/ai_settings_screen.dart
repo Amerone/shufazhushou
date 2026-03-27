@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/models/handwriting_analysis_result.dart';
 import '../../../core/models/qwen_vision_config.dart';
@@ -332,11 +333,12 @@ class AiSettingsScreen extends ConsumerWidget {
                       ),
                     ),
                     onPressed: () async {
+                      final value = controller.text.trim();
+                      Navigator.of(sheetCtx).pop();
                       await ref.read(settingsProvider.notifier).set(
                             keyName,
-                            controller.text.trim(),
+                            value,
                           );
-                      if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
                       if (context.mounted) AppToast.showSuccess(context, '已保存$title');
                     },
                     child: const Text('保存配置'),
@@ -514,6 +516,14 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+    _imageSourceController.text = image.path;
+    setState(() {});
+  }
+
   Future<void> _runAnalysis() async {
     final service = ref.read(handwritingAnalysisServiceProvider);
     if (service == null) {
@@ -605,26 +615,45 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
               ),
               const SizedBox(height: 6),
               Text(
-                '支持填写公网图片 URL，或桌面端/模拟器可访问的本地文件路径；本地图片会在请求前转成 data URL。',
+                '从相册选取书法作业图片，或输入公网图片 URL 进行分析。',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: kInkSecondary,
                       height: 1.5,
                     ),
               ),
               const SizedBox(height: 16),
-              TextField(
-                key: const ValueKey('ai_image_source_field'),
-                controller: _imageSourceController,
-                enabled: !_submitting,
-                decoration: InputDecoration(
-                  labelText: '图片 URL / 本地路径',
-                  hintText: '例如：https://example.com/work.jpg 或 E:\\images\\work.png',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      key: const ValueKey('ai_image_source_field'),
+                      controller: _imageSourceController,
+                      enabled: !_submitting,
+                      decoration: InputDecoration(
+                        labelText: '图片路径 / URL',
+                        hintText: '点击右侧按钮从相册选取',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.56),
+                      ),
+                    ),
                   ),
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.56),
-                ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: _submitting ? null : _pickImage,
+                    icon: const Icon(Icons.photo_library_outlined),
+                    style: IconButton.styleFrom(
+                      backgroundColor: kPrimaryBlue.withValues(alpha: 0.12),
+                      foregroundColor: kPrimaryBlue,
+                      fixedSize: const Size(52, 52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               TextField(

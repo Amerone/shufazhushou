@@ -1,4 +1,6 @@
 ﻿import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/attendance.dart';
 import '../../core/models/structured_attendance_feedback.dart';
@@ -7,6 +9,7 @@ import '../../core/providers/invalidation_helper.dart';
 import '../../core/utils/fee_calculator.dart';
 import '../constants.dart';
 import '../theme.dart';
+import '../utils/interaction_feedback.dart';
 import '../utils/toast.dart';
 import 'glass_card.dart';
 import 'time_wheel_picker.dart';
@@ -122,7 +125,10 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
 
       await dao.update(updated);
       _invalidate();
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        await InteractionFeedback.seal(context);
+        Navigator.of(context).pop();
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -136,7 +142,10 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
     setState(() => _saving = true);
     await ref.read(attendanceDaoProvider).delete(widget.record.id);
     _invalidate();
-    if (mounted) Navigator.of(context).pop();
+    if (mounted) {
+      await InteractionFeedback.seal(context);
+      Navigator.of(context).pop();
+    }
   }
 
   void _invalidate() {
@@ -212,7 +221,10 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                       (s) => ChoiceChip(
                         label: Text(s.$2),
                         selected: _status == s.$1,
-                        onSelected: (_) => setState(() => _status = s.$1),
+                        onSelected: (_) {
+                          unawaited(InteractionFeedback.selection(context));
+                          setState(() => _status = s.$1);
+                        },
                       ),
                     )
                     .toList(),
@@ -227,7 +239,10 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                     firstDate: DateTime(2020),
                     lastDate: DateTime.now().add(const Duration(days: 365)),
                   );
-                  if (d != null) setState(() => _date = d);
+                  if (d != null) {
+                    await InteractionFeedback.selection(context);
+                    setState(() => _date = d);
+                  }
                 },
                 child: InputDecorator(
                   decoration: InputDecoration(
@@ -257,6 +272,7 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                           label: '开始时间',
                         );
                         if (picked != null) {
+                          await InteractionFeedback.selection(context);
                           setState(() {
                             _startTime = formatTime(picked);
                           });
@@ -284,6 +300,7 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                           label: '结束时间',
                         );
                         if (picked != null) {
+                          await InteractionFeedback.selection(context);
                           setState(() {
                             _endTime = formatTime(picked);
                           });
@@ -330,6 +347,7 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                         label: Text(tag),
                         selected: _lessonFocusTags.contains(tag),
                         onSelected: (selected) {
+                          unawaited(InteractionFeedback.selection(context));
                           setState(() {
                             if (selected) {
                               _lessonFocusTags.add(tag);
@@ -432,7 +450,10 @@ class _ScoreEditor extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               TextButton(
-                onPressed: onClear,
+                onPressed: () {
+                  unawaited(InteractionFeedback.selection(context));
+                  onClear();
+                },
                 child: const Text('清空'),
               ),
             ],
@@ -443,7 +464,10 @@ class _ScoreEditor extends StatelessWidget {
             max: 5,
             divisions: 10,
             label: (value ?? 3.0).toStringAsFixed(1),
-            onChanged: onChanged,
+            onChanged: (nextValue) {
+              unawaited(InteractionFeedback.selection(context));
+              onChanged(nextValue);
+            },
           ),
         ],
       ),
