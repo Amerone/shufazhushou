@@ -1,26 +1,32 @@
-import 'package:calligraphy_assistant/core/database/dao/attendance_dao.dart';
-import 'package:calligraphy_assistant/core/database/dao/dismissed_insight_dao.dart';
-import 'package:calligraphy_assistant/core/database/dao/payment_dao.dart';
-import 'package:calligraphy_assistant/core/database/dao/student_dao.dart';
-import 'package:calligraphy_assistant/core/database/database_helper.dart';
-import 'package:calligraphy_assistant/core/models/attendance.dart';
-import 'package:calligraphy_assistant/core/models/student.dart';
-import 'package:calligraphy_assistant/core/providers/attendance_provider.dart';
-import 'package:calligraphy_assistant/core/providers/fee_summary_provider.dart';
-import 'package:calligraphy_assistant/core/providers/insight_provider.dart';
-import 'package:calligraphy_assistant/core/providers/student_provider.dart';
-import 'package:calligraphy_assistant/core/services/insight_aggregation_service.dart';
-import 'package:calligraphy_assistant/shared/constants.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moyun/core/database/dao/attendance_dao.dart';
+import 'package:moyun/core/database/dao/dismissed_insight_dao.dart';
+import 'package:moyun/core/database/dao/payment_dao.dart';
+import 'package:moyun/core/database/dao/student_dao.dart';
+import 'package:moyun/core/database/database_helper.dart';
+import 'package:moyun/core/models/attendance.dart';
+import 'package:moyun/core/models/student.dart';
+import 'package:moyun/core/providers/attendance_provider.dart';
+import 'package:moyun/core/providers/fee_summary_provider.dart';
+import 'package:moyun/core/providers/insight_provider.dart';
+import 'package:moyun/core/providers/statistics_period_provider.dart';
+import 'package:moyun/core/providers/student_provider.dart';
+import 'package:moyun/core/services/insight_aggregation_service.dart';
+import 'package:moyun/shared/constants.dart';
 
 void main() {
   test('InsightNotifier wires DAOs, cleanup and display names correctly', () async {
+    const range = StatisticsRange(
+      period: StatisticsPeriod.month,
+      from: '2026-03-01',
+      to: '2026-03-31',
+    );
     final studentDao = _FakeStudentDao([
       const Student(
         id: 'student-1',
-        name: '张三',
-        parentName: '李女士',
+        name: 'Alex',
+        parentName: 'Parent A',
         parentPhone: '13800000001',
         pricePerClass: 100,
         status: 'active',
@@ -30,8 +36,8 @@ void main() {
       ),
       const Student(
         id: 'student-2',
-        name: '张三',
-        parentName: '王女士',
+        name: 'Alex',
+        parentName: 'Parent B',
         parentPhone: '13800000002',
         pricePerClass: 120,
         status: 'active',
@@ -41,22 +47,20 @@ void main() {
       ),
     ]);
     final attendanceDao = _FakeAttendanceDao(
-      groupedAttendance: {
-        'student-1': [
-          Attendance(
-            id: 'attendance-1',
-            studentId: 'student-1',
-            date: '2026-03-25',
-            startTime: '09:00',
-            endTime: '10:00',
-            status: 'present',
-            priceSnapshot: 100,
-            feeAmount: 100,
-            createdAt: 1,
-            updatedAt: 1,
-          ),
-        ],
-      },
+      attendance: [
+        Attendance(
+          id: 'attendance-1',
+          studentId: 'student-1',
+          date: '2026-03-25',
+          startTime: '09:00',
+          endTime: '10:00',
+          status: 'present',
+          priceSnapshot: 100,
+          feeAmount: 100,
+          createdAt: 1,
+          updatedAt: 1,
+        ),
+      ],
       metrics: const {'activeStudentCount': 2},
     );
     final paymentDao = _FakePaymentDao(
@@ -70,10 +74,10 @@ void main() {
         Insight(
           type: InsightType.progress,
           studentId: 'student-1',
-          studentName: '张三（李女士）',
-          message: '近 3 次评分持续提升：笔画质量',
-          suggestion: '建议生成成长快照并同步家长，延续当前训练节奏。',
-          calcLogic: '在最近 3 次有效评分记录中，至少一个维度连续递增时触发。',
+          studentName: 'Alex\uFF08Parent A\uFF09',
+          message: 'Progress trend improved',
+          suggestion: 'Keep current practice rhythm.',
+          calcLogic: 'Generated when one score improves across 3 records.',
           dataFreshness: '2026-03-27 09:00',
         ),
       ],
@@ -89,6 +93,7 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+    container.read(statisticsPeriodProvider.notifier).state = range;
 
     final insights = await container.read(insightProvider.future);
 
@@ -97,26 +102,27 @@ void main() {
     expect(insights, hasLength(1));
     expect(insights.single.type, InsightType.progress);
     expect(spyService.capturedDismissedKeys, const {'renewal:student-1'});
-    expect(spyService.capturedWeeklyActiveStudentCount, 2);
-    expect(spyService.capturedDisplayNames['student-1'], '张三（李女士）');
-    expect(spyService.capturedDisplayNames['student-2'], '张三（王女士）');
+    expect(spyService.capturedActiveStudentCount, 2);
+    expect(spyService.capturedActivePeriodLabel, '\u672C\u6708');
+    expect(
+      spyService.capturedDisplayNames['student-1'],
+      'Alex\uFF08Parent A\uFF09',
+    );
+    expect(
+      spyService.capturedDisplayNames['student-2'],
+      'Alex\uFF08Parent B\uFF09',
+    );
     expect(spyService.capturedAllPayments['student-1'], 300);
     expect(spyService.capturedAllAttendance['student-1'], hasLength(1));
+    expect(attendanceDao.rangeFrom, range.from);
+    expect(attendanceDao.rangeTo, range.to);
     expect(attendanceDao.metricsFrom, isNotNull);
     expect(attendanceDao.metricsTo, isNotNull);
-
-    final capturedNow = spyService.capturedNow!;
-    final expectedWeekStart =
-        capturedNow.subtract(Duration(days: capturedNow.weekday - 1));
-    expect(attendanceDao.metricsFrom, _formatDate(expectedWeekStart));
-    expect(attendanceDao.metricsTo, _formatDate(capturedNow));
+    expect(attendanceDao.metricsFrom, range.from);
+    expect(attendanceDao.metricsTo, range.to);
+    expect(paymentDao.rangeFrom, range.from);
+    expect(paymentDao.rangeTo, range.to);
   });
-}
-
-String _formatDate(DateTime date) {
-  final month = date.month.toString().padLeft(2, '0');
-  final day = date.day.toString().padLeft(2, '0');
-  return '${date.year}-$month-$day';
 }
 
 class _FakeStudentDao extends StudentDao {
@@ -129,19 +135,23 @@ class _FakeStudentDao extends StudentDao {
 }
 
 class _FakeAttendanceDao extends AttendanceDao {
-  final Map<String, List<Attendance>> groupedAttendance;
+  final List<Attendance> attendance;
   final Map<String, dynamic> metrics;
+  String? rangeFrom;
+  String? rangeTo;
   String? metricsFrom;
   String? metricsTo;
 
   _FakeAttendanceDao({
-    required this.groupedAttendance,
+    required this.attendance,
     required this.metrics,
   }) : super(DatabaseHelper.instance);
 
   @override
-  Future<Map<String, List<Attendance>>> getAllGroupedByStudent() async {
-    return groupedAttendance;
+  Future<List<Attendance>> getByDateRange(String from, String to) async {
+    rangeFrom = from;
+    rangeTo = to;
+    return attendance;
   }
 
   @override
@@ -154,11 +164,20 @@ class _FakeAttendanceDao extends AttendanceDao {
 
 class _FakePaymentDao extends PaymentDao {
   final Map<String, double> totalsByStudent;
+  String? rangeFrom;
+  String? rangeTo;
 
   _FakePaymentDao(this.totalsByStudent) : super(DatabaseHelper.instance);
 
   @override
-  Future<Map<String, double>> getTotalByAllStudents() async => totalsByStudent;
+  Future<Map<String, double>> getTotalByAllStudentsAndDateRange(
+    String? from,
+    String? to,
+  ) async {
+    rangeFrom = from;
+    rangeTo = to;
+    return totalsByStudent;
+  }
 }
 
 class _FakeDismissedInsightDao extends DismissedInsightDao {
@@ -187,7 +206,8 @@ class _SpyInsightService extends InsightAggregationService {
   Map<String, List<Attendance>> capturedAllAttendance = const {};
   Map<String, double> capturedAllPayments = const {};
   Set<String> capturedDismissedKeys = const {};
-  int capturedWeeklyActiveStudentCount = 0;
+  int capturedActiveStudentCount = 0;
+  String capturedActivePeriodLabel = '';
   DateTime? capturedNow;
 
   _SpyInsightService(this._result);
@@ -199,7 +219,8 @@ class _SpyInsightService extends InsightAggregationService {
     required Map<String, List<Attendance>> allAttendance,
     required Map<String, double> allPayments,
     required Set<String> dismissedKeys,
-    required int weeklyActiveStudentCount,
+    required int activeStudentCount,
+    String activePeriodLabel = '\u672C\u5468',
     DateTime? now,
   }) {
     capturedStudents = students;
@@ -207,7 +228,8 @@ class _SpyInsightService extends InsightAggregationService {
     capturedAllAttendance = allAttendance;
     capturedAllPayments = allPayments;
     capturedDismissedKeys = dismissedKeys;
-    capturedWeeklyActiveStudentCount = weeklyActiveStudentCount;
+    capturedActiveStudentCount = activeStudentCount;
+    capturedActivePeriodLabel = activePeriodLabel;
     capturedNow = now;
     return _result;
   }

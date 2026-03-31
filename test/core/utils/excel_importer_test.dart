@@ -1,5 +1,5 @@
-﻿import 'package:calligraphy_assistant/core/models/student.dart';
-import 'package:calligraphy_assistant/core/utils/excel_importer.dart';
+import 'package:moyun/core/models/student.dart';
+import 'package:moyun/core/utils/excel_importer.dart';
 import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 

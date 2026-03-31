@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-书法私教助手 (Calligraphy Private Tutor Assistant) — an offline-first Android Flutter app for calligraphy instructors to manage student attendance, fees, and generate reports. All data is stored locally in SQLite.
+墨韵 (Moyun) — an offline-first Android Flutter app for calligraphy instructors to manage student attendance, fees, and generate reports. All data is stored locally in SQLite.
 
 ## Build & Development Commands
 
@@ -49,7 +49,7 @@ lib/
 ├── app.dart               # MaterialApp.router + GoRouter config
 ├── core/
 │   ├── database/
-│   │   ├── database_helper.dart   # SQLite singleton, migrations (v3), PRAGMA foreign_keys=ON
+│   │   ├── database_helper.dart   # SQLite singleton, migrations (v4), PRAGMA foreign_keys=ON
 │   │   └── dao/                   # Data Access Objects (one per table)
 │   ├── models/                    # Data classes with fromMap/toMap/copyWith
 │   ├── providers/                 # Riverpod providers (AsyncNotifier + StateProvider)
@@ -99,7 +99,7 @@ All statistics providers watch `statisticsPeriodProvider` (week/month/year) and 
 
 ## Database
 
-SQLite via sqflite. DB file: `calligraphy_assistant.db`, current version: 3.
+SQLite via sqflite. DB file: `moyun.db` (startup migrates legacy `calligraphy_assistant.db`), current version: 4.
 
 6 tables: `students`, `attendance`, `payments`, `class_templates`, `settings`, `dismissed_insights`. Foreign keys with CASCADE delete enabled via PRAGMA on every open.
 

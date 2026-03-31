@@ -1,12 +1,16 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/models/attendance.dart';
+import '../../../core/models/handwriting_analysis_result.dart';
 import '../../../core/models/payment.dart';
+import '../../../core/providers/ai_provider.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
+import '../../../core/services/handwriting_analysis_service.dart';
 import '../../../core/utils/fee_calculator.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
@@ -17,7 +21,9 @@ import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../export/screens/export_config_screen.dart';
+import '../widgets/attendance_ai_analysis_sheet.dart';
 import '../widgets/payment_bottom_sheet.dart';
+import '../widgets/student_ai_progress_card.dart';
 
 class StudentDetailScreen extends ConsumerStatefulWidget {
   final String studentId;
@@ -34,6 +40,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   static const _pageSize = 20;
   bool _hasMore = true;
   bool _loadingMore = false;
+  final Set<String> _analyzingImageRecordIds = <String>{};
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -88,13 +95,140 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   Future<void> _refresh() async {
     invalidateAfterAttendanceChange(ref);
     ref.invalidate(studentProvider);
+    await Future.wait([_reloadAttendanceRecords(), _loadPayments()]);
+  }
+
+  Future<void> _reloadAttendanceRecords() async {
+    if (!mounted) return;
     setState(() {
       _page = 0;
       _records = [];
       _hasMore = true;
       _loadingMore = false;
     });
-    await Future.wait([_loadMore(), _loadPayments()]);
+    await _loadMore();
+  }
+
+  Future<void> _analyzeAttendanceImage(Attendance record, String studentName) async {
+    final service = ref.read(handwritingAnalysisServiceProvider);
+    if (service == null) {
+      AppToast.showError(context, '\u8bf7\u5148\u5728\u8bbe\u7f6e\u4e2d\u5b8c\u6210 AI \u914d\u7f6e\u3002');
+      return;
+    }
+
+    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (image == null || !mounted) return;
+
+    setState(() => _analyzingImageRecordIds.add(record.id));
+
+    try {
+      final result = await service.analyze(
+        HandwritingAnalysisInput(
+          imageSource: image.path,
+          studentName: studentName,
+        ),
+      );
+      if (!mounted) return;
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) => AttendanceAiAnalysisSheet(
+          result: result,
+          onApplySuggestion: () async {
+            final nextPracticeNote = _buildPracticeSuggestionText(result);
+            final applied = await _applyPracticeSuggestion(
+              record,
+              nextPracticeNote,
+            );
+            if (applied && sheetContext.mounted) {
+              Navigator.of(sheetContext).pop();
+            }
+          },
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      AppToast.showError(context, '\u56fe\u7247\u5206\u6790\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002');
+    } finally {
+      if (mounted) {
+        setState(() => _analyzingImageRecordIds.remove(record.id));
+      }
+    }
+  }
+
+  Future<bool> _applyPracticeSuggestion(
+    Attendance record,
+    String suggestion,
+  ) async {
+    final normalizedSuggestion = suggestion.trim();
+    if (normalizedSuggestion.isEmpty) {
+      AppToast.showError(context, 'AI \u672a\u8fd4\u56de\u53ef\u5199\u5165\u7684\u7ec3\u4e60\u5efa\u8bae\u3002');
+      return false;
+    }
+
+    try {
+      final attendanceDao = ref.read(attendanceDaoProvider);
+      final latestRecord = await attendanceDao.getById(record.id);
+      if (latestRecord == null) {
+        if (mounted) {
+          AppToast.showError(
+            context,
+            '\u672a\u627e\u5230\u5bf9\u5e94\u7684\u51fa\u52e4\u8bb0\u5f55\uff0c\u65e0\u6cd5\u66f4\u65b0\u7ec3\u4e60\u5efa\u8bae\u3002',
+          );
+        }
+        return false;
+      }
+
+      final oldNote = latestRecord.homePracticeNote?.trim() ?? '';
+      final stamp = formatDate(DateTime.now());
+      final mergedNote = oldNote.isEmpty
+          ? normalizedSuggestion
+          : '$oldNote\n\nAI \u5efa\u8bae\u8bb0\u5f55\u4e8e $stamp\uff1a\n$normalizedSuggestion';
+
+      final updated = latestRecord.copyWith(
+        homePracticeNote: mergedNote,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      await attendanceDao.update(updated);
+      invalidateAfterAttendanceChange(ref);
+      await _reloadAttendanceRecords();
+      if (!mounted) return true;
+      AppToast.showSuccess(context, '\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae\u5df2\u66f4\u65b0\u3002');
+      return true;
+    } catch (_) {
+      if (mounted) {
+        AppToast.showError(
+          context,
+          '\u66f4\u65b0\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002',
+        );
+      }
+      return false;
+    }
+  }
+
+  String _buildPracticeSuggestionText(HandwritingAnalysisResult result) {
+    final suggestions = result.practiceSuggestions
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+    if (suggestions.isNotEmpty) {
+      return suggestions
+          .asMap()
+          .entries
+          .map((entry) => '${entry.key + 1}. ${entry.value}')
+          .join('\n');
+    }
+
+    final fallbackParts = <String>[
+      result.summary.trim(),
+      result.strokeObservation.trim(),
+      result.structureObservation.trim(),
+      result.layoutObservation.trim(),
+    ].where((item) => item.isNotEmpty);
+
+    return fallbackParts.join('\n');
   }
 
   @override
@@ -111,11 +245,18 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     final now = DateTime.now();
     final from = formatDate(DateTime(now.year, now.month, 1));
     final to = formatDate(DateTime(now.year, now.month + 1, 0));
-    final statusText = student.status == 'active' ? '在读' : '休学';
+    final statusText =
+        student.status == 'active'
+            ? '\u5728\u8bfb'
+            : '\u4f11\u5b66';
     final statusColor = student.status == 'active' ? kGreen : kOrange;
-    final lastAttendanceLabel = meta?.lastAttendanceDate ?? '暂无记录';
-    final attendanceCountLabel = _hasMore ? '已加载 ${_records.length} 条' : '${_records.length} 条';
-    final studentInitial = student.name.trim().isEmpty ? '学' : student.name.trim().substring(0, 1);
+    final lastAttendanceLabel = meta?.lastAttendanceDate ?? '\u6682\u65e0\u8bb0\u5f55';
+    final attendanceCountLabel =
+        _hasMore
+            ? '${_records.length}+ \u6761\u51fa\u52e4\u8bb0\u5f55'
+            : '${_records.length} \u6761\u51fa\u52e4\u8bb0\u5f55';
+    final studentInitial =
+        student.name.trim().isEmpty ? '\u5b66' : student.name.trim().substring(0, 1);
 
     final feeAsync = ref.watch(
       feeSummaryProvider(FeeSummaryParams(widget.studentId, from: from, to: to)),
@@ -131,7 +272,8 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
           children: [
             PageHeader(
               title: student.name,
-              subtitle: '$statusText学员 · 课时单价 ¥${student.pricePerClass.toStringAsFixed(0)}',
+              subtitle:
+                  '$statusText \u00b7 \u8bfe\u65f6\u5355\u4ef7 \u00a5${student.pricePerClass.toStringAsFixed(0)}',
               onBack: () => context.pop(),
               trailing: IconButton(
                 icon: const Icon(Icons.edit_outlined),
@@ -193,7 +335,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                               crossAxisAlignment: WrapCrossAlignment.center,
                                               children: [
                                                 Text(
-                                                  '学员档案概览',
+                                                  '\u5b66\u751f\u6863\u6848\u6982\u89c8',
                                                   style: theme.textTheme.titleMedium?.copyWith(
                                                     fontWeight: FontWeight.w700,
                                                   ),
@@ -205,14 +347,15 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                                 ),
                                                 _ProfileBadge(
                                                   icon: Icons.payments_outlined,
-                                                  label: '¥${student.pricePerClass.toStringAsFixed(0)}/节',
+                                                  label:
+                                                      '\u8bfe\u65f6\u5355\u4ef7 \u00a5${student.pricePerClass.toStringAsFixed(0)}',
                                                   color: kPrimaryBlue,
                                                 ),
                                               ],
                                             ),
                                             const SizedBox(height: 6),
                                             Text(
-                                              '集中查看联系信息、最近上课情况和缴费动态，便于课后跟进。',
+                                              '\u5728\u8fd9\u91cc\u96c6\u4e2d\u67e5\u770b\u5bb6\u957f\u4fe1\u606f\u3001\u6700\u8fd1\u8bfe\u7a0b\u548c\u7f34\u8d39\u52a8\u6001\u3002',
                                               style: theme.textTheme.bodySmall,
                                             ),
                                           ],
@@ -237,7 +380,8 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                         ),
                                       _InfoChip(
                                         icon: Icons.history_toggle_off_outlined,
-                                        label: '最近上课 $lastAttendanceLabel',
+                                        label:
+                                            '\u6700\u8fd1\u51fa\u52e4\uff1a$lastAttendanceLabel',
                                       ),
                                     ],
                                   ),
@@ -249,7 +393,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                       SizedBox(
                                         width: metricWidth,
                                         child: _StudentSnapshot(
-                                          label: '最近上课',
+                                          label: '\u6700\u8fd1\u8bfe\u7a0b',
                                           value: lastAttendanceLabel,
                                           color: kPrimaryBlue,
                                           icon: Icons.event_available_outlined,
@@ -258,8 +402,9 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                       SizedBox(
                                         width: metricWidth,
                                         child: _StudentSnapshot(
-                                          label: '缴费记录',
-                                          value: '${_payments.length} 笔',
+                                          label: '\u7f34\u8d39\u8bb0\u5f55',
+                                          value:
+                                              '${_payments.length} \u6761',
                                           color: kGreen,
                                           icon: Icons.receipt_long_outlined,
                                         ),
@@ -267,7 +412,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                       SizedBox(
                                         width: metricWidth,
                                         child: _StudentSnapshot(
-                                          label: '出勤记录',
+                                          label: '\u51fa\u52e4\u8bb0\u5f55',
                                           value: attendanceCountLabel,
                                           color: kSealRed,
                                           icon: Icons.fact_check_outlined,
@@ -276,7 +421,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                       SizedBox(
                                         width: metricWidth,
                                         child: _StudentSnapshot(
-                                          label: '当前状态',
+                                          label: '\u72b6\u6001',
                                           value: statusText,
                                           color: statusColor,
                                           icon: Icons.badge_outlined,
@@ -303,7 +448,9 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                           height: 88,
                           child: Center(child: CircularProgressIndicator()),
                         ),
-                        error: (e, _) => Text('加载失败：$e'),
+                        error: (e, _) => Text(
+                          '\u52a0\u8f7d\u8d39\u7528\u6c47\u603b\u5931\u8d25\uff1a$e',
+                        ),
                         data: (fee) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,17 +460,20 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                 runSpacing: 10,
                                 crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  Text('费用概览', style: theme.textTheme.titleMedium),
+                                  Text(
+                                    '\u8d39\u7528\u6982\u89c8',
+                                    style: theme.textTheme.titleMedium,
+                                  ),
                                   _ProfileBadge(
                                     icon: Icons.calendar_month_outlined,
-                                    label: '$from 至 $to',
+                                    label: '$from - $to',
                                     color: kPrimaryBlue,
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                '按本月区间汇总应收、已收和当前结余，便于核对学员收款情况。',
+                                '\u6309\u6708\u67e5\u770b\u5e94\u6536\u3001\u5df2\u6536\u548c\u5f53\u524d\u4f59\u989d\u3002',
                                 style: theme.textTheme.bodySmall,
                               ),
                               const SizedBox(height: 12),
@@ -342,16 +492,24 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                     children: [
                                       SizedBox(
                                         width: itemWidth,
-                                        child: _FeeMetric('本月应收', fee.totalReceivable, kPrimaryBlue),
-                                      ),
-                                      SizedBox(
-                                        width: itemWidth,
-                                        child: _FeeMetric('本月已收', fee.totalReceived, kGreen),
+                                        child: _FeeMetric(
+                                          '\u672c\u6708\u5e94\u6536',
+                                          fee.totalReceivable,
+                                          kPrimaryBlue,
+                                        ),
                                       ),
                                       SizedBox(
                                         width: itemWidth,
                                         child: _FeeMetric(
-                                          '当前余额',
+                                          '\u672c\u6708\u5df2\u6536',
+                                          fee.totalReceived,
+                                          kGreen,
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: itemWidth,
+                                        child: _FeeMetric(
+                                          '\u5f53\u524d\u4f59\u989d',
                                           fee.balance,
                                           fee.balance < 0
                                               ? kRed
@@ -379,17 +537,21 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                           final label = Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Text('累计余额', style: theme.textTheme.bodySmall),
+                                              Text(
+                                                '\u603b\u4f59\u989d',
+                                                style: theme.textTheme.bodySmall,
+                                              ),
                                               const SizedBox(width: 4),
                                               const Tooltip(
-                                                message: '累计余额 = 全部已收 - 全部应收\n正数表示预存，负数表示欠费',
+                                                message:
+                                                    '\u603b\u4f59\u989d = \u7d2f\u8ba1\u5df2\u6536 - \u7d2f\u8ba1\u5e94\u6536\u3002\u6b63\u6570\u8868\u793a\u7ed3\u4f59\uff0c\u8d1f\u6570\u8868\u793a\u6b20\u8d39\u3002',
                                                 child: Icon(Icons.info_outline, size: 14, color: kInkSecondary),
                                               ),
                                             ],
                                           );
 
                                           final value = Text(
-                                            '¥${allFee.balance.toStringAsFixed(2)}',
+                                            '\u00a5${allFee.balance.toStringAsFixed(2)}',
                                             style: theme.textTheme.titleMedium?.copyWith(
                                               fontFamily: 'NotoSansSC',
                                               color: balanceColor,
@@ -449,17 +611,20 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             runSpacing: 10,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Text('快捷操作', style: theme.textTheme.titleMedium),
+                              Text(
+                                '\u5feb\u901f\u64cd\u4f5c',
+                                style: theme.textTheme.titleMedium,
+                              ),
                               _ProfileBadge(
                                 icon: Icons.flash_on_outlined,
-                                label: '常用动作',
+                                label: '\u5feb\u901f\u5165\u53e3',
                                 color: kSealRed,
                               ),
                             ],
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            '从这里快速生成报告或补录缴费，减少来回切换页面。',
+                            '\u4e0d\u79bb\u5f00\u5f53\u524d\u9875\u5373\u53ef\u751f\u6210\u62a5\u544a\u6216\u8bb0\u5f55\u7f34\u8d39\u3002',
                             style: theme.textTheme.bodySmall,
                           ),
                           const SizedBox(height: 14),
@@ -469,11 +634,11 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             children: const [
                               _ActionHintChip(
                                 icon: Icons.description_outlined,
-                                label: '支持 PDF 导出',
+                                label: '\u5bfc\u51fa PDF \u62a5\u544a',
                               ),
                               _ActionHintChip(
                                 icon: Icons.payments_outlined,
-                                label: '保存后自动刷新余额',
+                                label: '\u4fdd\u5b58\u540e\u81ea\u52a8\u5237\u65b0\u4f59\u989d',
                               ),
                             ],
                           ),
@@ -499,7 +664,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                         builder: (_) => ExportConfigScreen(studentId: widget.studentId),
                                       ),
                                       icon: const Icon(Icons.description_outlined),
-                                      label: const Text('生成报告'),
+                                      label: const Text('\u5bfc\u51fa\u62a5\u544a'),
                                     ),
                                   ),
                                   SizedBox(
@@ -514,10 +679,11 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                           isScrollControlled: true,
                                           builder: (_) => PaymentBottomSheet(studentId: widget.studentId),
                                         );
-                                        _loadPayments();
+                                        invalidateAfterPaymentChange(ref);
+                                        await _loadPayments();
                                       },
                                       icon: const Icon(Icons.payments_outlined),
-                                      label: const Text('记录缴费'),
+                                      label: const Text('\u65b0\u589e\u7f34\u8d39'),
                                     ),
                                   ),
                                 ],
@@ -527,17 +693,24 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    StudentAiProgressCard(
+                      student: student,
+                    ),
                     const SizedBox(height: 22),
                     _SectionHeader(
-                      title: '缴费记录',
-                      subtitle: '用于核对学员余额和回顾每次收款备注。',
-                      trailing: '共 ${_payments.length} 笔',
+                      title: '\u7f34\u8d39\u8bb0\u5f55',
+                      subtitle:
+                          '\u67e5\u770b\u4f59\u989d\u53d8\u5316\u548c\u6bcf\u7b14\u7f34\u8d39\u5907\u6ce8\u3002',
+                      trailing: '${_payments.length} \u6761',
                     ),
                     const SizedBox(height: 10),
                     if (_payments.isEmpty)
                       const GlassCard(
                         padding: EdgeInsets.all(18),
-                        child: EmptyState(message: '暂无缴费记录，可先从上方快捷操作中补录。'),
+                        child: EmptyState(
+                          message: '\u6682\u65f6\u8fd8\u6ca1\u6709\u7f34\u8d39\u8bb0\u5f55\u3002',
+                        ),
                       )
                     else
                       ..._payments.map(
@@ -548,7 +721,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             onDelete: () async {
                               final ok = await AppToast.showConfirm(
                                 context,
-                                '确认删除该笔缴费记录（¥${payment.amount.toStringAsFixed(2)}）？',
+                                '\u786e\u8ba4\u5220\u9664\u8fd9\u7b14\u7f34\u8d39\u8bb0\u5f55\u5417\uff1f\u91d1\u989d\u4e3a \u00a5${payment.amount.toStringAsFixed(2)}\u3002',
                               );
                               if (!ok) return;
                               await ref.read(paymentDaoProvider).delete(payment.id);
@@ -560,15 +733,18 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     const SizedBox(height: 22),
                     _SectionHeader(
-                      title: '出勤记录',
-                      subtitle: '点击单条记录可补充出勤状态、备注和课堂反馈。',
+                      title: '\u51fa\u52e4\u8bb0\u5f55',
+                      subtitle:
+                          '\u70b9\u51fb\u8bb0\u5f55\u53ef\u7f16\u8f91\u51fa\u52e4\u72b6\u6001\u3001\u5907\u6ce8\u548c\u8bfe\u5802\u53cd\u9988\u3002',
                       trailing: attendanceCountLabel,
                     ),
                     const SizedBox(height: 10),
                     if (_records.isEmpty && !_hasMore)
                       const GlassCard(
                         padding: EdgeInsets.all(18),
-                        child: EmptyState(message: '暂无出勤记录，后续点名后会在这里持续累积。'),
+                        child: EmptyState(
+                          message: '\u6682\u65f6\u8fd8\u6ca1\u6709\u51fa\u52e4\u8bb0\u5f55\u3002',
+                        ),
                       )
                     else
                       ..._records.map(
@@ -576,19 +752,19 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                           padding: EdgeInsets.only(bottom: record == _records.last ? 0 : 10),
                           child: _AttendanceCard(
                             record: record,
+                            analyzingImage:
+                                _analyzingImageRecordIds.contains(record.id),
+                            onAnalyzeImage: () => _analyzeAttendanceImage(
+                              record,
+                              student.name,
+                            ),
                             onTap: () async {
                               await showModalBottomSheet(
                                 context: context,
                                 isScrollControlled: true,
                                 builder: (_) => AttendanceEditSheet(record: record),
                               );
-                              setState(() {
-                                _page = 0;
-                                _records = [];
-                                _hasMore = true;
-                                _loadingMore = false;
-                              });
-                              _loadMore();
+                              await _reloadAttendanceRecords();
                             },
                           ),
                         ),
@@ -784,7 +960,7 @@ class _DetailNoteCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '备注',
+                  '\u5907\u6ce8',
                   style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
@@ -892,7 +1068,7 @@ class _FeeMetric extends StatelessWidget {
           Text(label, style: theme.textTheme.bodySmall),
           const SizedBox(height: 6),
           Text(
-            '¥${value.toStringAsFixed(2)}',
+            '\u00a5${value.toStringAsFixed(2)}',
             style: theme.textTheme.titleMedium?.copyWith(
               fontFamily: 'NotoSansSC',
               color: color,
@@ -923,7 +1099,7 @@ class _PaymentCard extends StatelessWidget {
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 420;
           final deleteAction = _DangerActionButton(
-            tooltip: '删除缴费记录',
+            tooltip: '\u5220\u9664\u7f34\u8d39\u8bb0\u5f55',
             onPressed: onDelete,
           );
 
@@ -935,14 +1111,13 @@ class _PaymentCard extends StatelessWidget {
               border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
             ),
             child: Text(
-              '可删除',
+              '\u5220\u9664',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: kPrimaryBlue,
                 fontWeight: FontWeight.w700,
               ),
             ),
           );
-
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -959,7 +1134,7 @@ class _PaymentCard extends StatelessWidget {
                     const Icon(Icons.payments_outlined, color: kGreen, size: 18),
                     const SizedBox(height: 4),
                     Text(
-                      '收款',
+                      '\u5df2\u6536',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: kGreen,
                         fontWeight: FontWeight.w800,
@@ -978,7 +1153,7 @@ class _PaymentCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            '¥${payment.amount.toStringAsFixed(2)}',
+                            '\u00a5${payment.amount.toStringAsFixed(2)}',
                             style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -990,7 +1165,7 @@ class _PaymentCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            '已收款',
+                            '\u5df2\u6536',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: kGreen,
                               fontWeight: FontWeight.w700,
@@ -1010,13 +1185,15 @@ class _PaymentCard extends StatelessWidget {
                         ),
                         _DetailMetaChip(
                           icon: Icons.receipt_long_outlined,
-                          label: '计入学员余额',
+                          label: '\u5df2\u8ba1\u5165\u5b66\u751f\u4f59\u989d',
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      payment.note?.isNotEmpty == true ? payment.note! : '这笔缴费会直接计入学员的累计余额。',
+                      payment.note?.isNotEmpty == true
+                          ? payment.note!
+                          : '\u8fd9\u7b14\u7f34\u8d39\u5df2\u8ba1\u5165\u5b66\u751f\u4f59\u989d\u3002',
                       style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(height: 10),
@@ -1053,10 +1230,14 @@ class _PaymentCard extends StatelessWidget {
 class _AttendanceCard extends StatelessWidget {
   final Attendance record;
   final VoidCallback onTap;
+  final VoidCallback onAnalyzeImage;
+  final bool analyzingImage;
 
   const _AttendanceCard({
     required this.record,
     required this.onTap,
+    required this.onAnalyzeImage,
+    required this.analyzingImage,
   });
 
   @override
@@ -1068,12 +1249,12 @@ class _AttendanceCard extends StatelessWidget {
     final endTime = parseTime(record.endTime);
     final minutes = (endTime.hour * 60 + endTime.minute) - (startTime.hour * 60 + startTime.minute);
     final durationLabel = minutes <= 0
-        ? '时长待确认'
+        ? '\u65f6\u957f\u5f85\u5b9a'
         : minutes < 60
-            ? '$minutes 分钟'
+            ? '$minutes \u5206\u949f'
             : minutes % 60 == 0
-                ? '${minutes ~/ 60} 小时'
-                : '${minutes ~/ 60} 小时 ${minutes % 60} 分钟';
+                ? '${minutes ~/ 60} \u5c0f\u65f6'
+                : '${minutes ~/ 60} \u5c0f\u65f6 ${minutes % 60} \u5206\u949f';
 
     return GlassCard(
       onTap: onTap,
@@ -1089,14 +1270,32 @@ class _AttendanceCard extends StatelessWidget {
               border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
             ),
             child: Text(
-              '点击编辑',
+              '\u70b9\u51fb\u7f16\u8f91',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: kPrimaryBlue,
                 fontWeight: FontWeight.w700,
               ),
             ),
           );
-
+          final analysisAction = Container(
+            decoration: BoxDecoration(
+              color: kPrimaryBlue.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              tooltip: '\u5206\u6790\u5b57\u5e16\u56fe\u7247',
+              onPressed: analyzingImage ? null : onAnalyzeImage,
+              icon: analyzingImage
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.camera_alt_outlined),
+              color: kPrimaryBlue,
+              visualDensity: VisualDensity.compact,
+            ),
+          );
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1160,7 +1359,7 @@ class _AttendanceCard extends StatelessWidget {
                       children: [
                         _DetailMetaChip(
                           icon: Icons.access_time_outlined,
-                          label: '${record.startTime}-${record.endTime}',
+                          label: '${record.startTime} - ${record.endTime}',
                         ),
                         _DetailMetaChip(
                           icon: Icons.timelapse_outlined,
@@ -1168,7 +1367,7 @@ class _AttendanceCard extends StatelessWidget {
                         ),
                         _DetailMetaChip(
                           icon: Icons.payments_outlined,
-                          label: '¥${record.feeAmount.toStringAsFixed(2)}',
+                          label: '\u00a5${record.feeAmount.toStringAsFixed(2)}',
                         ),
                       ],
                     ),
@@ -1196,7 +1395,7 @@ class _AttendanceCard extends StatelessWidget {
                       const SizedBox(height: 8),
                       _FeedbackBlock(
                         icon: Icons.edit_note_outlined,
-                        title: '课后练习',
+                        title: '\u8bfe\u540e\u7ec3\u4e60',
                         content: record.homePracticeNote!,
                         color: kPrimaryBlue,
                       ),
@@ -1218,13 +1417,27 @@ class _AttendanceCard extends StatelessWidget {
                       ),
                     ],
                     const SizedBox(height: 10),
-                    if (compact) actionHint,
+                    if (compact)
+                      Row(
+                        children: [
+                          actionHint,
+                          const Spacer(),
+                          analysisAction,
+                        ],
+                      ),
                   ],
                 ),
               ),
               if (!compact) ...[
                 const SizedBox(width: 10),
-                actionHint,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    analysisAction,
+                    const SizedBox(height: 10),
+                    actionHint,
+                  ],
+                ),
               ],
             ],
           );
@@ -1340,13 +1553,19 @@ List<String> _buildProgressItems(Attendance record) {
 
   final result = <String>[];
   if (scores.strokeQuality != null) {
-    result.add('笔画 ${scores.strokeQuality!.toStringAsFixed(1)}');
+    result.add(
+      '\u7b14\u753b\u8d28\u91cf\uff1a${scores.strokeQuality!.toStringAsFixed(1)}',
+    );
   }
   if (scores.structureAccuracy != null) {
-    result.add('结构 ${scores.structureAccuracy!.toStringAsFixed(1)}');
+    result.add(
+      '\u7ed3\u6784\u51c6\u786e\u5ea6\uff1a${scores.structureAccuracy!.toStringAsFixed(1)}',
+    );
   }
   if (scores.rhythmConsistency != null) {
-    result.add('节奏 ${scores.rhythmConsistency!.toStringAsFixed(1)}');
+    result.add(
+      '\u8282\u594f\u7a33\u5b9a\u6027\uff1a${scores.rhythmConsistency!.toStringAsFixed(1)}',
+    );
   }
   return result;
 }

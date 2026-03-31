@@ -1,14 +1,14 @@
-import 'package:calligraphy_assistant/core/database/dao/dismissed_insight_dao.dart';
-import 'package:calligraphy_assistant/core/database/database_helper.dart';
-import 'package:calligraphy_assistant/core/models/dismissed_insight.dart';
-import 'package:calligraphy_assistant/core/providers/insight_provider.dart';
-import 'package:calligraphy_assistant/core/services/insight_aggregation_service.dart';
-import 'package:calligraphy_assistant/features/statistics/widgets/insight_list.dart';
-import 'package:calligraphy_assistant/shared/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moyun/core/database/dao/dismissed_insight_dao.dart';
+import 'package:moyun/core/database/database_helper.dart';
+import 'package:moyun/core/models/dismissed_insight.dart';
+import 'package:moyun/core/providers/insight_provider.dart';
+import 'package:moyun/core/services/insight_aggregation_service.dart';
+import 'package:moyun/features/statistics/widgets/insight_list.dart';
+import 'package:moyun/shared/constants.dart';
 
 void main() {
   testWidgets('ignore action persists dismissal and refreshes empty state', (
@@ -39,17 +39,17 @@ void main() {
     );
     await _settleUi(tester);
 
-    expect(find.text('张三'), findsOneWidget);
-    expect(find.textContaining('稍后'), findsOneWidget);
+    expect(find.text('Alex'), findsOneWidget);
+    expect(find.textContaining('\u7a0d\u540e'), findsOneWidget);
 
-    await tester.tap(find.textContaining('稍后'));
+    await tester.tap(find.textContaining('\u7a0d\u540e'));
     await _settleUi(tester);
 
     expect(fakeDao.inserted, hasLength(1));
     expect(fakeDao.inserted.single.insightType, InsightType.renewal.name);
     expect(fakeDao.inserted.single.studentId, 'student-1');
     expect(fakeDao.inserted.single.dismissedAt, greaterThan(0));
-    expect(find.text('笔墨安然，暂无提醒'), findsOneWidget);
+    expect(find.text('\u7b14\u58a8\u5b89\u7136\uff0c\u6682\u65e0\u63d0\u9192'), findsOneWidget);
   });
 
   testWidgets('primary action navigates to student detail route', (tester) async {
@@ -82,7 +82,7 @@ void main() {
                 builder: (context, state) {
                   return Scaffold(
                     body: Center(
-                      child: Text('student:${state.pathParameters['id']}'),
+                      child: Text("student:${state.pathParameters['id']}"),
                     ),
                   );
                 },
@@ -94,11 +94,11 @@ void main() {
     );
     await _settleUi(tester);
 
-    expect(find.text('张三'), findsOneWidget);
+    expect(find.text('Alex'), findsOneWidget);
 
-    Finder actionButton = find.text('前往处理');
+    Finder actionButton = find.text('\u524d\u5f80\u5904\u7406');
     if (actionButton.evaluate().isEmpty) {
-      actionButton = find.text('前往学生页处理');
+      actionButton = find.text('\u524d\u5f80\u5b66\u751f\u9875\u5904\u7406');
     }
 
     expect(actionButton, findsOneWidget);
@@ -121,10 +121,10 @@ class _DismissCycleNotifier extends InsightNotifier {
       Insight(
         type: InsightType.renewal,
         studentId: 'student-1',
-        studentName: '张三',
-        message: '余额 ¥120.00，约剩 1.2 节',
-        suggestion: '建议本周内发起续费沟通，并同步下一阶段课程安排建议。',
-        calcLogic: '当余额小于 ¥300 或剩余课次少于 3.0 节时触发。',
+        studentName: 'Alex',
+        message: 'Balance reminder',
+        suggestion: 'Follow up this week.',
+        calcLogic: 'Triggered when renewal balance is low.',
         dataFreshness: '2026-03-27 09:00',
       ),
     ];
@@ -149,10 +149,10 @@ class _StaticInsightNotifier extends InsightNotifier {
       Insight(
         type: InsightType.debt,
         studentId: 'student-1',
-        studentName: '张三',
-        message: '欠费 ¥120.00',
-        suggestion: '建议优先核对账单，并尽快联系家长确认补缴或续费安排。',
-        calcLogic: '累计余额 = 累计已收 - 累计应收；当余额小于 0 时触发欠费提醒。',
+        studentName: 'Alex',
+        message: 'Outstanding balance',
+        suggestion: 'Contact parent to confirm payment.',
+        calcLogic: 'Shown when the current balance is negative.',
         dataFreshness: '2026-03-27 09:00',
       ),
     ];

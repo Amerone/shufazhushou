@@ -35,6 +35,33 @@ class PaymentDao {
     return rows.map(Payment.fromMap).toList();
   }
 
+  Future<double> getTotalByDateRange(String? from, String? to) async {
+    final db = await _db.database;
+    final rows = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount),0) AS total FROM payments
+      WHERE (? IS NULL OR payment_date >= ?)
+        AND (? IS NULL OR payment_date <= ?)
+    ''', [from, from, to, to]);
+    return (rows.first['total'] as num).toDouble();
+  }
+
+  Future<Map<String, double>> getTotalByAllStudentsAndDateRange(
+      String? from, String? to) async {
+    final db = await _db.database;
+    final rows = await db.rawQuery('''
+      SELECT student_id, COALESCE(SUM(amount), 0) AS total
+      FROM payments
+      WHERE (? IS NULL OR payment_date >= ?)
+        AND (? IS NULL OR payment_date <= ?)
+      GROUP BY student_id
+    ''', [from, from, to, to]);
+    final result = <String, double>{};
+    for (final row in rows) {
+      result[row['student_id'] as String] = (row['total'] as num).toDouble();
+    }
+    return result;
+  }
+
   Future<double> getTotalByStudent(String studentId) async {
     final db = await _db.database;
     final rows = await db.rawQuery(

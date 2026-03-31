@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,7 +19,8 @@ class AttendanceEditSheet extends ConsumerStatefulWidget {
   const AttendanceEditSheet({super.key, required this.record});
 
   @override
-  ConsumerState<AttendanceEditSheet> createState() => _AttendanceEditSheetState();
+  ConsumerState<AttendanceEditSheet> createState() =>
+      _AttendanceEditSheetState();
 }
 
 class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
@@ -51,8 +52,9 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
     _startTime = widget.record.startTime;
     _endTime = widget.record.endTime;
     _noteCtrl = TextEditingController(text: widget.record.note ?? '');
-    _homePracticeCtrl =
-        TextEditingController(text: widget.record.homePracticeNote ?? '');
+    _homePracticeCtrl = TextEditingController(
+      text: widget.record.homePracticeNote ?? '',
+    );
     _lessonFocusTags.addAll(widget.record.lessonFocusTags);
     _strokeQuality = widget.record.progressScores?.strokeQuality;
     _structureAccuracy = widget.record.progressScores?.structureAccuracy;
@@ -94,19 +96,24 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
 
       // 冲突检测（排除自身）
       final conflict = await dao.findConflict(
-        widget.record.studentId, _dateStr(), _startTime, _endTime,
+        widget.record.studentId,
+        _dateStr(),
+        _startTime,
+        _endTime,
         excludeId: widget.record.id,
       );
       if (conflict != null && mounted) {
-        final ok = await AppToast.showConfirm(
-          context,
-          '该时段已有其他出勤记录，是否继续保存？',
-        );
+        final ok = await AppToast.showConfirm(context, '该时段已有其他出勤记录，是否继续保存？');
         if (!ok) return;
       }
 
-      final statusEnum = AttendanceStatus.values.firstWhere((e) => e.name == _status);
-      final newFee = FeeCalculator.calcFee(statusEnum, widget.record.priceSnapshot);
+      final statusEnum = AttendanceStatus.values.firstWhere(
+        (e) => e.name == _status,
+      );
+      final newFee = FeeCalculator.calcFee(
+        statusEnum,
+        widget.record.priceSnapshot,
+      );
 
       final updated = widget.record.copyWith(
         status: _status,
@@ -125,10 +132,10 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
 
       await dao.update(updated);
       _invalidate();
-      if (mounted) {
-        await InteractionFeedback.seal(context);
-        Navigator.of(context).pop();
-      }
+      if (!mounted) return;
+      await InteractionFeedback.seal(context);
+      if (!mounted) return;
+      Navigator.of(context).pop();
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -142,10 +149,10 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
     setState(() => _saving = true);
     await ref.read(attendanceDaoProvider).delete(widget.record.id);
     _invalidate();
-    if (mounted) {
-      await InteractionFeedback.seal(context);
-      Navigator.of(context).pop();
-    }
+    if (!mounted) return;
+    await InteractionFeedback.seal(context);
+    if (!mounted) return;
+    Navigator.of(context).pop();
   }
 
   void _invalidate() {
@@ -194,7 +201,9 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                       children: [
                         Text(
                           '编辑出勤记录',
-                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Text(
@@ -239,15 +248,17 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                     firstDate: DateTime(2020),
                     lastDate: DateTime.now().add(const Duration(days: 365)),
                   );
-                  if (d != null) {
-                    await InteractionFeedback.selection(context);
-                    setState(() => _date = d);
-                  }
+                  if (d == null || !context.mounted) return;
+                  await InteractionFeedback.selection(context);
+                  if (!context.mounted) return;
+                  setState(() => _date = d);
                 },
                 child: InputDecorator(
                   decoration: InputDecoration(
                     labelText: '日期',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.5),
                   ),
@@ -271,17 +282,19 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                           initialTime: parseTime(_startTime),
                           label: '开始时间',
                         );
-                        if (picked != null) {
-                          await InteractionFeedback.selection(context);
-                          setState(() {
-                            _startTime = formatTime(picked);
-                          });
-                        }
+                        if (picked == null || !context.mounted) return;
+                        await InteractionFeedback.selection(context);
+                        if (!context.mounted) return;
+                        setState(() {
+                          _startTime = formatTime(picked);
+                        });
                       },
                       child: InputDecorator(
                         decoration: InputDecoration(
                           labelText: '开始时间',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           filled: true,
                           fillColor: Colors.white.withValues(alpha: 0.5),
                         ),
@@ -299,17 +312,19 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                           initialTime: parseTime(_endTime),
                           label: '结束时间',
                         );
-                        if (picked != null) {
-                          await InteractionFeedback.selection(context);
-                          setState(() {
-                            _endTime = formatTime(picked);
-                          });
-                        }
+                        if (picked == null || !context.mounted) return;
+                        await InteractionFeedback.selection(context);
+                        if (!context.mounted) return;
+                        setState(() {
+                          _endTime = formatTime(picked);
+                        });
                       },
                       child: InputDecorator(
                         decoration: InputDecoration(
                           labelText: '结束时间',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           filled: true,
                           fillColor: Colors.white.withValues(alpha: 0.5),
                         ),
@@ -327,7 +342,9 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                 decoration: InputDecoration(
                   labelText: '备注',
                   hintText: '可记录补课原因、课堂说明或家长反馈。',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   filled: true,
                   fillColor: Colors.white.withValues(alpha: 0.5),
                 ),
@@ -368,7 +385,9 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                 decoration: InputDecoration(
                   labelText: '课后练习建议（可选）',
                   hintText: '例如：本周每天 15 分钟，先慢后快。',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   filled: true,
                   fillColor: Colors.white.withValues(alpha: 0.5),
                 ),
@@ -388,13 +407,15 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
               _ScoreEditor(
                 label: '结构准确',
                 value: _structureAccuracy,
-                onChanged: (value) => setState(() => _structureAccuracy = value),
+                onChanged: (value) =>
+                    setState(() => _structureAccuracy = value),
                 onClear: () => setState(() => _structureAccuracy = null),
               ),
               _ScoreEditor(
                 label: '节奏连贯',
                 value: _rhythmConsistency,
-                onChanged: (value) => setState(() => _rhythmConsistency = value),
+                onChanged: (value) =>
+                    setState(() => _rhythmConsistency = value),
                 onClear: () => setState(() => _rhythmConsistency = null),
               ),
               const SizedBox(height: 20),
@@ -402,7 +423,9 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                 onPressed: _saving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: Text(_saving ? '保存中...' : '保存修改'),
               ),

@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'dart:async';
 
@@ -45,28 +45,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: InkWashBackground(
         child: Column(
           children: [
-            const PageHeader(
-              title: '设置中心',
-              subtitle: '管理教师信息、导出模板和本地数据备份。',
-            ),
+            const PageHeader(title: '设置中心', subtitle: '管理教师信息、导出模板和本地数据备份。'),
             Expanded(
               child: settingsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('$e')),
                 data: (settings) {
-                  final lastBackupMs = int.tryParse(settings['last_backup_at'] ?? '');
-                  final isOverdue = lastBackupMs == null ||
-                      DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(lastBackupMs)).inDays >=
+                  final lastBackupMs = int.tryParse(
+                    settings['last_backup_at'] ?? '',
+                  );
+                  final isOverdue =
+                      lastBackupMs == null ||
+                      DateTime.now()
+                              .difference(
+                                DateTime.fromMillisecondsSinceEpoch(
+                                  lastBackupMs,
+                                ),
+                              )
+                              .inDays >=
                           kBackupWarningDays;
-                  final teacherName = settings['teacher_name'] ?? kDefaultTeacherName;
-                  final watermarkEnabled = settings['default_watermark_enabled'] != 'false';
+                  final teacherName =
+                      settings['teacher_name'] ?? kDefaultTeacherName;
+                  final watermarkEnabled =
+                      settings['default_watermark_enabled'] != 'false';
                   final hapticsEnabled =
-                      settings[InteractionFeedback.hapticsEnabledKey] != 'false';
+                      settings[InteractionFeedback.hapticsEnabledKey] !=
+                      'false';
                   final soundEnabled =
                       settings[InteractionFeedback.soundEnabledKey] == 'true';
-                  final hasDefaultMessage = settings['default_message_template']?.trim().isNotEmpty == true;
-                  final hasSignature = settings['signature_path']?.trim().isNotEmpty == true;
-                  final hasCustomTeacherName = teacherName.trim().isNotEmpty && teacherName != kDefaultTeacherName;
+                  final hasDefaultMessage =
+                      settings['default_message_template']?.trim().isNotEmpty ==
+                      true;
+                  final hasSignature =
+                      settings['signature_path']?.trim().isNotEmpty == true;
+                  final hasCustomTeacherName =
+                      teacherName.trim().isNotEmpty &&
+                      teacherName != kDefaultTeacherName;
                   final priority = _resolvePriority(
                     isOverdue: isOverdue,
                     hasDefaultMessage: hasDefaultMessage,
@@ -83,7 +97,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           description: priority.description,
                           actionLabel: priority.actionLabel,
                           color: priority.color,
-                          onTap: () => _handlePriorityTap(priority.action, context),
+                          onTap: () =>
+                              _handlePriorityTap(priority.action, context),
                         ),
                         const SizedBox(height: 16),
                       ],
@@ -104,38 +119,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     color: kPrimaryBlue.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(14),
                                   ),
-                                  child: const Icon(Icons.tune_outlined, color: kPrimaryBlue),
+                                  child: const Icon(
+                                    Icons.tune_outlined,
+                                    color: kPrimaryBlue,
+                                  ),
                                 ),
                                 SizedBox(
                                   width: versionStr.isEmpty ? 220 : 160,
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         '当前配置概览',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
                                               fontWeight: FontWeight.w700,
                                             ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         '先看关键状态，再进入对应分区调整教师资料、模板和备份。',
-                                        style: Theme.of(context).textTheme.bodySmall,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
                                       ),
                                     ],
                                   ),
                                 ),
                                 if (versionStr.isNotEmpty)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.68),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.68,
+                                      ),
                                       borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(color: kInkSecondary.withValues(alpha: 0.16)),
+                                      border: Border.all(
+                                        color: kInkSecondary.withValues(
+                                          alpha: 0.16,
+                                        ),
+                                      ),
                                     ),
                                     child: Text(
                                       'v$versionStr',
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
                                             color: kPrimaryBlue,
                                             fontWeight: FontWeight.w700,
                                           ),
@@ -146,8 +182,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             const SizedBox(height: 16),
                             LayoutBuilder(
                               builder: (context, constraints) {
-                                final columns = constraints.maxWidth >= 720 ? 4 : 2;
-                                final itemWidth = (constraints.maxWidth - 12 * (columns - 1)) / columns;
+                                final columns = constraints.maxWidth >= 720
+                                    ? 4
+                                    : 2;
+                                final itemWidth =
+                                    (constraints.maxWidth -
+                                        12 * (columns - 1)) /
+                                    columns;
 
                                 return Wrap(
                                   spacing: 12,
@@ -167,7 +208,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       child: _SettingsSnapshot(
                                         icon: Icons.backup_outlined,
                                         label: '最近备份',
-                                        value: _backupSummaryLabel(lastBackupMs),
+                                        value: _backupSummaryLabel(
+                                          lastBackupMs,
+                                        ),
                                         color: isOverdue ? kOrange : kGreen,
                                       ),
                                     ),
@@ -177,7 +220,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         icon: Icons.water_drop_outlined,
                                         label: 'PDF 水印',
                                         value: watermarkEnabled ? '已开启' : '已关闭',
-                                        color: watermarkEnabled ? kPrimaryBlue : kInkSecondary,
+                                        color: watermarkEnabled
+                                            ? kPrimaryBlue
+                                            : kInkSecondary,
                                       ),
                                     ),
                                     SizedBox(
@@ -185,8 +230,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       child: _SettingsSnapshot(
                                         icon: Icons.message_outlined,
                                         label: '默认寄语',
-                                        value: hasDefaultMessage ? '已配置' : '未设置',
-                                        color: hasDefaultMessage ? kSealRed : kOrange,
+                                        value: hasDefaultMessage
+                                            ? '已配置'
+                                            : '未设置',
+                                        color: hasDefaultMessage
+                                            ? kSealRed
+                                            : kOrange,
                                       ),
                                     ),
                                   ],
@@ -201,8 +250,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             const SizedBox(height: 12),
                             LayoutBuilder(
                               builder: (context, constraints) {
-                                final columns = constraints.maxWidth >= 720 ? 4 : 2;
-                                final itemWidth = (constraints.maxWidth - 12 * (columns - 1)) / columns;
+                                final columns = constraints.maxWidth >= 720
+                                    ? 4
+                                    : 2;
+                                final itemWidth =
+                                    (constraints.maxWidth -
+                                        12 * (columns - 1)) /
+                                    columns;
 
                                 return Wrap(
                                   spacing: 12,
@@ -214,8 +268,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         icon: Icons.backup_outlined,
                                         title: '数据备份',
                                         subtitle: isOverdue ? '建议更新' : '查看记录',
-                                        color: isOverdue ? kOrange : kPrimaryBlue,
-                                        onTap: () => context.push('/settings/backup'),
+                                        color: isOverdue
+                                            ? kOrange
+                                            : kPrimaryBlue,
+                                        onTap: () =>
+                                            context.push('/settings/backup'),
                                       ),
                                     ),
                                     SizedBox(
@@ -225,7 +282,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         title: '签名管理',
                                         subtitle: hasSignature ? '已配置' : '待上传',
                                         color: hasSignature ? kGreen : kSealRed,
-                                        onTap: () => context.push('/settings/signature'),
+                                        onTap: () =>
+                                            context.push('/settings/signature'),
                                       ),
                                     ),
                                     SizedBox(
@@ -235,7 +293,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         title: '课堂模板',
                                         subtitle: '时段与课程',
                                         color: kPrimaryBlue,
-                                        onTap: () => context.push('/settings/templates'),
+                                        onTap: () =>
+                                            context.push('/settings/templates'),
                                       ),
                                     ),
                                     SizedBox(
@@ -243,9 +302,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       child: _SettingsShortcutCard(
                                         icon: Icons.approval_outlined,
                                         title: '印章样式',
-                                        subtitle: settings['seal_text']?.isNotEmpty == true ? '已设置' : '待配置',
+                                        subtitle:
+                                            settings['seal_text']?.isNotEmpty ==
+                                                true
+                                            ? '已设置'
+                                            : '待配置',
                                         color: kSealRed,
-                                        onTap: () => context.push('/settings/seal'),
+                                        onTap: () =>
+                                            context.push('/settings/seal'),
                                       ),
                                     ),
                                     SizedBox(
@@ -253,9 +317,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       child: _SettingsShortcutCard(
                                         icon: Icons.psychology_alt_outlined,
                                         title: 'AI 视觉',
-                                        subtitle: settings['qwen_api_key']?.trim().isNotEmpty == true ? 'Qwen 已配置' : '待接入',
-                                        color: settings['qwen_api_key']?.trim().isNotEmpty == true ? kGreen : kPrimaryBlue,
-                                        onTap: () => context.push('/settings/ai'),
+                                        subtitle:
+                                            settings['qwen_api_key']
+                                                    ?.trim()
+                                                    .isNotEmpty ==
+                                                true
+                                            ? 'Qwen 已配置'
+                                            : '待接入',
+                                        color:
+                                            settings['qwen_api_key']
+                                                    ?.trim()
+                                                    .isNotEmpty ==
+                                                true
+                                            ? kGreen
+                                            : kPrimaryBlue,
+                                        onTap: () =>
+                                            context.push('/settings/ai'),
                                       ),
                                     ),
                                   ],
@@ -278,9 +355,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             _SettingsTile(
                               icon: Icons.person_outline,
                               title: '教师姓名',
-                              subtitle: settings['teacher_name'] ?? kDefaultTeacherName,
-                              trailing: const Icon(Icons.edit_outlined, size: 20),
-                              onTap: () => _editTeacherName(settings['teacher_name'] ?? kDefaultTeacherName),
+                              subtitle:
+                                  settings['teacher_name'] ??
+                                  kDefaultTeacherName,
+                              trailing: const Icon(
+                                Icons.edit_outlined,
+                                size: 20,
+                              ),
+                              onTap: () => _editTeacherName(
+                                settings['teacher_name'] ?? kDefaultTeacherName,
+                              ),
                             ),
                           ],
                         ),
@@ -298,7 +382,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             _SettingsTile(
                               icon: Icons.backup_outlined,
                               title: '数据备份',
-                              subtitle: isOverdue ? '建议立即执行一次本地备份' : '查看最近备份并导出备份文件',
+                              subtitle: isOverdue
+                                  ? '建议立即执行一次本地备份'
+                                  : '查看最近备份并导出备份文件',
                               warning: isOverdue,
                               onTap: () => context.push('/settings/backup'),
                             ),
@@ -320,7 +406,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             _SettingsTile(
                               icon: Icons.approval_outlined,
                               title: '印章样式',
-                              subtitle: settings['seal_text'] ?? kDefaultSealText,
+                              subtitle:
+                                  settings['seal_text'] ?? kDefaultSealText,
                               onTap: () => context.push('/settings/seal'),
                             ),
                           ],
@@ -342,18 +429,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               title: '默认启用 PDF 水印',
                               subtitle: '导出报告时自动附加印章与标识',
                               onChanged: (value) {
-                                ref.read(settingsProvider.notifier).set('default_watermark_enabled', value.toString());
+                                ref
+                                    .read(settingsProvider.notifier)
+                                    .set(
+                                      'default_watermark_enabled',
+                                      value.toString(),
+                                    );
                               },
                             ),
                             const Divider(height: 1, indent: 16, endIndent: 16),
                             _SettingsTile(
                               icon: Icons.message_outlined,
                               title: '默认寄语',
-                              subtitle: settings['default_message_template']?.isNotEmpty == true
+                              subtitle:
+                                  settings['default_message_template']
+                                          ?.isNotEmpty ==
+                                      true
                                   ? settings['default_message_template']!
                                   : '尚未设置默认寄语',
-                              trailing: const Icon(Icons.edit_outlined, size: 20),
-                              onTap: () => _editMessage(settings['default_message_template'] ?? ''),
+                              trailing: const Icon(
+                                Icons.edit_outlined,
+                                size: 20,
+                              ),
+                              onTap: () => _editMessage(
+                                settings['default_message_template'] ?? '',
+                              ),
                             ),
                           ],
                         ),
@@ -374,12 +474,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               title: '启用触感反馈',
                               subtitle: '保存、确认、时间滚轮和关键选择时给出轻微震动。',
                               onChanged: (value) {
-                                ref.read(settingsProvider.notifier).set(
+                                ref
+                                    .read(settingsProvider.notifier)
+                                    .set(
                                       InteractionFeedback.hapticsEnabledKey,
                                       value.toString(),
                                     );
                                 if (value) {
-                                  unawaited(InteractionFeedback.selection(context));
+                                  unawaited(
+                                    InteractionFeedback.selection(context),
+                                  );
                                 }
                               },
                             ),
@@ -390,11 +494,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               title: '启用轻音反馈',
                               subtitle: '页面切换与导出完成时播放极轻的系统提示音。',
                               onChanged: (value) {
-                                ref.read(settingsProvider.notifier).set(
+                                ref
+                                    .read(settingsProvider.notifier)
+                                    .set(
                                       InteractionFeedback.soundEnabledKey,
                                       value.toString(),
                                     );
-                                unawaited(InteractionFeedback.selection(context));
+                                unawaited(
+                                  InteractionFeedback.selection(context),
+                                );
                               },
                             ),
                           ],
@@ -413,7 +521,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             _SettingsTile(
                               icon: Icons.psychology_alt_outlined,
                               title: 'Qwen 视觉模型',
-                              subtitle: settings['qwen_model']?.trim().isNotEmpty == true
+                              subtitle:
+                                  settings['qwen_model']?.trim().isNotEmpty ==
+                                      true
                                   ? settings['qwen_model']!
                                   : '计划调用 Qwen3-VL-Plus',
                               onTap: () => context.push('/settings/ai'),
@@ -457,7 +567,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 subtitle: '插入 20 名学生与大量出勤记录，用于压力验证',
                                 onTap: _seedTestData,
                               ),
-                              const Divider(height: 1, indent: 16, endIndent: 16),
+                              const Divider(
+                                height: 1,
+                                indent: 16,
+                                endIndent: 16,
+                              ),
                               _SettingsTile(
                                 icon: Icons.delete_forever_outlined,
                                 title: '清空全部数据',
@@ -516,7 +630,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       initialValue: current,
       maxLines: 1,
       allowEmpty: false,
-      onSave: (value) => ref.read(settingsProvider.notifier).set('teacher_name', value),
+      onSave: (value) =>
+          ref.read(settingsProvider.notifier).set('teacher_name', value),
     );
   }
 
@@ -528,7 +643,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       maxLines: 4,
       maxLength: 200,
       allowEmpty: true,
-      onSave: (value) => ref.read(settingsProvider.notifier).set('default_message_template', value),
+      onSave: (value) => ref
+          .read(settingsProvider.notifier)
+          .set('default_message_template', value),
     );
   }
 
@@ -557,7 +674,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               left: 16,
               right: 16,
               top: 8,
-              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + MediaQuery.of(sheetCtx).padding.bottom + 16,
+              bottom:
+                  MediaQuery.of(sheetCtx).viewInsets.bottom +
+                  MediaQuery.of(sheetCtx).padding.bottom +
+                  16,
             ),
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -577,7 +697,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 Text(
                   title,
-                  style: Theme.of(sheetCtx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(
+                    sheetCtx,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
@@ -595,7 +717,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   decoration: InputDecoration(
                     labelText: title,
                     hintText: hintText,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.56),
                   ),
@@ -604,7 +728,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   onPressed: () async {
                     final value = ctrl.text.trim();
@@ -613,8 +739,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       return;
                     }
                     await onSave(value);
+                    if (!sheetCtx.mounted) return;
                     await InteractionFeedback.seal(sheetCtx);
-                    if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
+                    if (!sheetCtx.mounted) return;
+                    Navigator.of(sheetCtx).pop();
                   },
                   child: const Text('保存修改'),
                 ),
@@ -627,7 +755,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _seedTestData() async {
-    final confirmed = await AppToast.showConfirm(context, '将插入 20 名学生和约 5000 条出勤记录，确定继续吗？');
+    final confirmed = await AppToast.showConfirm(
+      context,
+      '将插入 20 名学生和约 5000 条出勤记录，确定继续吗？',
+    );
     if (!confirmed) return;
 
     try {
@@ -641,7 +772,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _clearAllData() async {
-    final confirmed = await AppToast.showConfirm(context, '将删除所有本地数据且不可恢复，确定继续吗？');
+    final confirmed = await AppToast.showConfirm(
+      context,
+      '将删除所有本地数据且不可恢复，确定继续吗？',
+    );
     if (!confirmed) return;
 
     try {
@@ -747,21 +881,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         context.push('/settings/signature');
         break;
       case _PriorityAction.message:
-        _editMessage(ref.read(settingsProvider).valueOrNull?['default_message_template'] ?? '');
+        _editMessage(
+          ref.read(settingsProvider).valueOrNull?['default_message_template'] ??
+              '',
+        );
         break;
       case _PriorityAction.teacher:
-        _editTeacherName(ref.read(settingsProvider).valueOrNull?['teacher_name'] ?? kDefaultTeacherName);
+        _editTeacherName(
+          ref.read(settingsProvider).valueOrNull?['teacher_name'] ??
+              kDefaultTeacherName,
+        );
         break;
     }
   }
 }
 
-enum _PriorityAction {
-  backup,
-  signature,
-  message,
-  teacher,
-}
+enum _PriorityAction { backup, signature, message, teacher }
 
 class _PrioritySuggestion {
   final String title;
@@ -802,7 +937,9 @@ class _PriorityBanner extends StatelessWidget {
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 420;
           final buttonWidth = compact ? constraints.maxWidth : 120.0;
-          final contentWidth = compact ? constraints.maxWidth : constraints.maxWidth - buttonWidth - 14;
+          final contentWidth = compact
+              ? constraints.maxWidth
+              : constraints.maxWidth - buttonWidth - 14;
 
           return Wrap(
             spacing: 14,
@@ -830,9 +967,8 @@ class _PriorityBanner extends StatelessWidget {
                         children: [
                           Text(
                             title,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -868,10 +1004,7 @@ class _SettingsSectionTitle extends StatelessWidget {
   final String title;
   final String? subtitle;
 
-  const _SettingsSectionTitle({
-    required this.title,
-    this.subtitle,
-  });
+  const _SettingsSectionTitle({required this.title, this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -882,14 +1015,13 @@ class _SettingsSectionTitle extends StatelessWidget {
       children: [
         Text(
           title,
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 4),
-          Text(
-            subtitle!,
-            style: theme.textTheme.bodySmall,
-          ),
+          Text(subtitle!, style: theme.textTheme.bodySmall),
         ],
       ],
     );
@@ -986,15 +1118,17 @@ class _SettingsShortcutCard extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 title,
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 subtitle,
                 style: theme.textTheme.bodySmall?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -1045,7 +1179,7 @@ class _SettingsTile extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: resolvedIconColor!.withValues(alpha: 0.1),
+                  color: resolvedIconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(icon, color: resolvedIconColor),
@@ -1073,7 +1207,12 @@ class _SettingsTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              trailing ?? const Icon(Icons.chevron_right, size: 20, color: kInkSecondary),
+              trailing ??
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: kInkSecondary,
+                  ),
             ],
           ),
         ),
@@ -1130,13 +1269,12 @@ class _SettingsSwitchTile extends StatelessWidget {
                             children: [
                               Text(
                                 title,
-                                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                subtitle,
-                                style: theme.textTheme.bodySmall,
-                              ),
+                              Text(subtitle, style: theme.textTheme.bodySmall),
                             ],
                           ),
                         ),
@@ -1172,13 +1310,12 @@ class _SettingsSwitchTile extends StatelessWidget {
                         children: [
                           Text(
                             title,
-                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            subtitle,
-                            style: theme.textTheme.bodySmall,
-                          ),
+                          Text(subtitle, style: theme.textTheme.bodySmall),
                         ],
                       ),
                     ),

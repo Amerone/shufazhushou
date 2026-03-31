@@ -11,13 +11,13 @@ import '../models/payment.dart';
 import '../../shared/constants.dart';
 
 class PdfGenerator {
-  // 宣纸暖色
+  // The palette mirrors soft-textured stationery with a warm ivory glow.
   static const _paperColor = PdfColor.fromInt(0xFFF5F1E8);
   static const _paperPanel = PdfColor.fromInt(0xF8FCFAF5);
   static const _paperPanelSoft = PdfColor.fromInt(0xEEF9F5ED);
   static const _inkPrimary = PdfColor.fromInt(0xFF2F3A2F);
   static const _inkSecondary = PdfColor.fromInt(0xFF8B7D6B);
-  // 印章红
+  // Deep seal red keeps calligraphic accents crisp against the soft background.
   static const _sealRed = PdfColor.fromInt(0xFFB44A3E);
   static const _sealRedSoft = PdfColor.fromInt(0x26B44A3E);
   static const _wusiLine = PdfColor.fromInt(0xFFD59A8B);
@@ -27,6 +27,9 @@ class PdfGenerator {
   static const _washInkDeep = PdfColor.fromInt(0x18393E35);
   static const _metricGreen = PdfColor.fromInt(0xFF6F8A68);
   static const _tableStripe = PdfColor.fromInt(0x0AF5F1E8);
+  static final _invalidFileNameChars = RegExp(r'[\\/:*?"<>|]');
+  static final _fileNameWhitespace = RegExp(r'\s+');
+  static final _fileNameUnderscores = RegExp(r'_+');
 
   static Future<String> generate({
     required Student student,
@@ -39,29 +42,26 @@ class PdfGenerator {
     required String message,
     required bool watermark,
     required SealConfig sealConfig,
+    String? aiAnalysis,
     String institutionName = kDefaultInstitutionName,
   }) async {
-    final fontData = await rootBundle.load('assets/fonts/NotoSansSC-Regular.ttf');
+    final fontData = await rootBundle.load(
+      'assets/fonts/NotoSansSC-Regular.ttf',
+    );
     final ttf = pw.Font.ttf(fontData);
-    final calliData = await rootBundle.load('assets/fonts/MaShanZheng-Regular.ttf');
+    final calliData = await rootBundle.load(
+      'assets/fonts/MaShanZheng-Regular.ttf',
+    );
     final calliFont = pw.Font.ttf(calliData);
 
-    final body = pw.TextStyle(
-      font: ttf,
-      fontSize: 11.5,
-      color: _inkPrimary,
-    );
+    final body = pw.TextStyle(font: ttf, fontSize: 11.5, color: _inkPrimary);
     final bodyStrong = pw.TextStyle(
       font: ttf,
       fontSize: 11.5,
       fontWeight: pw.FontWeight.bold,
       color: _inkPrimary,
     );
-    final subtle = pw.TextStyle(
-      font: ttf,
-      fontSize: 9.5,
-      color: _inkSecondary,
-    );
+    final subtle = pw.TextStyle(font: ttf, fontSize: 9.5, color: _inkSecondary);
     final calliHero = pw.TextStyle(
       font: calliFont,
       fontSize: 34,
@@ -93,21 +93,24 @@ class PdfGenerator {
       0,
       (sum, record) => sum + _durationMinutes(record.startTime, record.endTime),
     );
-    final totalFee =
-        sortedRecords.fold<double>(0, (sum, record) => sum + record.feeAmount);
-    final totalPaid =
-        sortedPayments.fold<double>(0, (sum, payment) => sum + payment.amount);
+    final totalFee = sortedRecords.fold<double>(
+      0,
+      (sum, record) => sum + record.feeAmount,
+    );
+    final totalPaid = sortedPayments.fold<double>(
+      0,
+      (sum, payment) => sum + payment.amount,
+    );
     final balance = totalPaid - totalFee;
-    final balanceLabel = balance >= 0 ? '结余' : '待收';
-    final balanceValue = '¥${balance.abs().toStringAsFixed(2)}';
+    final balanceLabel = balance >= 0 ? '\u7ed3\u4f59' : '\u5f85\u7f34';
+    final balanceValue = 'CNY ${balance.abs().toStringAsFixed(2)}';
     final balanceAccent = balance >= 0 ? _metricGreen : _sealRed;
     final messageText = message.trim();
+    final aiAnalysisText = aiAnalysis?.trim() ?? '';
+    final aiAnalysisParagraphs = _splitAiAnalysisParagraphs(aiAnalysisText);
 
     final pdf = pw.Document(
-      theme: pw.ThemeData.withFont(
-        base: ttf,
-        bold: ttf,
-      ),
+      theme: pw.ThemeData.withFont(base: ttf, bold: ttf),
     );
 
     pw.Widget buildWatermark() {
@@ -117,7 +120,8 @@ class PdfGenerator {
           child: pw.Opacity(
             opacity: 0.1,
             child: pw.Text(
-              '$institutionName\n${student.name}研习册',
+              '$institutionName\n${student.name}\n\u5b66\u4e60\u62a5\u544a',
+
               textAlign: pw.TextAlign.center,
               style: pw.TextStyle(
                 font: calliFont,
@@ -132,11 +136,7 @@ class PdfGenerator {
 
     final watermarkWidget = watermark ? buildWatermark() : null;
 
-    // 印章组件 — 根据 SealConfig 动态渲染
-    pw.Widget buildSealStamp({
-      double size = 60,
-      bool tilted = true,
-    }) {
+    pw.Widget buildSealStamp({double size = 60, bool tilted = true}) {
       final grid = sealConfig.gridLayout;
       final isInverted = sealConfig.isInverted;
       final bgColor = isInverted ? _sealRed : null;
@@ -187,11 +187,17 @@ class PdfGenerator {
             children: [
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [pw.Text(grid[0][0], style: charStyle), pw.Text(grid[0][1], style: charStyle)],
+                children: [
+                  pw.Text(grid[0][0], style: charStyle),
+                  pw.Text(grid[0][1], style: charStyle),
+                ],
               ),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [pw.Text(grid[1][0], style: charStyle), pw.Text(grid[1][1], style: charStyle)],
+                children: [
+                  pw.Text(grid[1][0], style: charStyle),
+                  pw.Text(grid[1][1], style: charStyle),
+                ],
               ),
             ],
           ),
@@ -202,11 +208,17 @@ class PdfGenerator {
           children: [
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-              children: [pw.Text(grid[0][0], style: charStyle), pw.Text(grid[0][1], style: charStyle)],
+              children: [
+                pw.Text(grid[0][0], style: charStyle),
+                pw.Text(grid[0][1], style: charStyle),
+              ],
             ),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-              children: [pw.Text(grid[1][0], style: charStyle), pw.Text(grid[1][1], style: charStyle)],
+              children: [
+                pw.Text(grid[1][0], style: charStyle),
+                pw.Text(grid[1][1], style: charStyle),
+              ],
             ),
           ],
         );
@@ -226,19 +238,15 @@ class PdfGenerator {
 
       return pw.Opacity(
         opacity: 0.9,
-        child: tilted
-            ? pw.Transform.rotate(angle: -0.08, child: stamp)
-            : stamp,
+        child: tilted ? pw.Transform.rotate(angle: -0.08, child: stamp) : stamp,
       );
     }
 
-    // 纸张背景装饰
+    // The background layers mimic a calm ledger with rotated gradients and muted strokes.
     pw.Widget buildPaperBackground() {
       return pw.Stack(
         children: [
-          pw.Positioned.fill(
-            child: pw.Container(color: _paperColor),
-          ),
+          pw.Positioned.fill(child: pw.Container(color: _paperColor)),
           pw.Positioned(
             top: -34,
             right: -10,
@@ -272,22 +280,14 @@ class PdfGenerator {
           pw.Positioned(
             left: 30,
             top: 44,
-            child: pw.Container(
-              width: 68,
-              height: 1,
-              color: _frameHairline,
-            ),
+            child: pw.Container(width: 68, height: 1, color: _frameHairline),
           ),
           pw.Positioned(
             right: 28,
             bottom: 32,
-            child: pw.Container(
-              width: 82,
-              height: 1,
-              color: _frameHairline,
-            ),
+            child: pw.Container(width: 82, height: 1, color: _frameHairline),
           ),
-          if (watermarkWidget != null) watermarkWidget,
+          ?watermarkWidget,
         ],
       );
     }
@@ -301,31 +301,29 @@ class PdfGenerator {
         pageFormat: PdfPageFormat.a4,
         theme: pw.ThemeData.withFont(base: ttf, bold: ttf),
         margin: margin ?? const pw.EdgeInsets.fromLTRB(48, 52, 48, 56),
-        buildBackground: (_) => pw.FullPage(
-          ignoreMargins: true,
-          child: buildPaperBackground(),
-        ),
+        buildBackground: (_) =>
+            pw.FullPage(ignoreMargins: true, child: buildPaperBackground()),
         buildForeground: showPageNumber
             ? (context) => pw.FullPage(
-                  ignoreMargins: true,
-                  child: pw.Padding(
-                    padding: const pw.EdgeInsets.fromLTRB(38, 0, 38, 18),
-                    child: pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        pw.Text(
-                          '$institutionName · 墨韵',
-                          style: footerStyle,
-                        ),
-                        pw.Text(
-                          '第 ${context.pageNumber} 页',
-                          style: footerStyle,
-                        ),
-                      ],
-                    ),
+                ignoreMargins: true,
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.fromLTRB(38, 0, 38, 18),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text(
+                        '$institutionName - \u58a8\u97f5',
+                        style: footerStyle,
+                      ),
+                      pw.Text(
+                        '\u7b2c ${context.pageNumber} \u9875',
+                        style: footerStyle,
+                      ),
+                    ],
                   ),
-                )
+                ),
+              )
             : null,
       );
     }
@@ -368,10 +366,7 @@ class PdfGenerator {
           children: [
             pw.Text(label, style: subtle),
             pw.SizedBox(height: 4),
-            pw.Text(
-              value,
-              style: bodyStrong.copyWith(fontSize: 10.8),
-            ),
+            pw.Text(value, style: bodyStrong.copyWith(fontSize: 10.8)),
           ],
         ),
       );
@@ -403,11 +398,7 @@ class PdfGenerator {
                   pw.SizedBox(height: 8),
                   pw.Row(
                     children: [
-                      pw.Container(
-                        width: 72,
-                        height: 2.4,
-                        color: _sealRed,
-                      ),
+                      pw.Container(width: 72, height: 2.4, color: _sealRed),
                       pw.SizedBox(width: 10),
                       pw.Container(
                         width: 18,
@@ -420,10 +411,7 @@ class PdfGenerator {
                     ],
                   ),
                   pw.SizedBox(height: 10),
-                  pw.Text(
-                    subtitle,
-                    style: subtle.copyWith(fontSize: 10.3),
-                  ),
+                  pw.Text(subtitle, style: subtle.copyWith(fontSize: 10.3)),
                 ],
               ),
             ),
@@ -451,27 +439,17 @@ class PdfGenerator {
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Container(
-                width: 28,
-                height: 3,
-                color: accent,
-              ),
+              pw.Container(width: 28, height: 3, color: accent),
               pw.SizedBox(height: 10),
               pw.Text(label, style: subtle),
               pw.SizedBox(height: 6),
               pw.Text(
                 value,
-                style: bodyStrong.copyWith(
-                  fontSize: 16,
-                  color: accent,
-                ),
+                style: bodyStrong.copyWith(fontSize: 16, color: accent),
               ),
               if (caption != null) ...[
                 pw.SizedBox(height: 4),
-                pw.Text(
-                  caption,
-                  style: subtle.copyWith(fontSize: 8.6),
-                ),
+                pw.Text(caption, style: subtle.copyWith(fontSize: 8.6)),
               ],
             ],
           ),
@@ -494,10 +472,7 @@ class PdfGenerator {
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text(
-              title,
-              style: bodyStrong.copyWith(fontSize: 12.4),
-            ),
+            pw.Text(title, style: bodyStrong.copyWith(fontSize: 12.4)),
             if (subtitle != null) ...[
               pw.SizedBox(height: 4),
               pw.Text(subtitle, style: subtle),
@@ -519,10 +494,7 @@ class PdfGenerator {
         ),
         child: pw.Text(
           text,
-          style: subtle.copyWith(
-            fontSize: 8.8,
-            color: accent,
-          ),
+          style: subtle.copyWith(fontSize: 8.8, color: accent),
         ),
       );
     }
@@ -532,24 +504,21 @@ class PdfGenerator {
       pw.TextStyle? style,
       pw.TextAlign align = pw.TextAlign.left,
     }) {
-      final content = text.trim().isEmpty ? '—' : text;
+      final content = text.trim().isEmpty ? '-' : text;
       return pw.Padding(
         padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-        child: pw.Text(
-          content,
-          style: style ?? body,
-          textAlign: align,
-        ),
+        child: pw.Text(content, style: style ?? body, textAlign: align),
       );
     }
 
     pw.Widget buildAttendanceLedger() {
       if (sortedRecords.isEmpty) {
         return buildPanel(
-          title: '出勤册页',
-          subtitle: '本周期暂无出勤记录。',
+          title: '\u51fa\u52e4\u8bb0\u5f55',
+          subtitle:
+              '\u5f53\u524d\u65f6\u95f4\u8303\u56f4\u5185\u6682\u65e0\u51fa\u52e4\u8bb0\u5f55\u3002',
           child: pw.Text(
-            '当前时间范围内没有可展示的课次，建议调整导出区间后重新生成。',
+            '\u672a\u5728\u6240\u9009\u65e5\u671f\u8303\u56f4\u5185\u627e\u5230\u8bfe\u7a0b\u8bb0\u5f55\uff0c\u53ef\u5c1d\u8bd5\u8c03\u6574\u5bfc\u51fa\u8303\u56f4\u3002',
             style: body.copyWith(fontSize: 10.5),
           ),
         );
@@ -559,24 +528,44 @@ class PdfGenerator {
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: _sealRedSoft),
           children: [
-            buildTableCell('日期', style: bodyStrong, align: pw.TextAlign.center),
-            buildTableCell('时段', style: bodyStrong, align: pw.TextAlign.center),
-            buildTableCell('状态', style: bodyStrong, align: pw.TextAlign.center),
-            buildTableCell('费用', style: bodyStrong, align: pw.TextAlign.center),
+            buildTableCell(
+              '\u65e5\u671f',
+              style: bodyStrong,
+              align: pw.TextAlign.center,
+            ),
+            buildTableCell(
+              '\u65f6\u95f4',
+              style: bodyStrong,
+              align: pw.TextAlign.center,
+            ),
+            buildTableCell(
+              '\u72b6\u6001',
+              style: bodyStrong,
+              align: pw.TextAlign.center,
+            ),
+            buildTableCell(
+              '\u8d39\u7528',
+              style: bodyStrong,
+              align: pw.TextAlign.center,
+            ),
           ],
         ),
         for (var i = 0; i < sortedRecords.length; i++)
           pw.TableRow(
-            decoration: i.isEven ? const pw.BoxDecoration(color: _tableStripe) : null,
+            decoration: i.isEven
+                ? const pw.BoxDecoration(color: _tableStripe)
+                : null,
             children: [
               buildTableCell(sortedRecords[i].date),
-              buildTableCell('${sortedRecords[i].startTime} – ${sortedRecords[i].endTime}'),
               buildTableCell(
-                statusLabel(sortedRecords[i].status),
+                '${sortedRecords[i].startTime} - ${sortedRecords[i].endTime}',
+              ),
+              buildTableCell(
+                _formatStatusLabel(sortedRecords[i].status),
                 align: pw.TextAlign.center,
               ),
               buildTableCell(
-                '¥${sortedRecords[i].feeAmount.toStringAsFixed(0)}',
+                'CNY ${sortedRecords[i].feeAmount.toStringAsFixed(2)}',
                 align: pw.TextAlign.center,
               ),
             ],
@@ -584,8 +573,9 @@ class PdfGenerator {
       ];
 
       return buildPanel(
-        title: '出勤册页',
-        subtitle: '借细红界格规整课次、时段与费用，便于快速核对。',
+        title: '\u51fa\u52e4\u8bb0\u5f55',
+        subtitle:
+            '\u6309\u8bfe\u7a0b\u65f6\u95f4\u4e0e\u8d39\u7528\u6c47\u603b\uff0c\u4fbf\u4e8e\u5feb\u901f\u67e5\u770b\u3002',
         child: pw.Table(
           columnWidths: const {
             0: pw.FlexColumnWidth(1.35),
@@ -628,18 +618,20 @@ class PdfGenerator {
                     runSpacing: 6,
                     children: [
                       buildTag(record.date),
-                      buildTag('${record.startTime} – ${record.endTime}', accent: _sealRed),
+                      buildTag(
+                        '${record.startTime} - ${record.endTime}',
+                        accent: _sealRed,
+                      ),
                     ],
                   ),
                   pw.SizedBox(height: 10),
-                  pw.Container(
-                    width: 40,
-                    height: 2,
-                    color: _sealRed,
-                  ),
+                  pw.Container(width: 40, height: 2, color: _sealRed),
                   if (record.lessonFocusTags.isNotEmpty) ...[
                     pw.SizedBox(height: 10),
-                    pw.Text('课堂重点', style: bodyStrong.copyWith(fontSize: 10.6)),
+                    pw.Text(
+                      '\u8bfe\u5802\u91cd\u70b9',
+                      style: bodyStrong.copyWith(fontSize: 10.6),
+                    ),
                     pw.SizedBox(height: 4),
                     pw.Text(
                       _formatLessonFocusTags(record),
@@ -648,7 +640,10 @@ class PdfGenerator {
                   ],
                   if (record.homePracticeNote?.trim().isNotEmpty ?? false) ...[
                     pw.SizedBox(height: 10),
-                    pw.Text('课后练习', style: bodyStrong.copyWith(fontSize: 10.6)),
+                    pw.Text(
+                      '\u8fdb\u6b65\u6458\u8981',
+                      style: bodyStrong.copyWith(fontSize: 10.6),
+                    ),
                     pw.SizedBox(height: 4),
                     pw.Text(
                       record.homePracticeNote!.trim(),
@@ -656,11 +651,14 @@ class PdfGenerator {
                     ),
                   ],
                   pw.SizedBox(height: 10),
-                  pw.Text('进步摘记', style: bodyStrong.copyWith(fontSize: 10.6)),
+                  pw.Text(
+                    '\u8fdb\u6b65\u8bb0\u5f55',
+                    style: bodyStrong.copyWith(fontSize: 10.6),
+                  ),
                   pw.SizedBox(height: 4),
                   pw.Text(
                     _formatProgressSummary(record).isEmpty
-                        ? '本次未填写评分，建议结合课堂重点一并查看。'
+                        ? '\u672c\u6b21\u8bfe\u5802\u6682\u65e0\u7ed3\u6784\u5316\u8bc4\u5206\uff0c\u8bf7\u7ed3\u5408\u5907\u6ce8\u4e0e\u91cd\u70b9\u6807\u7b7e\u67e5\u770b\u3002'
                         : _formatProgressSummary(record),
                     style: body.copyWith(
                       fontSize: 10.5,
@@ -678,10 +676,11 @@ class PdfGenerator {
     pw.Widget buildPaymentLedger() {
       if (sortedPayments.isEmpty) {
         return buildPanel(
-          title: '缴费流水',
-          subtitle: '本周期暂无缴费记录。',
+          title: '\u7f34\u8d39\u8bb0\u5f55',
+          subtitle:
+              '\u5f53\u524d\u65f6\u95f4\u8303\u56f4\u5185\u6682\u65e0\u7f34\u8d39\u8bb0\u5f55\u3002',
           child: pw.Text(
-            '若本阶段未发生缴费，可仅参考上方应收与待收金额；如需补录，请先在应用内完善缴费记录。',
+            '\u672c\u65f6\u95f4\u8303\u56f4\u5185\u672a\u8bb0\u5f55\u7f34\u8d39\uff0c\u4ecd\u53ef\u67e5\u770b\u5e94\u6536\u4e0e\u672a\u7ed3\u91d1\u989d\u3002',
             style: body.copyWith(fontSize: 10.5, lineSpacing: 3),
           ),
         );
@@ -691,18 +690,32 @@ class PdfGenerator {
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: _sealRedSoft),
           children: [
-            buildTableCell('缴费日期', style: bodyStrong, align: pw.TextAlign.center),
-            buildTableCell('金额', style: bodyStrong, align: pw.TextAlign.center),
-            buildTableCell('备注', style: bodyStrong, align: pw.TextAlign.center),
+            buildTableCell(
+              '\u7f34\u8d39\u65e5\u671f',
+              style: bodyStrong,
+              align: pw.TextAlign.center,
+            ),
+            buildTableCell(
+              '\u91d1\u989d',
+              style: bodyStrong,
+              align: pw.TextAlign.center,
+            ),
+            buildTableCell(
+              '\u5907\u6ce8',
+              style: bodyStrong,
+              align: pw.TextAlign.center,
+            ),
           ],
         ),
         for (var i = 0; i < sortedPayments.length; i++)
           pw.TableRow(
-            decoration: i.isEven ? const pw.BoxDecoration(color: _tableStripe) : null,
+            decoration: i.isEven
+                ? const pw.BoxDecoration(color: _tableStripe)
+                : null,
             children: [
               buildTableCell(sortedPayments[i].paymentDate),
               buildTableCell(
-                '¥${sortedPayments[i].amount.toStringAsFixed(2)}',
+                'CNY ${sortedPayments[i].amount.toStringAsFixed(2)}',
                 align: pw.TextAlign.center,
               ),
               buildTableCell(sortedPayments[i].note ?? ''),
@@ -711,8 +724,9 @@ class PdfGenerator {
       ];
 
       return buildPanel(
-        title: '缴费流水',
-        subtitle: '保留日期与附注，方便家长逐笔核对。',
+        title: '\u7f34\u8d39\u8bb0\u5f55',
+        subtitle:
+            '\u4fdd\u7559\u65e5\u671f\u4e0e\u5907\u6ce8\uff0c\u4fbf\u4e8e\u5bb6\u957f\u4fa7\u6838\u5bf9\u3002',
         child: pw.Table(
           columnWidths: const {
             0: pw.FlexColumnWidth(1.15),
@@ -732,7 +746,6 @@ class PdfGenerator {
       );
     }
 
-    // Page 1: 封面（压角章在此页，不放签名）
     pdf.addPage(
       pw.Page(
         pageTheme: buildTheme(
@@ -741,15 +754,17 @@ class PdfGenerator {
         ),
         build: (_) {
           final chips = <pw.Widget>[
-            buildInfoChip('研习区间', '$from 至 $to'),
+            buildInfoChip('\u5468\u671f', '$from \u81f3 $to'),
             buildInfoChip(
-              '指导教师',
+              '\u6388\u8bfe\u6559\u5e08',
               teacherName.trim().isEmpty ? institutionName : teacherName.trim(),
             ),
-            buildInfoChip('课次', '${sortedRecords.length} 节'),
+            buildInfoChip('\u8bfe\u6b21', '${sortedRecords.length} \u8282'),
           ];
           if (student.parentName?.trim().isNotEmpty ?? false) {
-            chips.add(buildInfoChip('家长', student.parentName!.trim()));
+            chips.add(
+              buildInfoChip('\u5bb6\u957f', student.parentName!.trim()),
+            );
           }
 
           return pw.Stack(
@@ -757,7 +772,7 @@ class PdfGenerator {
               pw.Positioned(
                 left: 0,
                 top: 6,
-                child: buildVerticalLabel('研习册'),
+                child: buildVerticalLabel('\u62a5\u544a'),
               ),
               pw.Align(
                 alignment: pw.Alignment.center,
@@ -781,7 +796,7 @@ class PdfGenerator {
                       pw.Text(student.name, style: calliHero),
                       pw.SizedBox(height: 10),
                       pw.Text(
-                        '学习报告',
+                        '\u5b66\u4e60\u62a5\u544a',
                         style: bodyStrong.copyWith(
                           fontSize: 15.2,
                           letterSpacing: 2,
@@ -789,14 +804,10 @@ class PdfGenerator {
                         ),
                       ),
                       pw.SizedBox(height: 12),
-                      pw.Container(
-                        width: 96,
-                        height: 2.4,
-                        color: _sealRed,
-                      ),
+                      pw.Container(width: 96, height: 2.4, color: _sealRed),
                       pw.SizedBox(height: 16),
                       pw.Text(
-                        '以纸墨留存本阶段的课录、札记与结算，让日常学习也有卷册般的归档感。',
+                        '\u6c47\u603b\u8bfe\u6b21\u3001\u8bfe\u5802\u8bb0\u5f55\u4e0e\u7ed3\u7b97\u4fe1\u606f\uff0c\u65b9\u4fbf\u5bb6\u6821\u5171\u540c\u67e5\u770b\u3002',
                         style: body.copyWith(
                           fontSize: 11,
                           color: _inkSecondary,
@@ -825,37 +836,40 @@ class PdfGenerator {
       ),
     );
 
-    // Page 2: 出勤明细
+    // Page 2: The attendance summary keeps classes, timing, and fees organized in a compact ledger layout.
     pdf.addPage(
       pw.MultiPage(
         pageTheme: buildTheme(),
         build: (_) => [
           buildSectionIntro(
-            title: '出勤纪要',
-            subtitle: '用古籍界格整理课次、时段与费用，让信息清楚而不生硬。',
-            sideLabel: '课录',
+            title: '\u51fa\u52e4\u6982\u89c8',
+            subtitle:
+                '\u4ee5\u7b80\u6d01\u8d26\u518c\u65b9\u5f0f\u6574\u7406\u8bfe\u7a0b\u65e5\u671f\u3001\u65f6\u6bb5\u4e0e\u8d39\u7528\u3002',
+            sideLabel: '\u8bfe\u7a0b',
           ),
           pw.Row(
             children: [
               buildMetricCard(
-                label: '累计课次',
-                value: '${sortedRecords.length} 节',
+                label: '\u8bfe\u6b21',
+                value: '${sortedRecords.length} \u8282',
                 accent: _inkPrimary,
-                caption: '当前筛选区间内的课次总数',
+                caption:
+                    '\u6240\u9009\u65f6\u95f4\u8303\u56f4\u5185\u7684\u603b\u8bfe\u6b21',
               ),
               pw.SizedBox(width: 12),
               buildMetricCard(
-                label: '累计时长',
+                label: '\u603b\u65f6\u957f',
                 value: _formatDuration(totalMinutes),
                 accent: _metricGreen,
-                caption: '按课次起止时间折算',
+                caption:
+                    '\u6839\u636e\u4e0a\u8bfe\u5f00\u59cb\u4e0e\u7ed3\u675f\u65f6\u95f4\u8ba1\u7b97',
               ),
               pw.SizedBox(width: 12),
               buildMetricCard(
-                label: '课时单价',
-                value: '¥${student.pricePerClass.toStringAsFixed(0)}',
+                label: '\u8bfe\u65f6\u5355\u4ef7',
+                value: 'CNY ${student.pricePerClass.toStringAsFixed(0)}',
                 accent: _sealRed,
-                caption: '默认课时价格快照',
+                caption: '\u5f53\u524d\u8bfe\u65f6\u4ef7\u683c\u5feb\u7167',
               ),
             ],
           ),
@@ -871,9 +885,10 @@ class PdfGenerator {
           pageTheme: buildTheme(),
           build: (_) => [
             buildSectionIntro(
-              title: '课堂札记',
-              subtitle: '把课堂重点、课后练习与评分收成册页式摘录，替代表格堆砌。',
-              sideLabel: '札记',
+              title: '\u8bfe\u5802\u8bb0\u5f55',
+              subtitle:
+                  '\u4ee5\u5361\u7247\u65b9\u5f0f\u5c55\u793a\u91cd\u70b9\u6807\u7b7e\u3001\u8bfe\u540e\u7ec3\u4e60\u4e0e\u8bc4\u5206\u6458\u8981\u3002',
+              sideLabel: '\u8bb0\u5f55',
             ),
             buildFeedbackGallery(),
           ],
@@ -886,31 +901,36 @@ class PdfGenerator {
         pageTheme: buildTheme(),
         build: (_) => [
           buildSectionIntro(
-            title: '费用结算',
-            subtitle: '以薄墨梳理应收、已收与结余，方便家长核对本阶段课耗。',
-            sideLabel: '款识',
+            title: '\u8d39\u7528\u6c47\u603b',
+            subtitle:
+                '\u6c47\u603b\u672c\u5468\u671f\u7684\u5e94\u6536\u3001\u5df2\u6536\u4e0e\u4f59\u989d\u60c5\u51b5\u3002',
+            sideLabel: '\u8d39\u7528',
           ),
           pw.Row(
             children: [
               buildMetricCard(
-                label: '应收',
-                value: '¥${totalFee.toStringAsFixed(2)}',
+                label: '\u5e94\u6536',
+                value: 'CNY ${totalFee.toStringAsFixed(2)}',
                 accent: _inkPrimary,
-                caption: '按出勤状态自动折算',
+                caption:
+                    '\u6839\u636e\u51fa\u52e4\u72b6\u6001\u81ea\u52a8\u8ba1\u7b97',
               ),
               pw.SizedBox(width: 12),
               buildMetricCard(
-                label: '已收',
-                value: '¥${totalPaid.toStringAsFixed(2)}',
+                label: '\u5df2\u6536',
+                value: 'CNY ${totalPaid.toStringAsFixed(2)}',
                 accent: _metricGreen,
-                caption: '当前区间内的缴费合计',
+                caption:
+                    '\u672c\u5468\u671f\u5185\u8bb0\u5f55\u7684\u603b\u7f34\u8d39',
               ),
               pw.SizedBox(width: 12),
               buildMetricCard(
                 label: balanceLabel,
                 value: balanceValue,
                 accent: balanceAccent,
-                caption: balance >= 0 ? '当前缴费已覆盖课耗' : '仍有课耗待结清',
+                caption: balance >= 0
+                    ? '\u5f53\u524d\u7f34\u8d39\u5df2\u8986\u76d6\u5b66\u8d39'
+                    : '\u4ecd\u6709\u5f85\u7ed3\u5b66\u8d39',
               ),
             ],
           ),
@@ -918,10 +938,11 @@ class PdfGenerator {
           buildPaymentLedger(),
           pw.SizedBox(height: 16),
           buildPanel(
-            title: '核对说明',
-            subtitle: '若对金额有疑问，可结合出勤纪要页逐条复核。',
+            title: '\u5bf9\u8d26\u8bf4\u660e',
+            subtitle:
+                '\u5982\u679c\u91d1\u989d\u5b58\u5728\u51fa\u5165\uff0c\u8bf7\u7ed3\u5408\u51fa\u52e4\u8bb0\u5f55\u6838\u5bf9\u3002',
             child: pw.Text(
-              '本报告中的费用以课次快照和出勤状态自动计算；缺勤、请假、试听等状态的计费逻辑，以应用当前规则为准。',
+              '\u62a5\u544a\u4e2d\u7684\u8d39\u7528\u6839\u636e\u51fa\u52e4\u5feb\u7167\u4e0e\u72b6\u6001\u8ba1\u8d39\u89c4\u5219\u81ea\u52a8\u751f\u6210\u3002',
               style: body.copyWith(fontSize: 10.5, lineSpacing: 3),
             ),
           ),
@@ -936,6 +957,49 @@ class PdfGenerator {
       ),
     );
 
+    if (aiAnalysisText.isNotEmpty) {
+      pdf.addPage(
+        pw.MultiPage(
+          pageTheme: buildTheme(),
+          build: (_) => [
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                buildSectionIntro(
+                  title: 'AI \u5b66\u4e60\u5206\u6790',
+                  subtitle:
+                      '\u6c47\u603b\u8fd1\u671f\u8bfe\u5802\u8868\u73b0\u4e0e\u6559\u5b66\u5efa\u8bae\uff0c\u4fbf\u4e8e\u5bb6\u6821\u540c\u6b65\u8bfe\u5802\u8fdb\u5c55\u3002',
+                  sideLabel: 'AI',
+                ),
+                pw.SizedBox(height: 8),
+                pw.Text('\u5206\u6790\u5185\u5bb9', style: calliSection),
+                pw.SizedBox(height: 10),
+                pw.Container(width: 56, height: 2.2, color: _sealRed),
+                pw.SizedBox(height: 16),
+              ],
+            ),
+            ...(aiAnalysisParagraphs.isEmpty
+                    ? [aiAnalysisText]
+                    : aiAnalysisParagraphs)
+                .map(
+                  (paragraph) => pw.Padding(
+                    padding: const pw.EdgeInsets.only(bottom: 12),
+                    child: pw.Text(
+                      paragraph,
+                      style: body.copyWith(fontSize: 12.2, lineSpacing: 5),
+                    ),
+                  ),
+                ),
+            pw.SizedBox(height: 10),
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: buildSealStamp(size: 56),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (messageText.isNotEmpty) {
       pdf.addPage(
         pw.Page(
@@ -944,9 +1008,10 @@ class PdfGenerator {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               buildSectionIntro(
-                title: '教师寄语',
-                subtitle: '将评语留在卷尾，以手写式落款和朱砂印章收束全册。',
-                sideLabel: '题跋',
+                title: '\u6559\u5e08\u5bc4\u8bed',
+                subtitle:
+                    '\u4ee5\u6559\u5e08\u5bc4\u8bed\u3001\u7b7e\u540d\u4e0e\u5370\u7ae0\u4e3a\u62a5\u544a\u6536\u5c3e\u3002',
+                sideLabel: '\u5bc4\u8bed',
               ),
               pw.SizedBox(height: 18),
               pw.Container(
@@ -960,20 +1025,13 @@ class PdfGenerator {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('寄语', style: calliSection),
+                    pw.Text('\u5bc4\u8bed', style: calliSection),
                     pw.SizedBox(height: 10),
-                    pw.Container(
-                      width: 56,
-                      height: 2.2,
-                      color: _sealRed,
-                    ),
+                    pw.Container(width: 56, height: 2.2, color: _sealRed),
                     pw.SizedBox(height: 18),
                     pw.Text(
                       messageText,
-                      style: body.copyWith(
-                        fontSize: 13,
-                        lineSpacing: 7,
-                      ),
+                      style: body.copyWith(fontSize: 13, lineSpacing: 7),
                     ),
                     pw.SizedBox(height: 24),
                     pw.Align(
@@ -982,13 +1040,13 @@ class PdfGenerator {
                         crossAxisAlignment: pw.CrossAxisAlignment.end,
                         children: [
                           if (signatureImage != null) ...[
-                            pw.Image(signatureImage!, height: 48),
+                            pw.Image(signatureImage, height: 48),
                             pw.SizedBox(height: 8),
                           ],
                           pw.Text(
                             teacherName.trim().isEmpty
-                                ? '—— $institutionName'
-                                : '—— ${teacherName.trim()}',
+                                ? '\u7531 $institutionName \u51fa\u5177'
+                                : '\u7531 ${teacherName.trim()} \u51fa\u5177',
                             style: calliSignature,
                           ),
                           pw.SizedBox(height: 10),
@@ -1006,7 +1064,17 @@ class PdfGenerator {
     }
 
     final dir = await getTemporaryDirectory();
-    final path = p.join(dir.path, '${student.name}_$from.pdf');
+    final safeStudentName = _sanitizeFileNameSegment(
+      student.name,
+      fallback: 'student',
+    );
+    final safeFrom = _sanitizeFileNameSegment(from, fallback: 'from');
+    final safeTo = _sanitizeFileNameSegment(to, fallback: 'to');
+    final fileStamp = _formatFileStamp(DateTime.now());
+    final path = p.join(
+      dir.path,
+      '${safeStudentName}_${safeFrom}_${safeTo}_$fileStamp.pdf',
+    );
     await File(path).writeAsBytes(await pdf.save());
     return path;
   }
@@ -1019,7 +1087,7 @@ class PdfGenerator {
 
   static String _formatLessonFocusTags(Attendance record) {
     if (record.lessonFocusTags.isEmpty) return '';
-    return record.lessonFocusTags.join('、');
+    return record.lessonFocusTags.join(', ');
   }
 
   static String _formatProgressSummary(Attendance record) {
@@ -1028,15 +1096,66 @@ class PdfGenerator {
 
     final parts = <String>[];
     if (scores.strokeQuality != null) {
-      parts.add('笔画 ${scores.strokeQuality!.toStringAsFixed(1)}');
+      parts.add(
+        '\u7b14\u753b\u8d28\u91cf\uff1a${scores.strokeQuality!.toStringAsFixed(1)}',
+      );
     }
     if (scores.structureAccuracy != null) {
-      parts.add('结构 ${scores.structureAccuracy!.toStringAsFixed(1)}');
+      parts.add(
+        '\u7ed3\u6784\u51c6\u786e\u5ea6\uff1a${scores.structureAccuracy!.toStringAsFixed(1)}',
+      );
     }
     if (scores.rhythmConsistency != null) {
-      parts.add('节奏 ${scores.rhythmConsistency!.toStringAsFixed(1)}');
+      parts.add(
+        '\u8282\u594f\u7a33\u5b9a\u6027\uff1a${scores.rhythmConsistency!.toStringAsFixed(1)}',
+      );
     }
     return parts.join(' / ');
+  }
+
+  static String _formatStatusLabel(String status) {
+    switch (status) {
+      case 'present':
+        return '\u51fa\u52e4';
+      case 'late':
+        return '\u8fdf\u5230';
+      case 'leave':
+        return '\u8bf7\u5047';
+      case 'absent':
+        return '\u7f3a\u52e4';
+      case 'trial':
+        return '\u8bd5\u542c';
+      default:
+        return status;
+    }
+  }
+
+  static List<String> _splitAiAnalysisParagraphs(String text) {
+    if (text.isEmpty) return const [];
+
+    final byBlankLine = text
+        .split(RegExp(r'\n\s*\n'))
+        .map((paragraph) => paragraph.trim())
+        .where((paragraph) => paragraph.isNotEmpty)
+        .toList(growable: false);
+    if (byBlankLine.length > 1) return byBlankLine;
+
+    final byLine = text
+        .split(RegExp(r'\n+'))
+        .map((paragraph) => paragraph.trim())
+        .where((paragraph) => paragraph.isNotEmpty)
+        .toList(growable: false);
+    if (byLine.length > 1) return byLine;
+
+    final bySentence =
+        RegExp(r'[^\u3002\uFF01\uFF1F!?]+[\u3002\uFF01\uFF1F!?]?')
+            .allMatches(text)
+            .map((match) => match.group(0)?.trim() ?? '')
+            .where((paragraph) => paragraph.isNotEmpty)
+            .toList(growable: false);
+    if (bySentence.length > 1) return bySentence;
+
+    return [text];
   }
 
   static int _durationMinutes(String startTime, String endTime) {
@@ -1056,12 +1175,34 @@ class PdfGenerator {
   }
 
   static String _formatDuration(int minutes) {
-    if (minutes <= 0) return '0 分钟';
-    if (minutes < 60) return '$minutes 分钟';
+    if (minutes <= 0) return '0\u5206\u949f';
+    if (minutes < 60) return '$minutes\u5206\u949f';
 
     final hours = minutes ~/ 60;
     final rest = minutes % 60;
-    if (rest == 0) return '$hours 小时';
-    return '$hours 小时 $rest 分钟';
+    if (rest == 0) return '$hours\u5c0f\u65f6';
+    return '$hours\u5c0f\u65f6 $rest\u5206\u949f';
+  }
+
+  static String _sanitizeFileNameSegment(
+    String value, {
+    required String fallback,
+  }) {
+    final sanitized = value
+        .trim()
+        .replaceAll(_invalidFileNameChars, '_')
+        .replaceAll(_fileNameWhitespace, '_')
+        .replaceAll(_fileNameUnderscores, '_')
+        .replaceAll(RegExp(r'^[._]+|[._]+$'), '');
+    return sanitized.isEmpty ? fallback : sanitized;
+  }
+
+  static String _formatFileStamp(DateTime time) {
+    final month = time.month.toString().padLeft(2, '0');
+    final day = time.day.toString().padLeft(2, '0');
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    final second = time.second.toString().padLeft(2, '0');
+    return '${time.year}$month$day$hour$minute$second';
   }
 }

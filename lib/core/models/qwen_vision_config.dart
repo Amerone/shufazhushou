@@ -8,7 +8,9 @@ class QwenVisionConfig {
       'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
   static const defaultModel = 'qwen3-vl-plus';
   static const defaultSystemPrompt =
-      '你是一名书法教学分析助手，请结合图片内容，从笔画、结构、章法和练习建议四个方面给出简洁、可执行的反馈。';
+      'You are a calligraphy analysis assistant. Review the input carefully '
+      'and provide concise, actionable feedback on stroke quality, structure, '
+      'layout, and next practice steps.';
 
   final String apiKey;
   final String baseUrl;

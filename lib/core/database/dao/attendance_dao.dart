@@ -20,6 +20,17 @@ class AttendanceDao {
     await db.delete('attendance', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<Attendance?> getById(String id) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'attendance',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : Attendance.fromMap(rows.first);
+  }
+
   /// Batch insert attendance records within a transaction.
   /// For each record, deletes any conflicting record (by id) before inserting.
   Future<void> batchInsertWithConflictReplace(

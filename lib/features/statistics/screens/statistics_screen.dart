@@ -14,6 +14,7 @@ import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../widgets/contribution_chart.dart';
+import '../widgets/data_insight_card.dart';
 import '../widgets/insight_list.dart';
 import '../widgets/metrics_grid.dart';
 import '../widgets/revenue_chart.dart';
@@ -43,7 +44,7 @@ class StatisticsScreen extends ConsumerWidget {
           children: [
             const PageHeader(
               title: '经营统计',
-              subtitle: '查看课时收入、出勤结构和经营提醒。',
+              subtitle: '查看课时收入、出勤结构和当前周期提醒。',
             ),
             Expanded(
               child: RefreshIndicator(
@@ -120,13 +121,20 @@ class StatisticsScreen extends ConsumerWidget {
                     const SizedBox(height: 24),
                     const _SectionTitle(
                       title: '经营提醒',
-                      subtitle: '集中处理欠费、流失和试听转化等需要跟进的事项。',
+                      subtitle: '聚焦当前周期内需要跟进的续费、流失与排课信号。',
                     ),
                     const SizedBox(height: 12),
                     GlassCard(
                       padding: const EdgeInsets.all(18),
                       child: const InsightList(),
                     ),
+                    const SizedBox(height: 24),
+                    const _SectionTitle(
+                      title: 'AI 经营洞察',
+                      subtitle: '基于当前周期核心数据生成经营分析和可执行建议。',
+                    ),
+                    const SizedBox(height: 12),
+                    const DataInsightCard(),
                   ],
                 ),
               ),

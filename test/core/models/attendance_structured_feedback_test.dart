@@ -1,6 +1,6 @@
-import 'package:calligraphy_assistant/core/models/attendance.dart';
-import 'package:calligraphy_assistant/core/models/structured_attendance_feedback.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moyun/core/models/attendance.dart';
+import 'package:moyun/core/models/structured_attendance_feedback.dart';
 
 void main() {
   group('Attendance structured feedback serialization', () {
@@ -26,54 +26,42 @@ void main() {
       final model = Attendance.fromMap(input);
       final roundTrip = model.toMap();
 
-      expect(
-        roundTrip['lesson_focus_tags'],
-        input['lesson_focus_tags'],
-        reason:
-            'Attendance should round-trip lesson focus tags so structured feedback remains queryable.',
-      );
-      expect(
-        roundTrip['home_practice_note'],
-        input['home_practice_note'],
-        reason:
-            'Attendance should round-trip home practice note for parent communication exports.',
-      );
-      expect(
-        roundTrip['progress_scores_json'],
-        input['progress_scores_json'],
-        reason:
-            'Attendance should round-trip progress score payload to support timeline insights.',
-      );
+      expect(roundTrip['lesson_focus_tags'], input['lesson_focus_tags']);
+      expect(roundTrip['home_practice_note'], input['home_practice_note']);
+      expect(roundTrip['progress_scores_json'], input['progress_scores_json']);
     });
 
-    test('null structured feedback fields remain nullable on serialization', () {
-      final input = <String, dynamic>{
-        'id': 'attendance-2',
-        'student_id': 'student-1',
-        'date': '2026-03-26',
-        'start_time': '10:00',
-        'end_time': '11:00',
-        'status': 'late',
-        'price_snapshot': 120.0,
-        'fee_amount': 120.0,
-        'note': null,
-        'lesson_focus_tags': null,
-        'home_practice_note': null,
-        'progress_scores_json': null,
-        'created_at': 1711411200000,
-        'updated_at': 1711411200000,
-      };
+    test(
+      'null structured feedback fields remain nullable on serialization',
+      () {
+        final input = <String, dynamic>{
+          'id': 'attendance-2',
+          'student_id': 'student-1',
+          'date': '2026-03-26',
+          'start_time': '10:00',
+          'end_time': '11:00',
+          'status': 'late',
+          'price_snapshot': 120.0,
+          'fee_amount': 120.0,
+          'note': null,
+          'lesson_focus_tags': null,
+          'home_practice_note': null,
+          'progress_scores_json': null,
+          'created_at': 1711411200000,
+          'updated_at': 1711411200000,
+        };
 
-      final model = Attendance.fromMap(input);
-      final roundTrip = model.toMap();
+        final model = Attendance.fromMap(input);
+        final roundTrip = model.toMap();
 
-      expect(roundTrip.containsKey('lesson_focus_tags'), isTrue);
-      expect(roundTrip.containsKey('home_practice_note'), isTrue);
-      expect(roundTrip.containsKey('progress_scores_json'), isTrue);
-      expect(roundTrip['lesson_focus_tags'], isNull);
-      expect(roundTrip['home_practice_note'], isNull);
-      expect(roundTrip['progress_scores_json'], isNull);
-    });
+        expect(roundTrip.containsKey('lesson_focus_tags'), isTrue);
+        expect(roundTrip.containsKey('home_practice_note'), isTrue);
+        expect(roundTrip.containsKey('progress_scores_json'), isTrue);
+        expect(roundTrip['lesson_focus_tags'], isNull);
+        expect(roundTrip['home_practice_note'], isNull);
+        expect(roundTrip['progress_scores_json'], isNull);
+      },
+    );
 
     test('copyWith can explicitly clear nullable structured fields', () {
       final original = Attendance(
@@ -88,7 +76,7 @@ void main() {
         note: '需要保留',
         lessonFocusTags: <String>['控笔稳定'],
         homePracticeNote: '每日练习',
-        progressScores: AttendanceProgressScores(strokeQuality: 4),
+        progressScores: const AttendanceProgressScores(strokeQuality: 4),
         createdAt: 1711411200000,
         updatedAt: 1711411200000,
       );
@@ -133,18 +121,9 @@ void main() {
         AttendanceFeedbackCodec.decodeFocusTags('["控笔"," 控笔 ","","结构",1]'),
         <String>['控笔', '结构'],
       );
-      expect(
-        AttendanceFeedbackCodec.decodeFocusTags('{not-json'),
-        isEmpty,
-      );
-      expect(
-        AttendanceFeedbackCodec.decodeProgressScores('{not-json'),
-        isNull,
-      );
-      expect(
-        AttendanceFeedbackCodec.decodeProgressScores('[]'),
-        isNull,
-      );
+      expect(AttendanceFeedbackCodec.decodeFocusTags('{not-json'), isEmpty);
+      expect(AttendanceFeedbackCodec.decodeProgressScores('{not-json'), isNull);
+      expect(AttendanceFeedbackCodec.decodeProgressScores('[]'), isNull);
     });
 
     test('progress scores copyWith can explicitly clear a score', () {

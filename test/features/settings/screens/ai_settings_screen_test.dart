@@ -1,12 +1,13 @@
-import 'package:calligraphy_assistant/core/models/qwen_vision_config.dart';
-import 'package:calligraphy_assistant/core/providers/ai_provider.dart';
-import 'package:calligraphy_assistant/core/providers/settings_provider.dart';
-import 'package:calligraphy_assistant/core/services/handwriting_analysis_service.dart';
-import 'package:calligraphy_assistant/core/services/vision_analysis_gateway.dart';
-import 'package:calligraphy_assistant/features/settings/screens/ai_settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moyun/core/models/qwen_vision_config.dart';
+import 'package:moyun/core/providers/ai_provider.dart';
+import 'package:moyun/core/providers/settings_provider.dart';
+import 'package:moyun/core/services/handwriting_analysis_service.dart';
+import 'package:moyun/core/services/vision_analysis_gateway.dart';
+import 'package:moyun/features/settings/screens/ai_settings_screen.dart';
+import 'package:moyun/shared/utils/interaction_feedback.dart';
 
 void main() {
   testWidgets('ai settings workbench runs analysis and renders result', (
@@ -16,6 +17,8 @@ void main() {
     _FakeSettingsNotifier.seededSettings = const {
       QwenVisionConfig.settingApiKey: 'sk-test',
       QwenVisionConfig.settingModel: 'qwen3-vl-plus',
+      InteractionFeedback.hapticsEnabledKey: 'false',
+      InteractionFeedback.soundEnabledKey: 'false',
     };
 
     await tester.pumpWidget(
@@ -26,13 +29,16 @@ void main() {
             HandwritingAnalysisService(gateway: gateway),
           ),
         ],
-        child: const MaterialApp(
-          home: AiSettingsScreen(),
-        ),
+        child: const MaterialApp(home: AiSettingsScreen()),
       ),
     );
     await _settleUi(tester);
 
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('ai_image_source_field')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(
       find.byKey(const ValueKey('ai_image_source_field')),
       'https://example.com/work.jpg',
@@ -46,24 +52,32 @@ void main() {
       '请重点关注结构稳定性',
     );
 
-    await tester.ensureVisible(
+    await tester.scrollUntilVisible(
       find.byKey(const ValueKey('run_qwen_analysis_button')),
+      200,
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.tap(find.byKey(const ValueKey('run_qwen_analysis_button')));
-    await _settleUi(tester);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('确认'));
-    await _settleUi(tester);
+    await tester.pumpAndSettle();
 
     expect(gateway.lastRequest, isNotNull);
-    expect(gateway.lastRequest!.prompt, contains('学生：李四'));
+    expect(gateway.lastRequest!.prompt, contains('学生：李四。'));
     expect(gateway.lastRequest!.prompt, contains('补充要求：请重点关注结构稳定性'));
-    expect(find.byKey(const ValueKey('ai_analysis_result_card')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ai_analysis_result_card')),
+      findsOneWidget,
+    );
     expect(find.textContaining('结构化结果 · qwen3-vl-plus'), findsOneWidget);
     expect(find.text('总评'), findsOneWidget);
     expect(find.text('笔画观察'), findsOneWidget);
     expect(find.text('练习建议'), findsOneWidget);
     expect(find.text('整体节奏稳定，观察维度完整。'), findsOneWidget);
-    expect(find.byKey(const ValueKey('ai_analysis_suggestion_0')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ai_analysis_suggestion_0')),
+      findsOneWidget,
+    );
   });
 }
 
@@ -92,6 +106,13 @@ class _FakeVisionGateway implements VisionAnalysisGateway {
 }
 ''',
       raw: <String, dynamic>{},
+    );
+  }
+
+  @override
+  Future<VisionAnalysisResult> analyzeText(TextAnalysisRequest request) async {
+    throw const VisionAnalysisException(
+      'Text analysis is not used in this test.',
     );
   }
 }

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,7 +20,9 @@ class AttendanceList extends ConsumerWidget {
   String _durationLabel(String start, String end) {
     final startTime = parseTime(start);
     final endTime = parseTime(end);
-    final minutes = (endTime.hour * 60 + endTime.minute) - (startTime.hour * 60 + startTime.minute);
+    final minutes =
+        (endTime.hour * 60 + endTime.minute) -
+        (startTime.hour * 60 + startTime.minute);
 
     if (minutes <= 0) return '时长待确认';
     if (minutes < 60) return '$minutes 分钟';
@@ -35,7 +37,9 @@ class AttendanceList extends ConsumerWidget {
     final selectedDate = ref.watch(selectedDateProvider);
     final asyncAll = ref.watch(attendanceProvider);
     final students = ref.watch(studentProvider).valueOrNull ?? [];
-    final nameMap = buildDisplayNameMap(students.map((m) => m.student).toList());
+    final nameMap = buildDisplayNameMap(
+      students.map((m) => m.student).toList(),
+    );
 
     final dateStr = formatDate(selectedDate);
 
@@ -103,20 +107,29 @@ class AttendanceList extends ConsumerWidget {
                       final compact = constraints.maxWidth < 420;
                       final deleteAction = _RecordActionButton(
                         onPressed: () async {
-                          final confirm = await AppToast.showConfirm(context, '确认删除此出勤记录？');
+                          final confirm = await AppToast.showConfirm(
+                            context,
+                            '确认删除此出勤记录？',
+                          );
                           if (!confirm) return;
                           await ref.read(attendanceDaoProvider).delete(r.id);
+                          if (!context.mounted) return;
                           await InteractionFeedback.seal(context);
                           invalidateAfterAttendanceChange(ref);
                         },
                       );
 
                       final actionHint = Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
+                          border: Border.all(
+                            color: kInkSecondary.withValues(alpha: 0.1),
+                          ),
                         ),
                         child: Text(
                           '轻触可改',
@@ -140,7 +153,11 @@ class AttendanceList extends ConsumerWidget {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.schedule_outlined, color: sColor, size: 18),
+                                Icon(
+                                  Icons.schedule_outlined,
+                                  color: sColor,
+                                  size: 18,
+                                ),
                                 const SizedBox(height: 4),
                                 Text(
                                   '${i + 1}',
@@ -162,13 +179,15 @@ class AttendanceList extends ConsumerWidget {
                                   children: [
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             nameMap[r.studentId] ?? r.studentId,
-                                            style: theme.textTheme.titleSmall?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                            ),
+                                            style: theme.textTheme.titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
                                           ),
                                           const SizedBox(height: 6),
                                           BrushStrokeDivider(
@@ -203,7 +222,8 @@ class AttendanceList extends ConsumerWidget {
                                     ),
                                     _MetaChip(
                                       icon: Icons.payments_outlined,
-                                      label: '¥${r.feeAmount.toStringAsFixed(0)}',
+                                      label:
+                                          '¥${r.feeAmount.toStringAsFixed(0)}',
                                     ),
                                   ],
                                 ),
@@ -216,15 +236,18 @@ class AttendanceList extends ConsumerWidget {
                                       vertical: 10,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: kPrimaryBlue.withValues(alpha: 0.05),
+                                      color: kPrimaryBlue.withValues(
+                                        alpha: 0.05,
+                                      ),
                                       borderRadius: BorderRadius.circular(14),
                                     ),
                                     child: Text(
                                       r.note!,
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: kInkSecondary,
-                                        height: 1.5,
-                                      ),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: kInkSecondary,
+                                            height: 1.5,
+                                          ),
                                     ),
                                   ),
                                 ],
@@ -269,10 +292,7 @@ class _StatusBadge extends StatelessWidget {
   final String status;
   final Color color;
 
-  const _StatusBadge({
-    required this.status,
-    required this.color,
-  });
+  const _StatusBadge({required this.status, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -299,10 +319,7 @@ class _MetaChip extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _MetaChip({
-    required this.icon,
-    required this.label,
-  });
+  const _MetaChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -345,9 +362,7 @@ class _RecordActionButton extends StatelessWidget {
         icon: const Icon(Icons.delete_outline),
         color: kRed,
         visualDensity: VisualDensity.compact,
-        style: IconButton.styleFrom(
-          overlayColor: kRed.withValues(alpha: 0.12),
-        ),
+        style: IconButton.styleFrom(overlayColor: kRed.withValues(alpha: 0.12)),
       ),
     );
   }

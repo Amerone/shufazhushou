@@ -1,4 +1,4 @@
-# 书法私教助手
+# 墨韵
 
 一款面向书法老师的离线 Android 应用，使用 Flutter 构建。管理学生考勤、费用收支，生成 PDF/Excel 报告。所有数据存储在本地 SQLite，无需联网。
 
@@ -41,7 +41,7 @@ lib/
 ├── app.dart                   # MaterialApp.router + GoRouter 路由配置
 ├── core/
 │   ├── database/
-│   │   ├── database_helper.dart   # SQLite 单例，数据库迁移（v3）
+│   │   ├── database_helper.dart   # SQLite 单例，数据库迁移（v4）
 │   │   └── dao/                   # 数据访问对象（每表一个）
 │   ├── models/                    # 数据模型（fromMap/toMap/copyWith）
 │   ├── providers/                 # Riverpod 全局 Provider
@@ -92,7 +92,7 @@ Release APK 路径：`build/app/outputs/flutter-apk/app-release.apk`
 
 ## 数据库设计
 
-SQLite 数据库文件 `calligraphy_assistant.db`，当前版本 v3，共 6 张表：
+SQLite 数据库文件 `moyun.db`（运行时会自动迁移旧版 `calligraphy_assistant.db`），当前版本 v4，共 6 张表：
 
 | 表名 | 用途 |
 |------|------|

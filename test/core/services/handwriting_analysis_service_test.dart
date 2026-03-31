@@ -1,7 +1,7 @@
-import 'package:calligraphy_assistant/core/models/handwriting_analysis_result.dart';
-import 'package:calligraphy_assistant/core/services/handwriting_analysis_service.dart';
-import 'package:calligraphy_assistant/core/services/vision_analysis_gateway.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moyun/core/models/handwriting_analysis_result.dart';
+import 'package:moyun/core/services/handwriting_analysis_service.dart';
+import 'package:moyun/core/services/vision_analysis_gateway.dart';
 
 void main() {
   group('HandwritingAnalysisService', () {
@@ -15,8 +15,8 @@ void main() {
         ),
       );
 
-      expect(prompt, contains('书体：行书'));
-      expect(prompt, contains('学生：张三'));
+      expect(prompt, contains('书体：行书。'));
+      expect(prompt, contains('学生：张三。'));
       expect(prompt, contains('补充要求：请重点关注笔画连贯性'));
       expect(prompt, contains('practice_suggestions'));
       expect(prompt, contains('请只输出一个 JSON 对象'));
@@ -35,7 +35,7 @@ void main() {
 
       expect(gateway.lastRequest, isNotNull);
       expect(gateway.lastRequest!.imageSource, 'https://example.com/work.jpg');
-      expect(gateway.lastRequest!.prompt, contains('书体：隶书'));
+      expect(gateway.lastRequest!.prompt, contains('书体：隶书。'));
       expect(result.model, 'qwen3-vl-plus');
       expect(result.isStructured, isTrue);
       expect(result.summary, '整体结构稳定，行笔较自然。');
@@ -85,7 +85,7 @@ void main() {
   "strokeObservation": "笔画顺畅",
   "structureObservation": "结构稳定",
   "layoutObservation": "章法自然",
-  "practiceSuggestions": "1. 继续慢写\n2. 留意转折"
+  "practiceSuggestions": "1. 继续慢写\\n2. 留意转折"
 }
 ''',
       );
@@ -115,6 +115,13 @@ class _SpyGateway implements VisionAnalysisGateway {
 }
 ''',
       raw: <String, dynamic>{},
+    );
+  }
+
+  @override
+  Future<VisionAnalysisResult> analyzeText(TextAnalysisRequest request) async {
+    throw const VisionAnalysisException(
+      'Text analysis is not used in this test.',
     );
   }
 }

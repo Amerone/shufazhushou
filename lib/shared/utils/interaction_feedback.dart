@@ -11,9 +11,10 @@ class InteractionFeedback {
   static DateTime? _lastSelectionAt;
 
   static Map<String, String>? _settingsFor(BuildContext context) {
-    return ProviderScope.containerOf(context, listen: false)
-        .read(settingsProvider)
-        .valueOrNull;
+    return ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(settingsProvider).valueOrNull;
   }
 
   static bool isHapticsEnabled(BuildContext context) {
@@ -29,8 +30,7 @@ class InteractionFeedback {
 
     final now = DateTime.now();
     if (_lastSelectionAt != null &&
-        now.difference(_lastSelectionAt!) <
-            const Duration(milliseconds: 48)) {
+        now.difference(_lastSelectionAt!) < const Duration(milliseconds: 48)) {
       return;
     }
     _lastSelectionAt = now;
@@ -38,16 +38,19 @@ class InteractionFeedback {
   }
 
   static Future<void> pageTurn(BuildContext context) async {
+    final soundEnabled = isSoundEnabled(context);
     await selection(context);
-    if (!isSoundEnabled(context)) return;
+    if (!soundEnabled) return;
     await SystemSound.play(SystemSoundType.click);
   }
 
   static Future<void> seal(BuildContext context) async {
-    if (isHapticsEnabled(context)) {
+    final hapticsEnabled = isHapticsEnabled(context);
+    final soundEnabled = isSoundEnabled(context);
+    if (hapticsEnabled) {
       await HapticFeedback.mediumImpact();
     }
-    if (!isSoundEnabled(context)) return;
+    if (!soundEnabled) return;
     await SystemSound.play(SystemSoundType.click);
   }
 }

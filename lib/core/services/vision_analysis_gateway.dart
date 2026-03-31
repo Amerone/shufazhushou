@@ -10,6 +10,16 @@ class VisionAnalysisRequest {
   });
 }
 
+class TextAnalysisRequest {
+  final String prompt;
+  final double temperature;
+
+  const TextAnalysisRequest({
+    required this.prompt,
+    this.temperature = 0.2,
+  });
+}
+
 class VisionAnalysisResult {
   final String model;
   final String text;
@@ -33,4 +43,10 @@ class VisionAnalysisException implements Exception {
 
 abstract class VisionAnalysisGateway {
   Future<VisionAnalysisResult> analyze(VisionAnalysisRequest request);
+
+  Future<VisionAnalysisResult> analyzeText(TextAnalysisRequest request) {
+    throw const VisionAnalysisException(
+      'This gateway does not support text-only analysis.',
+    );
+  }
 }

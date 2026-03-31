@@ -674,7 +674,7 @@ final ttf = pw.Font.ttf(fontData);
 4. 水印开关（默认开，关闭时二次确认）
 5. 底部：[预览 PDF] [生成 PDF 并分享] [导出 Excel]
 
-**PDF 分享：** 调用 `share_plus`，同时通过 MediaStore 保存副本到 `Downloads/书法助手导出/`（Android 10+ 用 MediaStore，Android 9- 直接写文件，与 P5-1 保持一致）
+**PDF 分享：** 调用 `share_plus`，同时通过 MediaStore 保存副本到 `Downloads/墨韵导出/`（Android 10+ 用 MediaStore，Android 9- 直接写文件，与 P5-1 保持一致）
 
 **Excel 导出：** 调用 `ExcelExporter`（P6-2），同样通过 MediaStore 保存，Toast 提示"已保存至下载目录"
 

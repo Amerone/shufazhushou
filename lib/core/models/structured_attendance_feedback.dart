@@ -28,10 +28,10 @@ class AttendanceProgressScores {
       rhythmConsistency == null;
 
   Map<String, dynamic> toMap() => {
-        'stroke_quality': strokeQuality,
-        'structure_accuracy': structureAccuracy,
-        'rhythm_consistency': rhythmConsistency,
-      };
+    'stroke_quality': _toJsonNumber(strokeQuality),
+    'structure_accuracy': _toJsonNumber(structureAccuracy),
+    'rhythm_consistency': _toJsonNumber(rhythmConsistency),
+  };
 
   factory AttendanceProgressScores.fromMap(Map<String, dynamic> map) {
     return AttendanceProgressScores(
@@ -47,16 +47,26 @@ class AttendanceProgressScores {
     Object? rhythmConsistency = _unset,
   }) {
     return AttendanceProgressScores(
-      strokeQuality: identical(strokeQuality, _unset)
-          ? this.strokeQuality
-          : strokeQuality as double?,
-      structureAccuracy: identical(structureAccuracy, _unset)
-          ? this.structureAccuracy
-          : structureAccuracy as double?,
-      rhythmConsistency: identical(rhythmConsistency, _unset)
-          ? this.rhythmConsistency
-          : rhythmConsistency as double?,
+      strokeQuality: _resolveDouble(strokeQuality, this.strokeQuality),
+      structureAccuracy: _resolveDouble(
+        structureAccuracy,
+        this.structureAccuracy,
+      ),
+      rhythmConsistency: _resolveDouble(
+        rhythmConsistency,
+        this.rhythmConsistency,
+      ),
     );
+  }
+
+  static num? _toJsonNumber(double? value) {
+    if (value == null) return null;
+    return value == value.truncateToDouble() ? value.toInt() : value;
+  }
+
+  static double? _resolveDouble(Object? value, double? fallback) {
+    if (identical(value, _unset)) return fallback;
+    return _toDouble(value);
   }
 
   static double? _toDouble(dynamic value) {

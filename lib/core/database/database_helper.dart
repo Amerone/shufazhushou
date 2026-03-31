@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
+  static const databaseFileName = 'moyun.db';
+  static const legacyDatabaseFileName = 'calligraphy_assistant.db';
+  static const _legacySuffixes = ['-wal', '-shm', '-journal'];
 
   Future<Database>? _dbFuture;
 
@@ -17,7 +22,7 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDB() async {
-    final path = join(await getDatabasesPath(), 'calligraphy_assistant.db');
+    final path = await resolveDatabasePath();
     return openDatabase(
       path,
       version: 4,
@@ -27,6 +32,49 @@ class DatabaseHelper {
         await db.execute('PRAGMA foreign_keys = ON');
       },
     );
+  }
+
+  static Future<String> resolveDatabasePath() async {
+    final databasesPath = await getDatabasesPath();
+    final currentPath = join(databasesPath, databaseFileName);
+    if (await databaseExists(currentPath)) {
+      return currentPath;
+    }
+
+    final legacyPath = join(databasesPath, legacyDatabaseFileName);
+    if (await databaseExists(legacyPath)) {
+      await _migrateLegacyDatabaseFiles(
+        legacyPath: legacyPath,
+        currentPath: currentPath,
+      );
+    }
+
+    return currentPath;
+  }
+
+  static Future<void> _migrateLegacyDatabaseFiles({
+    required String legacyPath,
+    required String currentPath,
+  }) async {
+    final legacyFile = File(legacyPath);
+    if (!await legacyFile.exists()) {
+      return;
+    }
+
+    await legacyFile.rename(currentPath);
+
+    for (final suffix in _legacySuffixes) {
+      final legacySidecar = File('$legacyPath$suffix');
+      if (!await legacySidecar.exists()) {
+        continue;
+      }
+
+      final currentSidecar = File('$currentPath$suffix');
+      if (await currentSidecar.exists()) {
+        await currentSidecar.delete();
+      }
+      await legacySidecar.rename(currentSidecar.path);
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {

@@ -43,7 +43,8 @@ class AiSettingsScreen extends ConsumerWidget {
 
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
-                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     children: [
                       GlassCard(
                         padding: const EdgeInsets.all(20),
@@ -59,7 +60,8 @@ class AiSettingsScreen extends ConsumerWidget {
                                   width: 48,
                                   height: 48,
                                   decoration: BoxDecoration(
-                                    color: (configured ? kGreen : kOrange).withValues(alpha: 0.12),
+                                    color: (configured ? kGreen : kOrange)
+                                        .withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: Icon(
@@ -70,11 +72,15 @@ class AiSettingsScreen extends ConsumerWidget {
                                 SizedBox(
                                   width: 240,
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Qwen 调用入口',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
                                               fontWeight: FontWeight.w700,
                                             ),
                                       ),
@@ -83,20 +89,27 @@ class AiSettingsScreen extends ConsumerWidget {
                                         configured
                                             ? '配置已保存，后续可以直接从 provider 侧调用视觉分析网关。'
                                             : '当前尚未配置 API Key，入口已准备好但不会发起远端请求。',
-                                        style: Theme.of(context).textTheme.bodySmall,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
                                       ),
                                     ],
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: (configured ? kGreen : kOrange).withValues(alpha: 0.12),
+                                    color: (configured ? kGreen : kOrange)
+                                        .withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
                                     configured ? '已配置' : '待配置',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
                                           color: configured ? kGreen : kOrange,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -107,9 +120,13 @@ class AiSettingsScreen extends ConsumerWidget {
                             const SizedBox(height: 16),
                             LayoutBuilder(
                               builder: (context, constraints) {
-                                final columns = constraints.maxWidth >= 720 ? 3 : 2;
+                                final columns = constraints.maxWidth >= 720
+                                    ? 3
+                                    : 2;
                                 final itemWidth =
-                                    (constraints.maxWidth - 12 * (columns - 1)) / columns;
+                                    (constraints.maxWidth -
+                                        12 * (columns - 1)) /
+                                    columns;
 
                                 return Wrap(
                                   spacing: 12,
@@ -149,10 +166,8 @@ class AiSettingsScreen extends ConsumerWidget {
                             const SizedBox(height: 12),
                             Text(
                               'API Key 仅保存在当前设备，不写入应用数据库备份；发起分析时会把图片、提示词和学员名发送到配置的远端服务。',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: kInkSecondary,
-                                    height: 1.5,
-                                  ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: kInkSecondary, height: 1.5),
                             ),
                           ],
                         ),
@@ -170,13 +185,17 @@ class AiSettingsScreen extends ConsumerWidget {
                             _AiTile(
                               icon: Icons.key_outlined,
                               title: 'API Key',
-                              subtitle: _maskApiKey(settings[QwenVisionConfig.settingApiKey] ?? ''),
+                              subtitle: _maskApiKey(
+                                settings[QwenVisionConfig.settingApiKey] ?? '',
+                              ),
                               onTap: () => _showEditSheet(
                                 context,
                                 ref,
                                 title: 'Qwen API Key',
                                 hintText: '请输入 DashScope / 百炼侧的 API Key',
-                                initialValue: settings[QwenVisionConfig.settingApiKey] ?? '',
+                                initialValue:
+                                    settings[QwenVisionConfig.settingApiKey] ??
+                                    '',
                                 keyName: QwenVisionConfig.settingApiKey,
                                 obscureText: true,
                               ),
@@ -191,7 +210,9 @@ class AiSettingsScreen extends ConsumerWidget {
                                 ref,
                                 title: '请求端点',
                                 hintText: QwenVisionConfig.defaultBaseUrl,
-                                initialValue: settings[QwenVisionConfig.settingBaseUrl] ?? config.baseUrl,
+                                initialValue:
+                                    settings[QwenVisionConfig.settingBaseUrl] ??
+                                    config.baseUrl,
                                 keyName: QwenVisionConfig.settingBaseUrl,
                               ),
                             ),
@@ -205,7 +226,9 @@ class AiSettingsScreen extends ConsumerWidget {
                                 ref,
                                 title: '模型标识',
                                 hintText: QwenVisionConfig.defaultModel,
-                                initialValue: settings[QwenVisionConfig.settingModel] ?? config.model,
+                                initialValue:
+                                    settings[QwenVisionConfig.settingModel] ??
+                                    config.model,
                                 keyName: QwenVisionConfig.settingModel,
                               ),
                             ),
@@ -219,7 +242,10 @@ class AiSettingsScreen extends ConsumerWidget {
                                 ref,
                                 title: '系统提示词',
                                 hintText: '请输入默认系统提示词',
-                                initialValue: settings[QwenVisionConfig.settingSystemPrompt] ?? config.systemPrompt,
+                                initialValue:
+                                    settings[QwenVisionConfig
+                                        .settingSystemPrompt] ??
+                                    config.systemPrompt,
                                 keyName: QwenVisionConfig.settingSystemPrompt,
                                 maxLines: 5,
                               ),
@@ -240,17 +266,14 @@ class AiSettingsScreen extends ConsumerWidget {
                           children: [
                             Text(
                               'Provider: `handwritingAnalysisServiceProvider`',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Config: `QwenVisionConfig.fromSettings(...)`\nService: `HandwritingAnalysisService.analyze(...) -> HandwritingAnalysisResult`\nGateway: `QwenVisionGateway.analyze(...)`\n请求体按兼容 Chat Completions 形式构造，图片支持远程 URL 和本地文件转 data URL。',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: kInkSecondary,
-                                    height: 1.5,
-                                  ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: kInkSecondary, height: 1.5),
                             ),
                           ],
                         ),
@@ -292,7 +315,8 @@ class AiSettingsScreen extends ConsumerWidget {
               left: 16,
               right: 16,
               top: 8,
-              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom +
+              bottom:
+                  MediaQuery.of(sheetCtx).viewInsets.bottom +
                   MediaQuery.of(sheetCtx).padding.bottom +
                   16,
             ),
@@ -305,8 +329,8 @@ class AiSettingsScreen extends ConsumerWidget {
                   Text(
                     title,
                     style: Theme.of(sheetCtx).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                      fontWeight: FontWeight.w800,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 20),
@@ -335,11 +359,12 @@ class AiSettingsScreen extends ConsumerWidget {
                     onPressed: () async {
                       final value = controller.text.trim();
                       Navigator.of(sheetCtx).pop();
-                      await ref.read(settingsProvider.notifier).set(
-                            keyName,
-                            value,
-                          );
-                      if (context.mounted) AppToast.showSuccess(context, '已保存$title');
+                      await ref
+                          .read(settingsProvider.notifier)
+                          .set(keyName, value);
+                      if (context.mounted) {
+                        AppToast.showSuccess(context, '已保存$title');
+                      }
                     },
                     child: const Text('保存配置'),
                   ),
@@ -370,10 +395,7 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _SectionTitle({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionTitle({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -382,16 +404,16 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 4),
         Text(
           subtitle,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: kInkSecondary,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: kInkSecondary),
         ),
       ],
     );
@@ -430,9 +452,9 @@ class _AiMetric extends StatelessWidget {
             value,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -480,9 +502,7 @@ class _AiTile extends StatelessWidget {
 class _AiWorkbench extends ConsumerStatefulWidget {
   final String modelName;
 
-  const _AiWorkbench({
-    required this.modelName,
-  });
+  const _AiWorkbench({required this.modelName});
 
   @override
   ConsumerState<_AiWorkbench> createState() => _AiWorkbenchState();
@@ -609,17 +629,17 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
             children: [
               Text(
                 '当前模型：${widget.modelName}',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               Text(
                 '从相册选取书法作业图片，或输入公网图片 URL 进行分析。',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: kInkSecondary,
-                      height: 1.5,
-                    ),
+                  color: kInkSecondary,
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -673,7 +693,7 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
               const SizedBox(height: 12),
               DropdownButtonFormField<CalligraphyScriptType>(
                 key: const ValueKey('ai_script_type_field'),
-                value: _scriptType,
+                initialValue: _scriptType,
                 decoration: InputDecoration(
                   labelText: '书体',
                   border: OutlineInputBorder(
@@ -742,16 +762,15 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
                     ? '请求会走 `handwritingAnalysisServiceProvider` -> `visionAnalysisGatewayProvider`。'
                     : '未配置 API Key 时只保留入口，不会发起远端调用。',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: enabled ? kInkSecondary : kOrange,
-                    ),
+                  color: enabled ? kInkSecondary : kOrange,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
                 '运行前会再次确认远端上传；API Key 不随应用备份导出。',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: kOrange,
-                      height: 1.5,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: kOrange, height: 1.5),
               ),
               if (_errorText != null) ...[
                 const SizedBox(height: 16),
@@ -765,9 +784,9 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
                   child: Text(
                     _errorText!,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: kSealRed,
-                          height: 1.5,
-                        ),
+                      color: kSealRed,
+                      height: 1.5,
+                    ),
                   ),
                 ),
               ],
@@ -789,9 +808,9 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
                             ? '结构化结果 · ${_result!.model}'
                             : '分析结果 · ${_result!.model}',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: kPrimaryBlue,
-                            ),
+                          fontWeight: FontWeight.w700,
+                          color: kPrimaryBlue,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       _AnalysisSection(label: '总评', content: _result!.summary),
@@ -820,32 +839,42 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
                         const SizedBox(height: 10),
                         Text(
                           '练习建议',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: kPrimaryBlue,
                               ),
                         ),
                         const SizedBox(height: 6),
-                        for (var i = 0; i < _result!.practiceSuggestions.length; i++)
+                        for (
+                          var i = 0;
+                          i < _result!.practiceSuggestions.length;
+                          i++
+                        )
                           Padding(
                             padding: EdgeInsets.only(
-                              bottom: i == _result!.practiceSuggestions.length - 1 ? 0 : 6,
+                              bottom:
+                                  i == _result!.practiceSuggestions.length - 1
+                                  ? 0
+                                  : 6,
                             ),
                             child: Text(
                               '${i + 1}. ${_result!.practiceSuggestions[i]}',
                               key: ValueKey('ai_analysis_suggestion_$i'),
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    height: 1.6,
-                                  ),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.copyWith(height: 1.6),
                             ),
                           ),
                       ],
                       if (_result!.rawText.isNotEmpty &&
-                          _result!.rawText.trim() != _result!.summary.trim()) ...[
+                          _result!.rawText.trim() !=
+                              _result!.summary.trim()) ...[
                         const SizedBox(height: 12),
                         Text(
                           '原始返回',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: kInkSecondary,
                               ),
@@ -854,18 +883,16 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
                         SelectableText(
                           _result!.rawText,
                           key: const ValueKey('ai_analysis_result_text'),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                height: 1.6,
-                                color: kInkSecondary,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(height: 1.6, color: kInkSecondary),
                         ),
                       ] else
                         SelectableText(
                           _result!.summary,
                           key: const ValueKey('ai_analysis_result_text'),
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                height: 1.6,
-                              ),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(height: 1.6),
                         ),
                     ],
                   ),
@@ -890,10 +917,7 @@ class _AnalysisSection extends StatelessWidget {
   final String label;
   final String content;
 
-  const _AnalysisSection({
-    required this.label,
-    required this.content,
-  });
+  const _AnalysisSection({required this.label, required this.content});
 
   @override
   Widget build(BuildContext context) {
@@ -903,16 +927,14 @@ class _AnalysisSection extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: kPrimaryBlue,
-              ),
+            fontWeight: FontWeight.w700,
+            color: kPrimaryBlue,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
           content.isEmpty ? '未返回' : content,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                height: 1.6,
-              ),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6),
         ),
       ],
     );

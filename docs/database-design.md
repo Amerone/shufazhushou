@@ -3,7 +3,7 @@
 ## 概览
 
 - 引擎：SQLite（通过 sqflite）
-- 数据库文件名：`calligraphy_assistant.db`
+- 数据库文件名：`moyun.db`（兼容迁移旧文件 `calligraphy_assistant.db`）
 - 当前版本：`4`
 
 ---
@@ -207,7 +207,7 @@ SELECT DISTINCT student_id FROM attendance WHERE status IN ('present','late');
 ```dart
 // database_helper.dart 关键逻辑
 static const int _version = 4;
-static const String _dbName = 'calligraphy_assistant.db';
+static const String _dbName = 'moyun.db';
 
 Future<Database> _initDB() async {
   final path = join(await getDatabasesPath(), _dbName);
@@ -249,7 +249,23 @@ Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
 
 ## 备份策略
 
-- 备份 = 直接复制 SQLite 数据库文件到 `Downloads/书法助手备份/` 目录
+- 备份 = 直接复制 SQLite 数据库文件到 `Downloads/墨韵备份/` 目录
 - 文件名格式：`backup_YYYYMMDD_HHmmss.db`
 - 恢复 = 用户选择备份文件，覆盖当前数据库文件后重启 App
 - 超过 7 天未备份：读取 `settings.last_backup_at`，在设置页显示橙色警告
+
+---
+
+## Runtime Naming Update
+
+- Active SQLite file name: `moyun.db`
+- Legacy SQLite file name: `calligraphy_assistant.db`
+- Active temporary backup directory: `moyun_backups`
+- Legacy temporary backup directory: `calligraphy_assistant_backups`
+
+### Compatibility
+
+At runtime the app now prefers `moyun.db`.
+If only the legacy database file exists, `DatabaseHelper.resolveDatabasePath()` migrates the old database and its sidecar files (`-wal`, `-shm`, `-journal`) to the new name before opening it.
+
+`BackupHelper` now reads the active database path via `DatabaseHelper.resolveDatabasePath()` and also migrates the legacy temporary backup directory to `moyun_backups` when needed.

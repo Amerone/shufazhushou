@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/data_insight_service.dart';
 import '../models/qwen_vision_config.dart';
 import '../services/handwriting_analysis_service.dart';
+import '../services/progress_analysis_service.dart';
 import '../services/qwen_vision_gateway.dart';
 import '../services/vision_analysis_gateway.dart';
 import 'settings_provider.dart';
@@ -24,4 +26,18 @@ final handwritingAnalysisServiceProvider =
   final gateway = ref.watch(visionAnalysisGatewayProvider);
   if (gateway == null) return null;
   return HandwritingAnalysisService(gateway: gateway);
+});
+
+final progressAnalysisServiceProvider =
+    Provider<ProgressAnalysisService?>((ref) {
+  final gateway = ref.watch(visionAnalysisGatewayProvider);
+  if (gateway == null) return null;
+  return ProgressAnalysisService(gateway: gateway);
+});
+
+final dataInsightServiceProvider =
+    Provider<DataInsightService?>((ref) {
+  final gateway = ref.watch(visionAnalysisGatewayProvider);
+  if (gateway == null) return null;
+  return DataInsightService(gateway: gateway);
 });

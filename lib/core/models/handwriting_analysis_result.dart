@@ -60,15 +60,21 @@ class HandwritingAnalysisResult {
       model: model,
       rawText: rawText.trim(),
       summary: _readString(map, 'summary'),
-      strokeObservation:
-          _readString(map, 'stroke_observation', alternateKey: 'strokeObservation'),
+      strokeObservation: _readString(
+        map,
+        'stroke_observation',
+        alternateKey: 'strokeObservation',
+      ),
       structureObservation: _readString(
         map,
         'structure_observation',
         alternateKey: 'structureObservation',
       ),
-      layoutObservation:
-          _readString(map, 'layout_observation', alternateKey: 'layoutObservation'),
+      layoutObservation: _readString(
+        map,
+        'layout_observation',
+        alternateKey: 'layoutObservation',
+      ),
       practiceSuggestions: _readSuggestions(
         map['practice_suggestions'] ?? map['practiceSuggestions'],
       ),
@@ -95,13 +101,7 @@ class HandwritingAnalysisResult {
     if (value is String) {
       return value
           .split(RegExp(r'[\r\n]+'))
-          .map((item) => item.trim())
-          .map(
-            (item) => item.replaceFirst(
-              RegExp(r'^(?:[-*•]|\d+[.)、])\s*'),
-              '',
-            ),
-          )
+          .map(_normalizeSuggestion)
           .where((item) => item.isNotEmpty)
           .take(3)
           .toList(growable: false);
@@ -111,10 +111,14 @@ class HandwritingAnalysisResult {
 
     return value
         .whereType<String>()
-        .map((item) => item.trim())
+        .map(_normalizeSuggestion)
         .where((item) => item.isNotEmpty)
         .take(3)
         .toList(growable: false);
+  }
+
+  static String _normalizeSuggestion(String value) {
+    return value.trim().replaceFirst(RegExp(r'^(?:[-*•]|\d+[.)、])\s*'), '');
   }
 
   static String _fallbackSummary(String rawText) {
@@ -154,13 +158,13 @@ class HandwritingAnalysisJsonCodec {
   }
 
   static String? _extractJsonObject(String text) {
-    final fenced = RegExp(r'```(?:json)?\s*([\s\S]*?)```', caseSensitive: false)
-        .firstMatch(text);
+    final fenced = RegExp(
+      r'```(?:json)?\s*([\s\S]*?)```',
+      caseSensitive: false,
+    ).firstMatch(text);
     if (fenced != null) {
       final content = fenced.group(1)?.trim();
-      if (content != null &&
-          content.startsWith('{') &&
-          content.endsWith('}')) {
+      if (content != null && content.startsWith('{') && content.endsWith('}')) {
         return content;
       }
     }

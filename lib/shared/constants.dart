@@ -4,11 +4,11 @@ import 'theme.dart';
 enum AttendanceStatus { present, late, leave, absent, trial }
 
 const kStatusLabel = <AttendanceStatus, String>{
-  AttendanceStatus.present: '出勤',
-  AttendanceStatus.late: '迟到',
-  AttendanceStatus.leave: '请假',
-  AttendanceStatus.absent: '缺勤',
-  AttendanceStatus.trial: '试听',
+  AttendanceStatus.present: '\u51fa\u52e4',
+  AttendanceStatus.late: '\u8fdf\u5230',
+  AttendanceStatus.leave: '\u8bf7\u5047',
+  AttendanceStatus.absent: '\u7f3a\u52e4',
+  AttendanceStatus.trial: '\u8bd5\u542c',
 };
 
 const kStatusColor = <AttendanceStatus, Color>{
@@ -39,10 +39,11 @@ const kBackupWarningDays = 7;
 const kBalanceAlertAmountThreshold = 300.0;
 const kBalanceAlertLessonThreshold = 3.0;
 
-const kDefaultTeacherName = '梁老师';
-const kDefaultInstitutionName = '院城墨点';
-const kDefaultInstitutionMotto = '执笔有境  观心成章';
-const kDefaultSealText = '梁围围书';
+const kDefaultTeacherName = '\u58a8\u97f5\u6559\u5e08';
+const kDefaultInstitutionName = '\u58a8\u97f5';
+const kDefaultInstitutionMotto =
+    '\u4e13\u6ce8\u843d\u7b14\uff0c\u4ece\u5bb9\u4e60\u5b57';
+const kDefaultSealText = 'MOYU';
 const kDefaultSealFont = 'xiaozhuan';
 const kDefaultSealLayout = 'grid';
 const kDefaultSealBorder = 'full';
@@ -61,4 +62,4 @@ TimeOfDay parseTime(String time) {
 String formatTime(TimeOfDay t) =>
     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-// 出勤率 = (present + late) / (present + late + absent) × 100%
+// Attendance rate = (present + late) / (present + late + absent) * 100%

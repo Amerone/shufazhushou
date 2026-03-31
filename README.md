@@ -41,7 +41,7 @@ lib/
 ├── app.dart                   # MaterialApp.router + GoRouter config
 ├── core/
 │   ├── database/
-│   │   ├── database_helper.dart   # SQLite singleton, migrations (v3)
+│   │   ├── database_helper.dart   # SQLite singleton, migrations (v4)
 │   │   └── dao/                   # Data Access Objects (one per table)
 │   ├── models/                    # Data classes with fromMap/toMap/copyWith
 │   ├── providers/                 # Riverpod providers (AsyncNotifier + StateProvider)
@@ -95,7 +95,7 @@ Release APK: `build/app/outputs/flutter-apk/app-release.apk`
 
 ## Database
 
-SQLite database `calligraphy_assistant.db` with 6 tables:
+SQLite database `moyun.db` with 6 tables. Legacy installs are migrated from `calligraphy_assistant.db` on startup:
 
 | Table | Purpose |
 |-------|---------|

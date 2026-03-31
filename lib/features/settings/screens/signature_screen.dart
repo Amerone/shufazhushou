@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -35,11 +35,15 @@ class SignatureScreen extends ConsumerWidget {
                 error: (e, _) => Center(child: Text('$e')),
                 data: (settings) {
                   final path = settings['signature_path'];
-                  final hasFile = path != null && path.isNotEmpty && File(path).existsSync();
+                  final hasFile =
+                      path != null &&
+                      path.isNotEmpty &&
+                      File(path).existsSync();
                   final statusColor = hasFile ? kGreen : kOrange;
 
                   return ListView(
-                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                     children: [
                       GlassCard(
@@ -59,36 +63,51 @@ class SignatureScreen extends ConsumerWidget {
                                     color: statusColor.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(14),
                                   ),
-                                  child: Icon(Icons.draw_outlined, color: statusColor),
+                                  child: Icon(
+                                    Icons.draw_outlined,
+                                    color: statusColor,
+                                  ),
                                 ),
                                 SizedBox(
                                   width: 220,
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         '签名状态',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
                                               fontWeight: FontWeight.w700,
                                             ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        hasFile ? '当前签名会用于报告落款，重新上传后会立即替换。' : '上传后会自动用于 PDF 报告和导出资料的落款区域。',
-                                        style: Theme.of(context).textTheme.bodySmall,
+                                        hasFile
+                                            ? '当前签名会用于报告落款，重新上传后会立即替换。'
+                                            : '上传后会自动用于 PDF 报告和导出资料的落款区域。',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
                                       ),
                                     ],
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: statusColor.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
                                     hasFile ? '已启用' : '未设置',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
                                           color: statusColor,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -99,8 +118,13 @@ class SignatureScreen extends ConsumerWidget {
                             const SizedBox(height: 16),
                             LayoutBuilder(
                               builder: (context, constraints) {
-                                final columns = constraints.maxWidth >= 720 ? 3 : 2;
-                                final itemWidth = (constraints.maxWidth - 12 * (columns - 1)) / columns;
+                                final columns = constraints.maxWidth >= 720
+                                    ? 3
+                                    : 2;
+                                final itemWidth =
+                                    (constraints.maxWidth -
+                                        12 * (columns - 1)) /
+                                    columns;
 
                                 return Wrap(
                                   spacing: 12,
@@ -140,7 +164,9 @@ class SignatureScreen extends ConsumerWidget {
                             const SizedBox(height: 16),
                             _SignatureSectionHeader(
                               title: '预览区域',
-                              subtitle: hasFile ? '确认签名清晰度和横向比例，导出时会直接复用。' : '上传后会在这里展示当前签名效果。',
+                              subtitle: hasFile
+                                  ? '确认签名清晰度和横向比例，导出时会直接复用。'
+                                  : '上传后会在这里展示当前签名效果。',
                               trailing: hasFile ? '本地文件' : '暂无文件',
                             ),
                             const SizedBox(height: 12),
@@ -150,25 +176,39 @@ class SignatureScreen extends ConsumerWidget {
                                 decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: 0.56),
                                   borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
+                                  border: Border.all(
+                                    color: kInkSecondary.withValues(alpha: 0.1),
+                                  ),
                                 ),
                                 child: Column(
                                   children: [
                                     Container(
                                       width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: kPrimaryBlue.withValues(alpha: 0.06),
+                                        color: kPrimaryBlue.withValues(
+                                          alpha: 0.06,
+                                        ),
                                         borderRadius: BorderRadius.circular(14),
                                       ),
                                       child: Row(
                                         children: [
-                                          const Icon(Icons.draw_outlined, size: 18, color: kPrimaryBlue),
+                                          const Icon(
+                                            Icons.draw_outlined,
+                                            size: 18,
+                                            color: kPrimaryBlue,
+                                          ),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
                                               '签名预览',
-                                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
                                                     color: kPrimaryBlue,
                                                     fontWeight: FontWeight.w700,
                                                   ),
@@ -176,7 +216,9 @@ class SignatureScreen extends ConsumerWidget {
                                           ),
                                           Text(
                                             '建议横向',
-                                            style: Theme.of(context).textTheme.bodySmall,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
                                           ),
                                         ],
                                       ),
@@ -186,14 +228,18 @@ class SignatureScreen extends ConsumerWidget {
                                       File(path),
                                       height: 160,
                                       fit: BoxFit.contain,
-                                      errorBuilder: (_, __, ___) => Container(
-                                        height: 160,
-                                        alignment: Alignment.center,
-                                        child: const Text(
-                                          '签名文件无法读取，请重新上传',
-                                          style: TextStyle(color: kInkSecondary),
-                                        ),
-                                      ),
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              Container(
+                                                height: 160,
+                                                alignment: Alignment.center,
+                                                child: const Text(
+                                                  '签名文件无法读取，请重新上传',
+                                                  style: TextStyle(
+                                                    color: kInkSecondary,
+                                                  ),
+                                                ),
+                                              ),
                                     ),
                                   ],
                                 ),
@@ -217,15 +263,26 @@ class SignatureScreen extends ConsumerWidget {
                                         width: 64,
                                         height: 64,
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.5),
-                                          borderRadius: BorderRadius.circular(20),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
                                         ),
-                                        child: const Icon(Icons.draw_outlined, size: 34, color: kInkSecondary),
+                                        child: const Icon(
+                                          Icons.draw_outlined,
+                                          size: 34,
+                                          color: kInkSecondary,
+                                        ),
                                       ),
                                       const SizedBox(height: 12),
                                       Text(
                                         '暂无签名，请上传用于 PDF 导出的签名',
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: kInkSecondary),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(color: kInkSecondary),
                                         textAlign: TextAlign.center,
                                       ),
                                     ],
@@ -258,8 +315,9 @@ class SignatureScreen extends ConsumerWidget {
                             LayoutBuilder(
                               builder: (context, constraints) {
                                 final compact = constraints.maxWidth < 420;
-                                final buttonWidth =
-                                    compact ? constraints.maxWidth : (constraints.maxWidth - 12) / 2;
+                                final buttonWidth = compact
+                                    ? constraints.maxWidth
+                                    : (constraints.maxWidth - 12) / 2;
 
                                 return Wrap(
                                   spacing: 12,
@@ -268,25 +326,49 @@ class SignatureScreen extends ConsumerWidget {
                                     SizedBox(
                                       width: buttonWidth,
                                       child: ElevatedButton.icon(
-                                        icon: const Icon(Icons.camera_alt_outlined),
+                                        icon: const Icon(
+                                          Icons.camera_alt_outlined,
+                                        ),
                                         label: const Text('拍照上传'),
                                         style: ElevatedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 16),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 16,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
                                         ),
-                                        onPressed: () => _pick(context, ref, ImageSource.camera),
+                                        onPressed: () => _pick(
+                                          context,
+                                          ref,
+                                          ImageSource.camera,
+                                        ),
                                       ),
                                     ),
                                     SizedBox(
                                       width: buttonWidth,
                                       child: OutlinedButton.icon(
-                                        icon: const Icon(Icons.photo_library_outlined),
+                                        icon: const Icon(
+                                          Icons.photo_library_outlined,
+                                        ),
                                         label: Text(hasFile ? '重新选择' : '相册选择'),
                                         style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 16),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 16,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
                                         ),
-                                        onPressed: () => _pick(context, ref, ImageSource.gallery),
+                                        onPressed: () => _pick(
+                                          context,
+                                          ref,
+                                          ImageSource.gallery,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -306,14 +388,26 @@ class SignatureScreen extends ConsumerWidget {
                                     final compact = constraints.maxWidth < 420;
                                     final deleteButton = TextButton.icon(
                                       onPressed: () async {
-                                        final ok = await AppToast.showConfirm(context, '确认删除签名？');
+                                        final ok = await AppToast.showConfirm(
+                                          context,
+                                          '确认删除签名？',
+                                        );
                                         if (!ok) return;
-                                        await ref.read(settingsProvider.notifier).set('signature_path', '');
+                                        await ref
+                                            .read(settingsProvider.notifier)
+                                            .set('signature_path', '');
                                       },
                                       style: TextButton.styleFrom(
                                         foregroundColor: kRed,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 10,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
                                       ),
                                       icon: const Icon(Icons.delete_outline),
                                       label: const Text('删除签名'),
@@ -321,11 +415,14 @@ class SignatureScreen extends ConsumerWidget {
 
                                     if (compact) {
                                       return Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             '如果需要更换签名，可直接重新上传；删除后导出报告将不再显示签名。',
-                                            style: Theme.of(context).textTheme.bodySmall,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
                                           ),
                                           const SizedBox(height: 12),
                                           Align(
@@ -341,7 +438,9 @@ class SignatureScreen extends ConsumerWidget {
                                         Expanded(
                                           child: Text(
                                             '如果需要更换签名，可直接重新上传；删除后导出报告将不再显示签名。',
-                                            style: Theme.of(context).textTheme.bodySmall,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
                                           ),
                                         ),
                                         const SizedBox(width: 12),
@@ -394,7 +493,11 @@ class SignatureScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _pick(BuildContext context, WidgetRef ref, ImageSource source) async {
+  Future<void> _pick(
+    BuildContext context,
+    WidgetRef ref,
+    ImageSource source,
+  ) async {
     final picker = ImagePicker();
     final img = await picker.pickImage(source: source);
     if (img == null) return;
@@ -433,7 +536,9 @@ class _SignatureSectionHeader extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             SizedBox(
-              width: trailing == null || compact ? constraints.maxWidth : constraints.maxWidth - 96,
+              width: trailing == null || compact
+                  ? constraints.maxWidth
+                  : constraints.maxWidth - 96,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -445,11 +550,16 @@ class _SignatureSectionHeader extends StatelessWidget {
             ),
             if (trailing != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.64),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
+                  border: Border.all(
+                    color: kInkSecondary.withValues(alpha: 0.12),
+                  ),
                 ),
                 child: Text(trailing!, style: theme.textTheme.bodySmall),
               ),
@@ -532,9 +642,9 @@ class _SignatureTag extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -546,10 +656,7 @@ class _SignatureHintLine extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _SignatureHintLine({
-    required this.icon,
-    required this.text,
-  });
+  const _SignatureHintLine({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -559,10 +666,7 @@ class _SignatureHintLine extends StatelessWidget {
         Icon(icon, size: 18, color: kInkSecondary),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          child: Text(text, style: Theme.of(context).textTheme.bodySmall),
         ),
       ],
     );

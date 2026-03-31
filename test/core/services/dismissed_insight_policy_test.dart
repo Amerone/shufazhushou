@@ -1,6 +1,6 @@
-import 'package:calligraphy_assistant/core/models/dismissed_insight.dart';
-import 'package:calligraphy_assistant/core/services/dismissed_insight_policy.dart';
-import 'package:calligraphy_assistant/shared/constants.dart';
+import 'package:moyun/core/models/dismissed_insight.dart';
+import 'package:moyun/core/services/dismissed_insight_policy.dart';
+import 'package:moyun/shared/constants.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

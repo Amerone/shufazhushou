@@ -27,8 +27,8 @@ class InsightAggregationService {
 
   static const _progressDimensionLabels = <String, String>{
     'stroke_quality': '笔画质量',
-    'structure_accuracy': '结构准确',
-    'rhythm_consistency': '节奏连贯',
+    'structure_accuracy': '结构准确度',
+    'rhythm_consistency': '节奏稳定性',
   };
 
   List<Insight> buildInsights({
@@ -37,7 +37,8 @@ class InsightAggregationService {
     required Map<String, List<Attendance>> allAttendance,
     required Map<String, double> allPayments,
     required Set<String> dismissedKeys,
-    required int weeklyActiveStudentCount,
+    required int activeStudentCount,
+    String activePeriodLabel = '本周',
     DateTime? now,
   }) {
     final currentTime = now ?? DateTime.now();
@@ -47,8 +48,10 @@ class InsightAggregationService {
       final records = allAttendance[student.id] ?? const <Attendance>[];
       final studentName = displayNames[student.id] ?? student.name;
       final totalReceived = allPayments[student.id] ?? 0;
-      final totalReceivable =
-          records.fold<double>(0, (sum, item) => sum + item.feeAmount);
+      final totalReceivable = records.fold<double>(
+        0,
+        (sum, item) => sum + item.feeAmount,
+      );
       final balance = totalReceived - totalReceivable;
       final hasBalanceContext = totalReceived > 0 || totalReceivable > 0;
       final dataFreshness = _buildDataFreshness(records, currentTime);
@@ -73,7 +76,8 @@ class InsightAggregationService {
           : null;
       final hitAmountThreshold =
           balance >= 0 && balance < kBalanceAlertAmountThreshold;
-      final hitLessonThreshold = remainingLessons != null &&
+      final hitLessonThreshold =
+          remainingLessons != null &&
           remainingLessons >= 0 &&
           remainingLessons < kBalanceAlertLessonThreshold;
 
@@ -103,10 +107,12 @@ class InsightAggregationService {
             .where((item) => item.status == 'present' || item.status == 'late')
             .map((item) => item.date);
         if (formalDates.isNotEmpty) {
-          final lastDate =
-              formalDates.reduce((a, b) => a.compareTo(b) > 0 ? a : b);
-          final inactiveDays =
-              currentTime.difference(DateTime.parse(lastDate)).inDays;
+          final lastDate = formalDates.reduce(
+            (a, b) => a.compareTo(b) > 0 ? a : b,
+          );
+          final inactiveDays = currentTime
+              .difference(DateTime.parse(lastDate))
+              .inDays;
           if (inactiveDays >= kChurnDays) {
             insights.add(
               Insight(
@@ -125,8 +131,9 @@ class InsightAggregationService {
 
       if (!_isDismissed(dismissedKeys, InsightType.trial, student.id)) {
         final hasTrial = records.any((item) => item.status == 'trial');
-        final hasFormal = records
-            .any((item) => item.status == 'present' || item.status == 'late');
+        final hasFormal = records.any(
+          (item) => item.status == 'present' || item.status == 'late',
+        );
         if (hasTrial && !hasFormal) {
           insights.add(
             Insight(
@@ -135,7 +142,7 @@ class InsightAggregationService {
               studentName: studentName,
               message: '已有试听记录，尚未转为正式课程',
               suggestion: '建议在 7 天内完成试听复盘，并给出首月课包建议。',
-              calcLogic: '存在试听记录且暂无正式出勤记录时触发试听转化提醒。',
+              calcLogic: '存在试听记录且暂时无正式出勤记录时触发试听转化提醒。',
               dataFreshness: dataFreshness,
             ),
           );
@@ -155,14 +162,14 @@ class InsightAggregationService {
     }
 
     if (!_isDismissed(dismissedKeys, InsightType.peak, null) &&
-        weeklyActiveStudentCount >= kPeakThreshold) {
+        activeStudentCount >= kPeakThreshold) {
       insights.add(
         Insight(
           type: InsightType.peak,
           studentName: '',
-          message: '本周活跃学员较多（$weeklyActiveStudentCount 人）',
-          suggestion: '建议提前预留高峰时段补课窗口，并确认本周排课余量。',
-          calcLogic: '本周活跃学员数达到高峰阈值时触发提示。',
+          message: '$activePeriodLabel活跃学员较多（$activeStudentCount 人）',
+          suggestion: '建议提前预留高峰时段补课窗口，并确认近期排课余量。',
+          calcLogic: '$activePeriodLabel活跃学员数达到高峰阈值时触发提示。',
           dataFreshness: _formatTimestamp(currentTime.millisecondsSinceEpoch),
         ),
       );
@@ -287,8 +294,5 @@ class _ProgressSnapshot {
   final Attendance record;
   final Map<String, double> scores;
 
-  const _ProgressSnapshot({
-    required this.record,
-    required this.scores,
-  });
+  const _ProgressSnapshot({required this.record, required this.scores});
 }

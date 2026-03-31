@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -95,17 +95,23 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         if (mounted) AppToast.showError(context, '没有可保存的学生');
         return;
       }
-      final selectedStudents =
-          students.where((m) => _selectedIds.contains(m.student.id)).toList();
+      final selectedStudents = students
+          .where((m) => _selectedIds.contains(m.student.id))
+          .toList();
 
       final allStudents = students.map((m) => m.student).toList();
       final displayNames = buildDisplayNameMap(allStudents);
       final conflicts = <String>[];
-      final conflictIds = <String, String>{}; // studentId -> conflicting attendance id
+      final conflictIds =
+          <String, String>{}; // studentId -> conflicting attendance id
 
       for (final m in selectedStudents) {
-        final conflict =
-            await dao.findConflict(m.student.id, _dateStr(), _startTime, _endTime);
+        final conflict = await dao.findConflict(
+          m.student.id,
+          _dateStr(),
+          _startTime,
+          _endTime,
+        );
         if (conflict != null) {
           conflicts.add(displayNames[m.student.id] ?? m.student.name);
           conflictIds[m.student.id] = conflict.id;
@@ -120,42 +126,45 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         if (!ok) return;
       }
 
-      final statusEnum =
-          AttendanceStatus.values.firstWhere((e) => e.name == _status);
+      final statusEnum = AttendanceStatus.values.firstWhere(
+        (e) => e.name == _status,
+      );
       final now = DateTime.now().millisecondsSinceEpoch;
 
       final records = <Attendance>[];
       for (final m in selectedStudents) {
         final price = m.student.pricePerClass;
         final fee = FeeCalculator.calcFee(statusEnum, price);
-        records.add(Attendance(
-          id: const Uuid().v4(),
-          studentId: m.student.id,
-          date: _dateStr(),
-          startTime: _startTime,
-          endTime: _endTime,
-          status: _status,
-          priceSnapshot: price,
-          feeAmount: fee,
-          lessonFocusTags: _lessonFocusTags.toList(growable: false),
-          homePracticeNote: _homePracticeCtrl.text.trim().isEmpty
-              ? null
-              : _homePracticeCtrl.text.trim(),
-          progressScores: _buildProgressScores(),
-          createdAt: now,
-          updatedAt: now,
-        ));
+        records.add(
+          Attendance(
+            id: const Uuid().v4(),
+            studentId: m.student.id,
+            date: _dateStr(),
+            startTime: _startTime,
+            endTime: _endTime,
+            status: _status,
+            priceSnapshot: price,
+            feeAmount: fee,
+            lessonFocusTags: _lessonFocusTags.toList(growable: false),
+            homePracticeNote: _homePracticeCtrl.text.trim().isEmpty
+                ? null
+                : _homePracticeCtrl.text.trim(),
+            progressScores: _buildProgressScores(),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
       }
 
       await dao.batchInsertWithConflictReplace(records, conflictIds);
 
       invalidateAfterAttendanceChange(ref);
 
-      if (mounted) {
-        await InteractionFeedback.seal(context);
-        AppToast.showSuccess(context, '已保存 ${selectedStudents.length} 条出勤记录');
-        Navigator.of(context).pop();
-      }
+      if (!mounted) return;
+      await InteractionFeedback.seal(context);
+      if (!mounted) return;
+      AppToast.showSuccess(context, '已保存 ${selectedStudents.length} 条出勤记录');
+      Navigator.of(context).pop();
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -193,7 +202,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   children: [
                     Text(
                       ['选择学员', '设置课程', '确认提交'][_step],
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 6),
@@ -221,14 +232,22 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                       width: _step == i ? 24 : 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: _step >= i ? theme.colorScheme.primary : theme.dividerColor,
+                        color: _step >= i
+                            ? theme.colorScheme.primary
+                            : theme.dividerColor,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ),
                 ),
               ),
-              Expanded(child: [_buildStep0(controller), _buildStep1(), _buildStep2()][_step]),
+              Expanded(
+                child: [
+                  _buildStep0(controller),
+                  _buildStep1(),
+                  _buildStep2(),
+                ][_step],
+              ),
             ],
           ),
         ),
@@ -248,9 +267,12 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 (m.student.parentPhone?.contains(_searchQuery) ?? false);
           }).toList();
 
-    final displayNames = buildDisplayNameMap(filtered.map((m) => m.student).toList());
+    final displayNames = buildDisplayNameMap(
+      filtered.map((m) => m.student).toList(),
+    );
     final filteredIds = filtered.map((m) => m.student.id).toSet();
-    final allFilteredSelected = filteredIds.isNotEmpty &&
+    final allFilteredSelected =
+        filteredIds.isNotEmpty &&
         filteredIds.every((id) => _selectedIds.contains(id));
 
     return Column(
@@ -299,7 +321,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: kPrimaryBlue.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(999),
@@ -307,9 +332,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 child: Text(
                   '已选 ${_selectedIds.length}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: kPrimaryBlue,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: kPrimaryBlue,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -331,11 +356,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   itemBuilder: (_, i) {
                     final m = filtered[i];
                     final selected = _selectedIds.contains(m.student.id);
-                    final statusText = m.student.status == 'active' ? '在读' : '休学';
-                    final statusColorValue = m.student.status == 'active' ? kGreen : kOrange;
+                    final statusText = m.student.status == 'active'
+                        ? '在读'
+                        : '休学';
+                    final statusColorValue = m.student.status == 'active'
+                        ? kGreen
+                        : kOrange;
 
                     return Container(
-                      margin: EdgeInsets.only(bottom: i == filtered.length - 1 ? 0 : 10),
+                      margin: EdgeInsets.only(
+                        bottom: i == filtered.length - 1 ? 0 : 10,
+                      ),
                       decoration: BoxDecoration(
                         color: selected
                             ? kPrimaryBlue.withValues(alpha: 0.08)
@@ -366,7 +397,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                               Checkbox(
                                 value: selected,
                                 onChanged: (v) {
-                                  unawaited(InteractionFeedback.selection(context));
+                                  unawaited(
+                                    InteractionFeedback.selection(context),
+                                  );
                                   setState(() {
                                     if (v == true) {
                                       _selectedIds.add(m.student.id);
@@ -381,16 +414,23 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      displayNames[m.student.id] ?? m.student.name,
-                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                      displayNames[m.student.id] ??
+                                          m.student.name,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
                                             fontWeight: FontWeight.w700,
                                           ),
                                     ),
-                                    if (m.student.parentPhone?.isNotEmpty ?? false) ...[
+                                    if (m.student.parentPhone?.isNotEmpty ??
+                                        false) ...[
                                       const SizedBox(height: 4),
                                       Text(
                                         m.student.parentPhone!,
-                                        style: Theme.of(context).textTheme.bodySmall,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
                                       ),
                                     ],
                                     const SizedBox(height: 8),
@@ -400,7 +440,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                                       children: [
                                         _QuickInfoPill(
                                           icon: Icons.payments_outlined,
-                                          label: '¥${m.student.pricePerClass.toStringAsFixed(0)}/节',
+                                          label:
+                                              '¥${m.student.pricePerClass.toStringAsFixed(0)}/节',
                                         ),
                                         _QuickInfoPill(
                                           icon: Icons.badge_outlined,
@@ -433,7 +474,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     },
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
               child: Text('下一步（已选 ${_selectedIds.length} 人）'),
             ),
@@ -461,7 +504,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   (t) => ActionChip(
                     label: Text('${t.name} ${t.startTime}-${t.endTime}'),
                     backgroundColor: Colors.white.withValues(alpha: 0.56),
-                    side: BorderSide(color: kInkSecondary.withValues(alpha: 0.14)),
+                    side: BorderSide(
+                      color: kInkSecondary.withValues(alpha: 0.14),
+                    ),
                     onPressed: () {
                       unawaited(InteractionFeedback.selection(context));
                       setState(() {
@@ -484,15 +529,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
               firstDate: DateTime(2020),
               lastDate: DateTime.now().add(const Duration(days: 365)),
             );
-            if (d != null) {
-              await InteractionFeedback.selection(context);
-              setState(() => _date = d);
-            }
+            if (d == null || !mounted) return;
+            await InteractionFeedback.selection(context);
+            if (!mounted) return;
+            setState(() => _date = d);
           },
           child: InputDecorator(
             decoration: InputDecoration(
               labelText: '上课日期',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.56),
             ),
@@ -516,17 +563,19 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     initialTime: parseTime(_startTime),
                     label: '开始时间',
                   );
-                  if (t != null) {
-                    await InteractionFeedback.selection(context);
-                    setState(() {
-                      _startTime = formatTime(t);
-                    });
-                  }
+                  if (t == null || !mounted) return;
+                  await InteractionFeedback.selection(context);
+                  if (!mounted) return;
+                  setState(() {
+                    _startTime = formatTime(t);
+                  });
                 },
                 child: InputDecorator(
                   decoration: InputDecoration(
                     labelText: '开始时间',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.56),
                   ),
@@ -544,17 +593,19 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     initialTime: parseTime(_endTime),
                     label: '结束时间',
                   );
-                  if (t != null) {
-                    await InteractionFeedback.selection(context);
-                    setState(() {
-                      _endTime = formatTime(t);
-                    });
-                  }
+                  if (t == null || !mounted) return;
+                  await InteractionFeedback.selection(context);
+                  if (!mounted) return;
+                  setState(() {
+                    _endTime = formatTime(t);
+                  });
                 },
                 child: InputDecorator(
                   decoration: InputDecoration(
                     labelText: '结束时间',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.56),
                   ),
@@ -653,7 +704,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 },
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
                 child: const Text('上一步'),
               ),
@@ -671,7 +724,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 },
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
                 child: const Text('下一步'),
               ),
@@ -685,12 +740,15 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   Widget _buildStep2() {
     final theme = Theme.of(context);
     final students = ref.watch(studentProvider).valueOrNull ?? [];
-    final selected =
-        students.where((m) => _selectedIds.contains(m.student.id)).toList();
-    final displayNames =
-        buildDisplayNameMap(selected.map((m) => m.student).toList());
-    final statusEnum =
-        AttendanceStatus.values.firstWhere((e) => e.name == _status);
+    final selected = students
+        .where((m) => _selectedIds.contains(m.student.id))
+        .toList();
+    final displayNames = buildDisplayNameMap(
+      selected.map((m) => m.student).toList(),
+    );
+    final statusEnum = AttendanceStatus.values.firstWhere(
+      (e) => e.name == _status,
+    );
 
     return Column(
       children: [
@@ -707,20 +765,36 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('课程摘要', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(
+                      '课程摘要',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        _QuickInfoPill(icon: Icons.calendar_today_outlined, label: _dateStr()),
-                        _QuickInfoPill(icon: Icons.access_time_outlined, label: '$_startTime - $_endTime'),
+                        _QuickInfoPill(
+                          icon: Icons.calendar_today_outlined,
+                          label: _dateStr(),
+                        ),
+                        _QuickInfoPill(
+                          icon: Icons.access_time_outlined,
+                          label: '$_startTime - $_endTime',
+                        ),
                         _QuickInfoPill(
                           icon: Icons.flag_outlined,
-                          label: _statuses.firstWhere((s) => s.$1 == _status).$2,
+                          label: _statuses
+                              .firstWhere((s) => s.$1 == _status)
+                              .$2,
                           color: statusColor(_status),
                         ),
-                        _QuickInfoPill(icon: Icons.groups_2_outlined, label: '${selected.length} 位学员'),
+                        _QuickInfoPill(
+                          icon: Icons.groups_2_outlined,
+                          label: '${selected.length} 位学员',
+                        ),
                         if (_lessonFocusTags.isNotEmpty)
                           _QuickInfoPill(
                             icon: Icons.auto_awesome_outlined,
@@ -749,7 +823,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
               Text('学员列表', style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
               ...selected.map((m) {
-                final fee = FeeCalculator.calcFee(statusEnum, m.student.pricePerClass);
+                final fee = FeeCalculator.calcFee(
+                  statusEnum,
+                  m.student.pricePerClass,
+                );
                 return Container(
                   margin: EdgeInsets.only(bottom: m == selected.last ? 0 : 10),
                   padding: const EdgeInsets.all(14),
@@ -765,7 +842,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                           children: [
                             Text(
                               displayNames[m.student.id] ?? m.student.name,
-                              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -799,7 +878,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   onPressed: () => setState(() => _step = 1),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   child: const Text('上一步'),
                 ),
@@ -810,7 +891,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   onPressed: _saving ? null : _save,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   child: Text(_saving ? '保存中...' : '确认保存'),
                 ),
@@ -851,11 +934,7 @@ class _QuickInfoPill extends StatelessWidget {
   final String label;
   final Color? color;
 
-  const _QuickInfoPill({
-    required this.icon,
-    required this.label,
-    this.color,
-  });
+  const _QuickInfoPill({required this.icon, required this.label, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -875,9 +954,11 @@ class _QuickInfoPill extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: resolvedColor == kInkSecondary ? null : resolvedColor,
-                  fontWeight: resolvedColor == kInkSecondary ? null : FontWeight.w700,
-                ),
+              color: resolvedColor == kInkSecondary ? null : resolvedColor,
+              fontWeight: resolvedColor == kInkSecondary
+                  ? null
+                  : FontWeight.w700,
+            ),
           ),
         ],
       ),

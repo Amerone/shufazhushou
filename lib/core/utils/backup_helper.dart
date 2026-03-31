@@ -1,11 +1,15 @@
 import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite/sqflite.dart';
+
 import '../database/database_helper.dart';
 
 class BackupHelper {
+  static const _backupDirectoryName = 'moyun_backups';
+  static const _legacyBackupDirectoryName = 'calligraphy_assistant_backups';
+
   static String _timestamp() {
     final now = DateTime.now();
     return '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}'
@@ -13,17 +17,14 @@ class BackupHelper {
   }
 
   static Future<String> backup() async {
-    // Flush WAL to ensure the .db file contains all data
+    // Flush WAL to ensure the .db file contains all data.
     try {
       final db = await DatabaseHelper.instance.database;
       await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
     } catch (_) {}
 
-    final dbPath = p.join(await getDatabasesPath(), 'calligraphy_assistant.db');
-    final tempDir = await getTemporaryDirectory();
-    final backupDir =
-        Directory(p.join(tempDir.path, 'calligraphy_assistant_backups'));
-    await backupDir.create(recursive: true);
+    final dbPath = await DatabaseHelper.resolveDatabasePath();
+    final backupDir = await _resolveBackupDirectory();
     final dest = p.join(backupDir.path, 'backup_${_timestamp()}.db');
     await File(dbPath).copy(dest);
     return dest;
@@ -40,46 +41,67 @@ class BackupHelper {
     final srcPath = result.files.single.path;
     if (srcPath == null) return false;
 
-    // Validate SQLite file header
+    // Validate SQLite file header.
     final srcFile = File(srcPath);
     final raf = await srcFile.open(mode: FileMode.read);
     try {
       final header = await raf.read(16);
       if (header.length < 15 ||
           String.fromCharCodes(header.take(15)) != 'SQLite format 3') {
-        throw Exception('所选文件不是有效的数据库备份');
+        throw Exception(
+          '\u9009\u62e9\u7684\u6587\u4ef6\u4e0d\u662f\u6709\u6548\u7684\u6570\u636e\u5e93\u5907\u4efd\u3002',
+        );
       }
     } finally {
       await raf.close();
     }
 
-    final dbPath =
-        p.join(await getDatabasesPath(), 'calligraphy_assistant.db');
+    final dbPath = await DatabaseHelper.resolveDatabasePath();
 
-    // Ensure databases directory exists (critical after app reinstall)
+    // Ensure databases directory exists (critical after app reinstall).
     final dbDir = Directory(p.dirname(dbPath));
     if (!await dbDir.exists()) {
       await dbDir.create(recursive: true);
     }
 
-    // Close DB before overwrite
+    // Close DB before overwrite.
     try {
       final db = await DatabaseHelper.instance.database;
       await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
       await db.close();
     } catch (_) {
-      // DB may not be open yet, ignore
+      // DB may not be open yet, ignore.
     }
     DatabaseHelper.instance.resetForRestore();
 
-    // Delete WAL and SHM journal files — they belong to the old database
-    // and will corrupt the restored database if left in place.
+    // Delete WAL and SHM journal files because they belong to the old database
+    // and would corrupt the restored database if left in place.
     for (final suffix in ['-wal', '-shm', '-journal']) {
-      final f = File('$dbPath$suffix');
-      if (await f.exists()) await f.delete();
+      final sidecar = File('$dbPath$suffix');
+      if (await sidecar.exists()) {
+        await sidecar.delete();
+      }
     }
 
     await File(srcPath).copy(dbPath);
     return true;
+  }
+
+  static Future<Directory> _resolveBackupDirectory() async {
+    final tempDir = await getTemporaryDirectory();
+    final currentDir = Directory(p.join(tempDir.path, _backupDirectoryName));
+    if (await currentDir.exists()) {
+      return currentDir;
+    }
+
+    final legacyDir = Directory(
+      p.join(tempDir.path, _legacyBackupDirectoryName),
+    );
+    if (await legacyDir.exists()) {
+      return legacyDir.rename(currentDir.path);
+    }
+
+    await currentDir.create(recursive: true);
+    return currentDir;
   }
 }
