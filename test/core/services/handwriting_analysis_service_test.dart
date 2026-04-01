@@ -22,25 +22,57 @@ void main() {
       expect(prompt, contains('请只输出一个 JSON 对象'));
     });
 
+    test('buildPrompt omits student name when disabled', () {
+      final prompt = HandwritingAnalysisService.buildPrompt(
+        const HandwritingAnalysisInput(
+          imageSource: 'https://example.com/work.jpg',
+          studentName: '张三',
+        ),
+        includeStudentName: false,
+      );
+
+      expect(prompt, isNot(contains('学生：张三。')));
+    });
+
     test('delegates to gateway and returns structured result', () async {
       final gateway = _SpyGateway();
-      final service = HandwritingAnalysisService(gateway: gateway);
+      final service = HandwritingAnalysisService(
+        gateway: gateway,
+        includeStudentNameByDefault: true,
+      );
 
       final result = await service.analyze(
         const HandwritingAnalysisInput(
           imageSource: '  https://example.com/work.jpg  ',
           scriptType: CalligraphyScriptType.lishu,
+          studentName: '李四',
         ),
       );
 
       expect(gateway.lastRequest, isNotNull);
       expect(gateway.lastRequest!.imageSource, 'https://example.com/work.jpg');
       expect(gateway.lastRequest!.prompt, contains('书体：隶书。'));
+      expect(gateway.lastRequest!.prompt, contains('学生：李四。'));
       expect(result.model, 'qwen3-vl-plus');
       expect(result.isStructured, isTrue);
       expect(result.summary, '整体结构稳定，行笔较自然。');
       expect(result.strokeObservation, '起收笔较明确，但转折处略显生硬。');
       expect(result.practiceSuggestions, hasLength(2));
+    });
+
+    test('service omits student name by default', () async {
+      final gateway = _SpyGateway();
+      final service = HandwritingAnalysisService(gateway: gateway);
+
+      await service.analyze(
+        const HandwritingAnalysisInput(
+          imageSource: 'https://example.com/work.jpg',
+          studentName: '王五',
+        ),
+      );
+
+      expect(gateway.lastRequest, isNotNull);
+      expect(gateway.lastRequest!.prompt, isNot(contains('学生：王五。')));
     });
 
     test('falls back to raw text summary when response is not json', () {

@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/models/attendance.dart';
+import '../../../core/models/export_template.dart';
 import '../../../core/models/payment.dart';
 import '../../../core/models/seal_config.dart';
 import '../../../core/models/student.dart';
@@ -27,8 +28,13 @@ import '../../../shared/widgets/ink_wash_background.dart';
 
 class ExportConfigScreen extends ConsumerStatefulWidget {
   final String studentId;
+  final ExportTemplateId? initialTemplate;
 
-  const ExportConfigScreen({super.key, required this.studentId});
+  const ExportConfigScreen({
+    super.key,
+    required this.studentId,
+    this.initialTemplate,
+  });
 
   @override
   ConsumerState<ExportConfigScreen> createState() => _ExportConfigScreenState();
@@ -49,6 +55,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
   bool _includeAiAnalysis = false;
   bool _loading = false;
   Student? _latestStudentSnapshot;
+  late ExportTemplateId _template;
 
   String _fmt(DateTime date) => formatDate(date);
 
@@ -58,6 +65,9 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     final settings = ref.read(settingsProvider).valueOrNull ?? {};
     _msgCtrl.text = settings['default_message_template'] ?? '';
     _watermark = settings['default_watermark_enabled'] != 'false';
+    _template =
+        widget.initialTemplate ??
+        exportTemplateFromSetting(settings['default_export_template']);
     unawaited(_refreshStudentSnapshot());
   }
 
@@ -147,6 +157,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       watermark: _watermark,
       sealConfig: SealConfig.fromSettings(settings),
       aiAnalysis: aiAnalysis,
+      template: _template,
     );
     return _PreparedPdf(path: path, student: student);
   }
@@ -390,6 +401,18 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     setState(() => _watermark = value);
   }
 
+  Future<void> _selectTemplate(ExportTemplateId template) async {
+    if (!mounted || _template == template) return;
+    await InteractionFeedback.selection(context);
+    if (!mounted) return;
+    setState(() => _template = template);
+    unawaited(
+      ref
+          .read(settingsProvider.notifier)
+          .set('default_export_template', template.settingValue),
+    );
+  }
+
   Future<void> _pickDate({
     required DateTime initialDate,
     required ValueChanged<DateTime> onPicked,
@@ -419,6 +442,8 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     final savedAiAnalysis = _extractSavedAiAnalysis(student?.note);
     final hasSavedAiAnalysis = savedAiAnalysis != null;
     final includeAiAnalysis = _includeAiAnalysis && hasSavedAiAnalysis;
+    final templateLabel = _template.label;
+    final templateDescription = _template.description;
 
     return SafeArea(
       top: false,
@@ -546,6 +571,15 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                             SizedBox(
                               width: metricWidth,
                               child: _ExportSummaryMetric(
+                                icon: Icons.view_carousel_outlined,
+                                label: '\u5bfc\u51fa\u6a21\u677f',
+                                value: templateLabel,
+                                color: kPrimaryBlue,
+                              ),
+                            ),
+                            SizedBox(
+                              width: metricWidth,
+                              child: _ExportSummaryMetric(
                                 icon: Icons.person_outline,
                                 label: '\u5bfc\u51fa\u5bf9\u8c61',
                                 value:
@@ -599,6 +633,11 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                               color: kPrimaryBlue,
                             ),
                             _ExportMetaBadge(
+                              icon: Icons.view_carousel_outlined,
+                              label: templateLabel,
+                              color: kPrimaryBlue,
+                            ),
+                            _ExportMetaBadge(
                               icon: Icons.picture_as_pdf_outlined,
                               label: _watermark
                                   ? '\u542b\u6c34\u5370 PDF'
@@ -617,16 +656,6 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                                   : kInkSecondary,
                             ),
                             const _ExportMetaBadge(
-                              icon: Icons.grid_view_outlined,
-                              label: '\u7f51\u683c\u7248\u5f0f',
-                              color: kPrimaryBlue,
-                            ),
-                            const _ExportMetaBadge(
-                              icon: Icons.menu_book_outlined,
-                              label: '\u624b\u8d26\u98ce\u7248\u5f0f',
-                              color: kGreen,
-                            ),
-                            const _ExportMetaBadge(
                               icon: Icons.approval_outlined,
                               label:
                                   '\u5370\u7ae0\u4e0e\u7b7e\u540d\u6837\u5f0f',
@@ -637,6 +666,36 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                       ],
                     );
                   },
+                ),
+              ),
+              const SizedBox(height: 24),
+              _ExportSectionHeader(
+                title: '\u5bfc\u51fa\u6a21\u677f',
+                subtitle: templateDescription,
+                trailing: templateLabel,
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.44),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: kInkSecondary.withValues(alpha: 0.12),
+                  ),
+                ),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: ExportTemplateId.values
+                      .map(
+                        (template) => ChoiceChip(
+                          label: Text(template.label),
+                          selected: _template == template,
+                          onSelected: (_) => _selectTemplate(template),
+                        ),
+                      )
+                      .toList(growable: false),
                 ),
               ),
               const SizedBox(height: 24),

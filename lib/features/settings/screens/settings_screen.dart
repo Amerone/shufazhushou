@@ -23,6 +23,16 @@ import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
 
+enum _SettingsSectionAnchor {
+  profile,
+  assets,
+  export,
+  feedback,
+  ai,
+  importTool,
+  about,
+}
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -33,12 +43,50 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int _versionTapCount = 0;
   bool _devMode = false;
+  bool _showScrollToTop = false;
+  final ScrollController _scrollController = ScrollController();
+  final Map<_SettingsSectionAnchor, GlobalKey> _sectionKeys = {
+    for (final anchor in _SettingsSectionAnchor.values) anchor: GlobalKey(),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    final showScrollToTop = _scrollController.hasClients
+        ? _scrollController.offset > 260
+        : false;
+    if (showScrollToTop != _showScrollToTop && mounted) {
+      setState(() => _showScrollToTop = showScrollToTop);
+    }
+  }
+
+  Future<void> _scrollToTop() async {
+    if (!_scrollController.hasClients) return;
+    await InteractionFeedback.selection(context);
+    if (!mounted || !_scrollController.hasClients) return;
+    await _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
     final pkgInfo = ref.watch(packageInfoProvider);
     final versionStr = pkgInfo.whenOrNull(data: (info) => info.version) ?? '';
+    final viewPaddingBottom = MediaQuery.of(context).viewPadding.bottom;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -87,8 +135,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     hasSignature: hasSignature,
                     hasCustomTeacherName: hasCustomTeacherName,
                   );
+                  final setupReadyCount = [
+                    hasCustomTeacherName,
+                    hasSignature,
+                    hasDefaultMessage,
+                    !isOverdue,
+                  ].where((item) => item).length;
+                  final setupCompletion = setupReadyCount / 4;
 
                   return ListView(
+                    controller: _scrollController,
                     padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                     children: [
                       if (priority != null) ...[
@@ -243,6 +299,66 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               },
                             ),
                             const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.52),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: kInkSecondary.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        '配置完成度',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        '$setupReadyCount/4 项已就绪',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: kPrimaryBlue,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(999),
+                                    child: LinearProgressIndicator(
+                                      minHeight: 8,
+                                      value: setupCompletion,
+                                      backgroundColor: kInkSecondary.withValues(
+                                        alpha: 0.12,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    priority == null
+                                        ? '当前导出与备份配置已经比较完整，可以继续微调细节。'
+                                        : '下一步建议先处理“${priority.actionLabel}”，这样后续导出和沟通会更顺手。',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
                             const _SettingsSectionTitle(
                               title: '常用入口',
                               subtitle: '把最常打开的设置集中放在顶部，减少来回查找。',
@@ -342,8 +458,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      const _SettingsSectionTitle(
+                      const SizedBox(height: 16),
+                      _SettingsSectionTitle(
+                        key: _sectionKeys[_SettingsSectionAnchor.profile],
                         title: '教师资料',
                         subtitle: '影响首页抬头、导出报告与对外展示的基础信息。',
                       ),
@@ -370,7 +487,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const _SettingsSectionTitle(
+                      _SettingsSectionTitle(
+                        key: _sectionKeys[_SettingsSectionAnchor.assets],
                         title: '资料与模板',
                         subtitle: '维护备份、课堂模板、签名和印章等常用资产。',
                       ),
@@ -414,7 +532,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const _SettingsSectionTitle(
+                      _SettingsSectionTitle(
+                        key: _sectionKeys[_SettingsSectionAnchor.export],
                         title: '导出与沟通',
                         subtitle: '决定 PDF 报告的默认效果，以及家长沟通文案的起点。',
                       ),
@@ -435,6 +554,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       'default_watermark_enabled',
                                       value.toString(),
                                     );
+                                unawaited(
+                                  InteractionFeedback.selection(context),
+                                );
                               },
                             ),
                             const Divider(height: 1, indent: 16, endIndent: 16),
@@ -459,7 +581,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const _SettingsSectionTitle(
+                      _SettingsSectionTitle(
+                        key: _sectionKeys[_SettingsSectionAnchor.feedback],
                         title: '沉浸反馈',
                         subtitle: '让翻页、保存与导出在视觉之外，也保留一点纸墨手感。',
                       ),
@@ -509,7 +632,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const _SettingsSectionTitle(
+                      _SettingsSectionTitle(
+                        key: _sectionKeys[_SettingsSectionAnchor.ai],
                         title: 'AI 扩展',
                         subtitle: '预留视觉模型与远端能力配置，保持 UI 与远端网关解耦。',
                       ),
@@ -532,7 +656,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const _SettingsSectionTitle(
+                      _SettingsSectionTitle(
+                        key: _sectionKeys[_SettingsSectionAnchor.importTool],
                         title: '导入工具',
                         subtitle: '批量录入前可先下载标准模板，减少字段缺失或顺序错误。',
                       ),
@@ -585,7 +710,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ],
                       const SizedBox(height: 20),
-                      const _SettingsSectionTitle(
+                      _SettingsSectionTitle(
+                        key: _sectionKeys[_SettingsSectionAnchor.about],
                         title: '关于应用',
                         subtitle: '查看版本信息，并保留隐藏的开发者模式入口。',
                       ),
@@ -618,6 +744,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ],
+        ),
+      ),
+      floatingActionButton: AnimatedSlide(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        offset: _showScrollToTop ? Offset.zero : const Offset(0, 1.6),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: _showScrollToTop ? 1 : 0,
+          child: IgnorePointer(
+            ignoring: !_showScrollToTop,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
+              child: FloatingActionButton.small(
+                heroTag: 'settings-scroll-top',
+                onPressed: _scrollToTop,
+                tooltip: '回到顶部',
+                backgroundColor: Colors.white.withValues(alpha: 0.92),
+                foregroundColor: kPrimaryBlue,
+                elevation: 0,
+                child: const Icon(Icons.vertical_align_top_outlined),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1000,11 +1150,212 @@ class _PriorityBanner extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
+class _SettingsQuickNavigator extends StatelessWidget {
+  final _SettingsSectionAnchor? activeAnchor;
+  final ValueChanged<_SettingsSectionAnchor> onTap;
+
+  const _SettingsQuickNavigator({
+    required this.activeAnchor,
+    required this.onTap,
+  });
+
+  static const _items = [
+    _SettingsQuickNavItem(
+      anchor: _SettingsSectionAnchor.profile,
+      icon: Icons.person_outline,
+      label: '教师资料',
+      color: kPrimaryBlue,
+    ),
+    _SettingsQuickNavItem(
+      anchor: _SettingsSectionAnchor.assets,
+      icon: Icons.folder_copy_outlined,
+      label: '资料模板',
+      color: kSealRed,
+    ),
+    _SettingsQuickNavItem(
+      anchor: _SettingsSectionAnchor.export,
+      icon: Icons.send_outlined,
+      label: '导出沟通',
+      color: kOrange,
+    ),
+    _SettingsQuickNavItem(
+      anchor: _SettingsSectionAnchor.feedback,
+      icon: Icons.touch_app_outlined,
+      label: '交互反馈',
+      color: kGreen,
+    ),
+    _SettingsQuickNavItem(
+      anchor: _SettingsSectionAnchor.ai,
+      icon: Icons.psychology_alt_outlined,
+      label: 'AI',
+      color: kPrimaryBlue,
+    ),
+    _SettingsQuickNavItem(
+      anchor: _SettingsSectionAnchor.importTool,
+      icon: Icons.download_outlined,
+      label: '导入工具',
+      color: kSealRed,
+    ),
+    _SettingsQuickNavItem(
+      anchor: _SettingsSectionAnchor.about,
+      icon: Icons.info_outline,
+      label: '关于',
+      color: kInkSecondary,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '区块导航',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                '长页速达',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: kInkSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '快速跳到教师资料、模板、导出沟通和反馈设置，减少长页面来回查找。',
+            style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 720
+                  ? 4
+                  : constraints.maxWidth >= 460
+                  ? 3
+                  : 2;
+              final itemWidth =
+                  (constraints.maxWidth - 10 * (columns - 1)) / columns;
+
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final item in _items)
+                    SizedBox(
+                      width: itemWidth,
+                      child: _SettingsQuickNavChip(
+                        item: item,
+                        selected: activeAnchor == item.anchor,
+                        onTap: () => onTap(item.anchor),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
+class _SettingsQuickNavItem {
+  final _SettingsSectionAnchor anchor;
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SettingsQuickNavItem({
+    required this.anchor,
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+}
+
+// ignore: unused_element
+class _SettingsQuickNavChip extends StatelessWidget {
+  final _SettingsQuickNavItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SettingsQuickNavChip({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? item.color.withValues(alpha: 0.14)
+                : Colors.white.withValues(alpha: 0.52),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: item.color.withValues(alpha: selected ? 0.22 : 0.1),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: item.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(item.icon, size: 18, color: item.color),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  item.label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: item.color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (selected)
+                Icon(Icons.check_circle, size: 16, color: item.color),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SettingsSectionTitle extends StatelessWidget {
   final String title;
   final String? subtitle;
 
-  const _SettingsSectionTitle({required this.title, this.subtitle});
+  const _SettingsSectionTitle({super.key, required this.title, this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -1096,7 +1447,10 @@ class _SettingsShortcutCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
+        onTap: () {
+          unawaited(InteractionFeedback.selection(context));
+          onTap();
+        },
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -1169,7 +1523,10 @@ class _SettingsTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
+        onTap: () {
+          unawaited(InteractionFeedback.selection(context));
+          onTap();
+        },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(

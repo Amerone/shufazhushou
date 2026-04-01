@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:excel/excel.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/student.dart';
@@ -8,6 +9,10 @@ import '../models/payment.dart';
 import '../../shared/constants.dart';
 
 class ExcelExporter {
+  static final _invalidFileNameChars = RegExp(r'[\\/:*?"<>|]');
+  static final _fileNameWhitespace = RegExp(r'\s+');
+  static final _fileNameUnderscores = RegExp(r'_+');
+
   static Future<String> export({
     required Student student,
     required String from,
@@ -28,15 +33,12 @@ class ExcelExporter {
       TextCellValue('费用'),
       TextCellValue('备注'),
     ]);
-    detail
-        .cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0))
-        .value = TextCellValue('课堂重点');
-    detail
-        .cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0))
-        .value = TextCellValue('课后练习');
-    detail
-        .cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0))
-        .value = TextCellValue('进步评分');
+    detail.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0)).value =
+        TextCellValue('课堂重点');
+    detail.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0)).value =
+        TextCellValue('课后练习');
+    detail.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0)).value =
+        TextCellValue('进步评分');
     for (final r in records) {
       final row = [
         TextCellValue(r.date),
@@ -58,11 +60,13 @@ class ExcelExporter {
       final bgColor = r.status == 'absent'
           ? ExcelColor.fromHexString('#FFCCCC')
           : r.status == 'leave'
-              ? ExcelColor.fromHexString('#EEEEEE')
-              : null;
+          ? ExcelColor.fromHexString('#EEEEEE')
+          : null;
       if (bgColor != null) {
         for (int col = 0; col < row.length; col++) {
-          final cell = detail.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: rowIdx));
+          final cell = detail.cell(
+            CellIndex.indexByColumnRow(columnIndex: col, rowIndex: rowIdx),
+          );
           cell.cellStyle = CellStyle(backgroundColorHex: bgColor);
         }
       }
@@ -75,11 +79,17 @@ class ExcelExporter {
     summary.appendRow([TextCellValue('项目'), TextCellValue('金额')]);
     summary.appendRow([TextCellValue('应收（出勤费用）'), DoubleCellValue(totalFee)]);
     summary.appendRow([TextCellValue('已收'), DoubleCellValue(totalPaid)]);
-    summary.appendRow([TextCellValue('余额'), DoubleCellValue(totalPaid - totalFee)]);
+    summary.appendRow([
+      TextCellValue('余额'),
+      DoubleCellValue(totalPaid - totalFee),
+    ]);
     summary.appendRow([TextCellValue('')]);
     summary.appendRow([TextCellValue('缴费明细')]);
     for (final pay in payments) {
-      summary.appendRow([TextCellValue('${pay.paymentDate} ${pay.note ?? ''}'), DoubleCellValue(pay.amount)]);
+      summary.appendRow([
+        TextCellValue('${pay.paymentDate} ${pay.note ?? ''}'),
+        DoubleCellValue(pay.amount),
+      ]);
     }
 
     excel.delete('Sheet1');
@@ -87,7 +97,10 @@ class ExcelExporter {
     final bytes = excel.encode();
     if (bytes == null) throw Exception('Excel 编码失败');
     final dir = await getTemporaryDirectory();
-    final path = p.join(dir.path, '${student.name}_${from}_$to.xlsx');
+    final path = p.join(
+      dir.path,
+      buildStudentExportFileName(studentName: student.name, from: from, to: to),
+    );
     await File(path).writeAsBytes(bytes);
     return path;
   }
@@ -112,9 +125,37 @@ class ExcelExporter {
     final bytes = excel.encode();
     if (bytes == null) throw Exception('Excel 编码失败');
     final dir = await getTemporaryDirectory();
-    final path = p.join(dir.path, '出勤汇总_${from}_$to.xlsx');
+    final path = p.join(
+      dir.path,
+      buildAttendanceExportFileName(from: from, to: to),
+    );
     await File(path).writeAsBytes(bytes);
     return path;
+  }
+
+  @visibleForTesting
+  static String buildStudentExportFileName({
+    required String studentName,
+    required String from,
+    required String to,
+  }) {
+    final safeStudentName = _sanitizeFileNameSegment(
+      studentName,
+      fallback: 'student',
+    );
+    final safeFrom = _sanitizeFileNameSegment(from, fallback: 'from');
+    final safeTo = _sanitizeFileNameSegment(to, fallback: 'to');
+    return '${safeStudentName}_${safeFrom}_$safeTo.xlsx';
+  }
+
+  @visibleForTesting
+  static String buildAttendanceExportFileName({
+    required String from,
+    required String to,
+  }) {
+    final safeFrom = _sanitizeFileNameSegment(from, fallback: 'from');
+    final safeTo = _sanitizeFileNameSegment(to, fallback: 'to');
+    return 'attendance_${safeFrom}_$safeTo.xlsx';
   }
 
   static void _buildMatrixSheet(
@@ -161,8 +202,7 @@ class ExcelExporter {
         TextCellValue(date),
         ...timeSlots.map((slot) {
           final names = map[date]?[slot];
-          return TextCellValue(
-              names != null ? names.join('、') : '');
+          return TextCellValue(names != null ? names.join('、') : '');
         }),
       ];
       sheet.appendRow(row);
@@ -185,15 +225,12 @@ class ExcelExporter {
       TextCellValue('备注'),
     ]);
 
-    sheet
-        .cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0))
-        .value = TextCellValue('课堂重点');
-    sheet
-        .cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0))
-        .value = TextCellValue('课后练习');
-    sheet
-        .cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0))
-        .value = TextCellValue('进步评分');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0)).value =
+        TextCellValue('课堂重点');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0)).value =
+        TextCellValue('课后练习');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0)).value =
+        TextCellValue('进步评分');
 
     final sorted = List<Attendance>.from(records)
       ..sort((a, b) {
@@ -239,5 +276,18 @@ class ExcelExporter {
       parts.add('节奏 ${scores.rhythmConsistency!.toStringAsFixed(1)}');
     }
     return parts.join(' / ');
+  }
+
+  static String _sanitizeFileNameSegment(
+    String value, {
+    required String fallback,
+  }) {
+    final sanitized = value
+        .trim()
+        .replaceAll(_invalidFileNameChars, '_')
+        .replaceAll(_fileNameWhitespace, '_')
+        .replaceAll(_fileNameUnderscores, '_')
+        .replaceAll(RegExp(r'^[._]+|[._]+$'), '');
+    return sanitized.isEmpty ? fallback : sanitized;
   }
 }

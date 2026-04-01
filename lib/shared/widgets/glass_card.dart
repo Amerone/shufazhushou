@@ -23,37 +23,38 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final card = ClipRRect(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(18),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           width: width,
           height: height,
           padding: padding,
           decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.78),
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
               colors: [
                 Colors.white.withValues(alpha: 0.84),
-                Colors.white.withValues(alpha: 0.66),
+                Colors.white.withValues(alpha: 0.72),
               ],
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.72),
-              width: 1.1,
+              color: Colors.white.withValues(alpha: 0.8),
+              width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF8B7D6B).withValues(alpha: 0.1),
-                blurRadius: 26,
-                offset: const Offset(0, 12),
+                color: const Color(0xFF8B7D6B).withValues(alpha: 0.06),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: kPrimaryBlue.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+                color: kPrimaryBlue.withValues(alpha: 0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -67,13 +68,13 @@ class GlassCard extends StatelessWidget {
       result = Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           overlayColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.pressed)) {
-              return kPrimaryBlue.withValues(alpha: 0.08);
+              return kPrimaryBlue.withValues(alpha: 0.06);
             }
             if (states.contains(WidgetState.hovered)) {
-              return kPrimaryBlue.withValues(alpha: 0.03);
+              return kPrimaryBlue.withValues(alpha: 0.02);
             }
             return null;
           }),
@@ -86,7 +87,7 @@ class GlassCard extends StatelessWidget {
     if (margin != null) {
       return Padding(padding: margin!, child: result);
     }
-    
+
     return result;
   }
 }

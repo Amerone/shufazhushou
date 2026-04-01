@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/database/dao/class_template_dao.dart';
 import '../../../core/models/class_template.dart';
 import '../../../core/providers/class_template_provider.dart';
 import '../../../shared/constants.dart';
@@ -36,71 +37,193 @@ class TemplateScreen extends ConsumerWidget {
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('$e')),
                 data: (templates) {
-                  if (templates.isEmpty) {
-                    return ListView(
-                      padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
-                      children: const [
-                        GlassCard(
+                  final orderedTemplates = List<ClassTemplate>.of(templates)
+                    ..sort((left, right) {
+                      final leftBuiltin = _isBuiltinTemplate(left);
+                      final rightBuiltin = _isBuiltinTemplate(right);
+                      if (leftBuiltin != rightBuiltin) {
+                        return leftBuiltin ? -1 : 1;
+                      }
+                      return left.createdAt.compareTo(right.createdAt);
+                    });
+
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
+                    children: [
+                      GlassCard(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '内置模板',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '已内置周内与周末常用时段。若你误删了默认模板，可一键补齐。',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: const [
+                                _TemplateTag('周内 18:00-19:00'),
+                                _TemplateTag('周内 19:00-20:00'),
+                                _TemplateTag('周末 08:30-09:30'),
+                                _TemplateTag('周末 09:30-10:30'),
+                                _TemplateTag('周末 10:30-11:30'),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final inserted = await ref
+                                      .read(classTemplateProvider.notifier)
+                                      .ensureBuiltinTemplates(force: true);
+                                  if (!context.mounted) return;
+                                  if (inserted == 0) {
+                                    AppToast.showSuccess(
+                                      context,
+                                      '默认模板已完整，无需补齐。',
+                                    );
+                                    return;
+                                  }
+                                  AppToast.showSuccess(
+                                    context,
+                                    '已补齐 $inserted 个默认模板。',
+                                  );
+                                },
+                                icon: const Icon(Icons.restore_outlined),
+                                label: const Text('补齐默认模板'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (orderedTemplates.isEmpty)
+                        const GlassCard(
                           padding: EdgeInsets.all(18),
                           child: EmptyState(message: '暂无课堂模板'),
-                        ),
-                      ],
-                    );
-                  }
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
-                    itemCount: templates.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) {
-                      final template = templates[i];
-                      return GlassCard(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: kPrimaryBlue.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Icon(Icons.schedule_outlined, color: kPrimaryBlue),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        )
+                      else
+                        ...orderedTemplates.map((template) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: GlassCard(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    template.name,
-                                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: kPrimaryBlue.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: const Icon(
+                                      Icons.schedule_outlined,
+                                      color: kPrimaryBlue,
+                                    ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${template.startTime} - ${template.endTime}',
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          children: [
+                                            Text(
+                                              template.name,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleSmall
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                            ),
+                                            if (_isBuiltinTemplate(template))
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: kSealRed.withValues(
+                                                    alpha: 0.08,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        999,
+                                                      ),
+                                                ),
+                                                child: Text(
+                                                  '内置',
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.copyWith(
+                                                        color: kSealRed,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${template.startTime} - ${template.endTime}',
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined),
+                                    onPressed: () =>
+                                        _showForm(context, ref, template),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      color: kRed,
+                                    ),
+                                    onPressed: () async {
+                                      final ok = await AppToast.showConfirm(
+                                        context,
+                                        '确认删除模板“${template.name}”？',
+                                      );
+                                      if (!ok) return;
+                                      await ref
+                                          .read(classTemplateDaoProvider)
+                                          .delete(template.id);
+                                      ref
+                                          .read(classTemplateProvider.notifier)
+                                          .reload();
+                                    },
                                   ),
                                 ],
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined),
-                              onPressed: () => _showForm(context, ref, template),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: kRed),
-                              onPressed: () async {
-                                final ok = await AppToast.showConfirm(context, '确认删除模板“${template.name}”？');
-                                if (!ok) return;
-                                await ref.read(classTemplateDaoProvider).delete(template.id);
-                                ref.read(classTemplateProvider.notifier).reload();
-                              },
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                          );
+                        }),
+                    ],
                   );
                 },
               ),
@@ -136,7 +259,10 @@ class TemplateScreen extends ConsumerWidget {
                 left: 16,
                 right: 16,
                 top: 8,
-                bottom: MediaQuery.of(stCtx).viewInsets.bottom + MediaQuery.of(stCtx).padding.bottom + 16,
+                bottom:
+                    MediaQuery.of(stCtx).viewInsets.bottom +
+                    MediaQuery.of(stCtx).padding.bottom +
+                    16,
               ),
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -156,7 +282,9 @@ class TemplateScreen extends ConsumerWidget {
                   ),
                   Text(
                     template == null ? '新增课堂模板' : '编辑课堂模板',
-                    style: Theme.of(stCtx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    style: Theme.of(stCtx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
@@ -171,7 +299,9 @@ class TemplateScreen extends ConsumerWidget {
                     decoration: InputDecoration(
                       labelText: '模板名称',
                       hintText: '例如：早班、晚班、周末提高班',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       filled: true,
                       fillColor: Colors.white.withValues(alpha: 0.56),
                     ),
@@ -188,16 +318,23 @@ class TemplateScreen extends ConsumerWidget {
                               initialTime: startTime,
                               label: '开始时间',
                             );
-                            if (picked != null) setSheetState(() => startTime = picked);
+                            if (picked != null) {
+                              setSheetState(() => startTime = picked);
+                            }
                           },
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: '开始时间',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               filled: true,
                               fillColor: Colors.white.withValues(alpha: 0.56),
                             ),
-                            child: Text(formatTime(startTime), style: const TextStyle(fontSize: 16)),
+                            child: Text(
+                              formatTime(startTime),
+                              style: const TextStyle(fontSize: 16),
+                            ),
                           ),
                         ),
                       ),
@@ -211,16 +348,23 @@ class TemplateScreen extends ConsumerWidget {
                               initialTime: endTime,
                               label: '结束时间',
                             );
-                            if (picked != null) setSheetState(() => endTime = picked);
+                            if (picked != null) {
+                              setSheetState(() => endTime = picked);
+                            }
                           },
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: '结束时间',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               filled: true,
                               fillColor: Colors.white.withValues(alpha: 0.56),
                             ),
-                            child: Text(formatTime(endTime), style: const TextStyle(fontSize: 16)),
+                            child: Text(
+                              formatTime(endTime),
+                              style: const TextStyle(fontSize: 16),
+                            ),
                           ),
                         ),
                       ),
@@ -230,7 +374,9 @@ class TemplateScreen extends ConsumerWidget {
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     onPressed: () async {
                       final name = nameCtrl.text.trim();
@@ -246,9 +392,13 @@ class TemplateScreen extends ConsumerWidget {
                         return;
                       }
 
-                      final existing = ref.read(classTemplateProvider).valueOrNull ?? [];
+                      final existing =
+                          ref.read(classTemplateProvider).valueOrNull ?? [];
                       final hasDuplicate = existing.any(
-                        (item) => item.id != (template?.id ?? '') && item.startTime == startStr && item.endTime == endStr,
+                        (item) =>
+                            item.id != (template?.id ?? '') &&
+                            item.startTime == startStr &&
+                            item.endTime == endStr,
                       );
                       if (hasDuplicate) {
                         AppToast.showError(stCtx, '已存在相同时间段的模板');
@@ -286,6 +436,39 @@ class TemplateScreen extends ConsumerWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+bool _isBuiltinTemplate(ClassTemplate template) {
+  return builtinClassTemplateSeeds.any(
+    (seed) =>
+        seed.name == template.name &&
+        seed.startTime == template.startTime &&
+        seed.endTime == template.endTime,
+  );
+}
+
+class _TemplateTag extends StatelessWidget {
+  final String label;
+
+  const _TemplateTag(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: kPrimaryBlue.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: kPrimaryBlue,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

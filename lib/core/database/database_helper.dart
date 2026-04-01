@@ -8,6 +8,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._();
   static const databaseFileName = 'moyun.db';
   static const legacyDatabaseFileName = 'calligraphy_assistant.db';
+  static const databaseVersion = 4;
   static const _legacySuffixes = ['-wal', '-shm', '-journal'];
 
   Future<Database>? _dbFuture;
@@ -25,7 +26,7 @@ class DatabaseHelper {
     final path = await resolveDatabasePath();
     return openDatabase(
       path,
-      version: 4,
+      version: databaseVersion,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: (db) async {
@@ -111,9 +112,9 @@ class DatabaseHelper {
       )
     ''');
     await db.execute(
-        'CREATE INDEX idx_attendance_student_date ON attendance(student_id, date)');
-    await db.execute(
-        'CREATE INDEX idx_attendance_date ON attendance(date)');
+      'CREATE INDEX idx_attendance_student_date ON attendance(student_id, date)',
+    );
+    await db.execute('CREATE INDEX idx_attendance_date ON attendance(date)');
     await db.execute('''
       CREATE TABLE payments (
         id TEXT PRIMARY KEY,
@@ -126,7 +127,8 @@ class DatabaseHelper {
       )
     ''');
     await db.execute(
-        'CREATE INDEX idx_payments_student ON payments(student_id)');
+      'CREATE INDEX idx_payments_student ON payments(student_id)',
+    );
     await db.execute('''
       CREATE TABLE class_templates (
         id TEXT PRIMARY KEY,

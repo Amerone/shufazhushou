@@ -43,6 +43,32 @@ void main() {
       expect(container.read(dataInsightServiceProvider), isNull);
     });
 
+    test('student name outbound switch defaults to false', () async {
+      _FakeSettingsNotifier.seededSettings = const {};
+
+      final container = ProviderContainer(
+        overrides: [settingsProvider.overrideWith(_FakeSettingsNotifier.new)],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(settingsProvider.future);
+      expect(container.read(aiIncludeStudentNameProvider), isFalse);
+    });
+
+    test('student name outbound switch reads persisted setting', () async {
+      _FakeSettingsNotifier.seededSettings = const {
+        QwenVisionConfig.settingIncludeStudentName: 'true',
+      };
+
+      final container = ProviderContainer(
+        overrides: [settingsProvider.overrideWith(_FakeSettingsNotifier.new)],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(settingsProvider.future);
+      expect(container.read(aiIncludeStudentNameProvider), isTrue);
+    });
+
     test(
       'gateway and services are available when api key is present',
       () async {
@@ -60,6 +86,80 @@ void main() {
         expect(container.read(handwritingAnalysisServiceProvider), isNotNull);
         expect(container.read(progressAnalysisServiceProvider), isNotNull);
         expect(container.read(dataInsightServiceProvider), isNotNull);
+      },
+    );
+
+    test(
+      'gateway and services stay unavailable for insecure non-local http endpoints',
+      () async {
+        _FakeSettingsNotifier.seededSettings = const {
+          QwenVisionConfig.settingApiKey: 'sk-test',
+          QwenVisionConfig.settingBaseUrl:
+              'http://example.com/v1/chat/completions',
+        };
+
+        final container = ProviderContainer(
+          overrides: [settingsProvider.overrideWith(_FakeSettingsNotifier.new)],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(settingsProvider.future);
+        final config = container.read(qwenVisionConfigProvider);
+
+        expect(config.hasApiKey, isTrue);
+        expect(config.hasValidBaseUrl, isFalse);
+        expect(container.read(visionAnalysisGatewayProvider), isNull);
+        expect(container.read(handwritingAnalysisServiceProvider), isNull);
+        expect(container.read(progressAnalysisServiceProvider), isNull);
+        expect(container.read(dataInsightServiceProvider), isNull);
+      },
+    );
+
+    test(
+      'gateway and services stay unavailable for non-official https endpoints by default',
+      () async {
+        _FakeSettingsNotifier.seededSettings = const {
+          QwenVisionConfig.settingApiKey: 'sk-test',
+          QwenVisionConfig.settingBaseUrl:
+              'https://example.com/v1/chat/completions',
+        };
+
+        final container = ProviderContainer(
+          overrides: [settingsProvider.overrideWith(_FakeSettingsNotifier.new)],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(settingsProvider.future);
+        final config = container.read(qwenVisionConfigProvider);
+
+        expect(config.hasApiKey, isTrue);
+        expect(config.allowCustomEndpoint, isFalse);
+        expect(config.hasValidBaseUrl, isFalse);
+        expect(container.read(visionAnalysisGatewayProvider), isNull);
+      },
+    );
+
+    test(
+      'gateway and services are available for custom https endpoints when advanced mode is enabled',
+      () async {
+        _FakeSettingsNotifier.seededSettings = const {
+          QwenVisionConfig.settingApiKey: 'sk-test',
+          QwenVisionConfig.settingBaseUrl:
+              'https://example.com/v1/chat/completions',
+          QwenVisionConfig.settingAllowCustomEndpoint: 'true',
+        };
+
+        final container = ProviderContainer(
+          overrides: [settingsProvider.overrideWith(_FakeSettingsNotifier.new)],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(settingsProvider.future);
+        final config = container.read(qwenVisionConfigProvider);
+
+        expect(config.allowCustomEndpoint, isTrue);
+        expect(config.hasValidBaseUrl, isTrue);
+        expect(container.read(visionAnalysisGatewayProvider), isNotNull);
       },
     );
   });

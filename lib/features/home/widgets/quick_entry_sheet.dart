@@ -170,6 +170,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     }
   }
 
+  Future<void> _quickSaveWithDefaults() async {
+    if (_saving || _selectedIds.isEmpty) return;
+    final statusLabel = _statuses.firstWhere((item) => item.$1 == _status).$2;
+    final confirmed = await AppToast.showConfirm(
+      context,
+      '将按默认设置直接保存：$_startTime-$_endTime，状态“$statusLabel”。是否继续？',
+    );
+    if (!confirmed) return;
+    await _save();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -463,23 +474,38 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _selectedIds.isEmpty
-                  ? null
-                  : () {
-                      unawaited(InteractionFeedback.selection(context));
-                      setState(() => _step = 1);
-                    },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+          child: Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _selectedIds.isEmpty
+                      ? null
+                      : () {
+                          unawaited(InteractionFeedback.selection(context));
+                          setState(() => _step = 1);
+                        },
+                  onLongPress: _selectedIds.isEmpty
+                      ? null
+                      : () {
+                          unawaited(InteractionFeedback.selection(context));
+                          unawaited(_quickSaveWithDefaults());
+                        },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text('下一步（已选 ${_selectedIds.length} 人）'),
                 ),
               ),
-              child: Text('下一步（已选 ${_selectedIds.length} 人）'),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                '长按上方按钮可按默认时间快速保存',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ),
         ),
       ],

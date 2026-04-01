@@ -1,15 +1,21 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+
 import '../../../core/providers/attendance_provider.dart';
+import '../../../core/providers/home_workbench_provider.dart';
 import '../../../shared/constants.dart' show formatDate;
 import '../../../shared/theme.dart';
-import '../../../shared/widgets/brush_stroke_divider.dart';
+import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../widgets/attendance_calendar.dart';
 import '../widgets/attendance_list.dart';
+import '../widgets/home_workbench_panel.dart';
 import '../widgets/quick_entry_sheet.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -21,27 +27,32 @@ class HomeScreen extends ConsumerWidget {
     final selectedDate = ref.watch(selectedDateProvider);
     final selectedMonth = ref.watch(selectedMonthProvider);
     final asyncRecords = ref.watch(attendanceProvider);
+    final workbenchTasks = ref.watch(homeWorkbenchProvider);
     final today = DateTime.now();
 
     final dateStr = formatDate(selectedDate);
-    final count = asyncRecords.valueOrNull?.where((r) => r.date == dateStr).length ?? 0;
-
-    final monthLabel = DateFormat('yyyy年M月', 'zh_CN').format(selectedMonth);
-    final dateLabel = DateFormat('M月d日 EEEE', 'zh_CN').format(selectedDate);
-    final isToday = selectedDate.year == today.year &&
-        selectedDate.month == today.month &&
-        selectedDate.day == today.day;
-    final sectionTitle = isToday ? '今日记录' : '$dateLabel 记录';
-    final summaryText = isToday
-        ? '今日共 $count 条出勤记录'
-        : '当日共 $count 条出勤记录';
+    final dayCount =
+        asyncRecords.valueOrNull
+            ?.where((record) => record.date == dateStr)
+            .length ??
+        0;
     final monthKey = DateFormat('yyyy-MM', 'zh_CN').format(selectedMonth);
-    final monthCount = asyncRecords.valueOrNull
+    final monthCount =
+        asyncRecords.valueOrNull
             ?.where((record) => record.date.startsWith(monthKey))
             .length ??
         0;
-    final totalCount = asyncRecords.valueOrNull?.length ?? 0;
-    final headerSubtitle = isToday ? '$monthLabel · 今天已记录 $count 条' : '$monthLabel · $dateLabel';
+    final pendingTaskCount = workbenchTasks.valueOrNull?.length;
+
+    final monthLabel = DateFormat('yyyy年M月', 'zh_CN').format(selectedMonth);
+    final dateLabel = DateFormat('M月d日 EEEE', 'zh_CN').format(selectedDate);
+    final isToday =
+        selectedDate.year == today.year &&
+        selectedDate.month == today.month &&
+        selectedDate.day == today.day;
+    final sectionTitle = isToday ? '今日记录' : '$dateLabel 记录';
+    final headerSubtitle = isToday ? '先记课，再处理待办。' : '$dateLabel 已选中，可继续核对当日记录。';
+
     final homeTheme = theme.copyWith(
       splashColor: kPrimaryBlue.withValues(alpha: 0.08),
       highlightColor: kPrimaryBlue.withValues(alpha: 0.04),
@@ -56,13 +67,16 @@ class HomeScreen extends ConsumerWidget {
           child: Column(
             children: [
               PageHeader(
-                title: '笔墨课堂总览',
+                title: '今日工作台',
                 subtitle: headerSubtitle,
                 trailing: _TodayAction(
                   onPressed: () {
+                    unawaited(InteractionFeedback.selection(context));
                     ref.read(selectedDateProvider.notifier).state = today;
-                    ref.read(selectedMonthProvider.notifier).state =
-                        DateTime(today.year, today.month);
+                    ref.read(selectedMonthProvider.notifier).state = DateTime(
+                      today.year,
+                      today.month,
+                    );
                     ref.read(attendanceProvider.notifier).reload();
                   },
                 ),
@@ -81,114 +95,75 @@ class HomeScreen extends ConsumerWidget {
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                         sliver: SliverToBoxAdapter(
-                          child: _DateSummaryCard(
+                          child: _HomeFocusCard(
                             monthLabel: monthLabel,
                             dateLabel: dateLabel,
-                            summaryText: summaryText,
-                            dayCount: count,
+                            dayCount: dayCount,
                             monthCount: monthCount,
-                            totalCount: totalCount,
+                            taskCount: pendingTaskCount,
                             isToday: isToday,
-                          ),
-                        ),
-                      ),
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 34, 20, 0),
-                        sliver: SliverToBoxAdapter(
-                          child: _SectionLead(
-                            eyebrow: '课历',
-                            title: '翻阅本月出勤笔记',
-                            subtitle: '点选具体日期即可切换当天记录，色条会提示整天的整体出勤状态。',
-                            badgeText: '$monthCount 次',
-                            badgeColor: kPrimaryBlue,
+                            onQuickEntry: () => _openQuickEntrySheet(context),
+                            onOpenStudents: () async {
+                              await InteractionFeedback.pageTurn(context);
+                              if (!context.mounted) return;
+                              context.go('/students');
+                            },
+                            onOpenStatistics: () async {
+                              await InteractionFeedback.pageTurn(context);
+                              if (!context.mounted) return;
+                              context.go('/statistics');
+                            },
                           ),
                         ),
                       ),
                       const SliverPadding(
-                        padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
-                        sliver: SliverToBoxAdapter(child: AttendanceCalendar()),
+                        padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
+                        sliver: SliverToBoxAdapter(child: HomeWorkbenchPanel()),
                       ),
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 34, 20, 0),
+                        padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
                         sliver: SliverToBoxAdapter(
-                          child: _SectionLead(
-                            eyebrow: isToday ? '札记' : '选日',
+                          child: _SectionTitleRow(
                             title: sectionTitle,
-                            subtitle: isToday
-                                ? '按课时顺序整理今日记录，轻触卡片可直接补改或核对细节。'
-                                : '切换日期后，这里会按时间顺序展开当日的全部课时记录。',
-                            badgeText: '$count 条',
-                            badgeColor: kSealRed,
+                            countText: '$dayCount 条',
+                            color: kSealRed,
                           ),
                         ),
                       ),
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 120),
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                         sliver: SliverToBoxAdapter(
                           child: GlassCard(
-                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            sectionTitle,
-                                            style: theme.textTheme.titleLarge?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          const BrushStrokeDivider(
-                                            width: 128,
-                                            height: 12,
-                                            color: kPrimaryBlue,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: kSealRed.withValues(alpha: 0.08),
-                                        borderRadius: BorderRadius.circular(999),
-                                        border: Border.all(
-                                          color: kSealRed.withValues(alpha: 0.16),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        '$count 条',
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: kSealRed,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
                                 Text(
-                                  isToday ? '今日已整理的课时按时间自然展开。' : '按当前选中日期查看对应记录。',
+                                  '按时间顺序查看与调整当日记录',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     height: 1.45,
                                   ),
                                 ),
-                                const SizedBox(height: 18),
+                                const SizedBox(height: 14),
                                 const AttendanceList(),
                               ],
                             ),
                           ),
                         ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: _SectionTitleRow(
+                            title: '本月课历',
+                            countText: '$monthCount 次',
+                            color: kPrimaryBlue,
+                          ),
+                        ),
+                      ),
+                      const SliverPadding(
+                        padding: EdgeInsets.fromLTRB(20, 12, 20, 120),
+                        sliver: SliverToBoxAdapter(child: AttendanceCalendar()),
                       ),
                     ],
                   ),
@@ -203,209 +178,210 @@ class HomeScreen extends ConsumerWidget {
           bottom: MediaQuery.viewPaddingOf(context).bottom + 80,
         ),
         child: _QuickEntryAction(
-          onPressed: () => showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            builder: (_) => const QuickEntrySheet(),
-          ),
+          onPressed: () => _openQuickEntrySheet(context),
         ),
       ),
     );
   }
 }
 
-class _DateSummaryCard extends StatelessWidget {
+Future<void> _openQuickEntrySheet(BuildContext context) async {
+  unawaited(InteractionFeedback.selection(context));
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => const QuickEntrySheet(),
+  );
+}
+
+class _HomeFocusCard extends StatelessWidget {
   final String monthLabel;
   final String dateLabel;
-  final String summaryText;
   final int dayCount;
   final int monthCount;
-  final int totalCount;
+  final int? taskCount;
   final bool isToday;
+  final VoidCallback onQuickEntry;
+  final VoidCallback onOpenStudents;
+  final VoidCallback onOpenStatistics;
 
-  const _DateSummaryCard({
+  const _HomeFocusCard({
     required this.monthLabel,
     required this.dateLabel,
-    required this.summaryText,
     required this.dayCount,
     required this.monthCount,
-    required this.totalCount,
+    required this.taskCount,
     required this.isToday,
+    required this.onQuickEntry,
+    required this.onOpenStudents,
+    required this.onOpenStatistics,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final pendingCount = taskCount ?? 0;
+    final nextActionText = dayCount == 0
+        ? '下一步：先记录今天第一节课。'
+        : pendingCount > 0
+        ? '下一步：处理 $pendingCount 项待办，避免任务堆积。'
+        : '下一步：核对记录后，可查看本月课历安排。';
+
     return GlassCard(
-      padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
-      child: Stack(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            top: -18,
-            right: -14,
-            child: IgnorePointer(
-              child: Container(
-                width: 132,
-                height: 132,
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(132),
-                  gradient: RadialGradient(
-                    colors: [
-                      kSealRed.withValues(alpha: 0.12),
-                      kSealRed.withValues(alpha: 0.04),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.42, 1.0],
+                  color: Colors.white.withValues(alpha: 0.66),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: kInkSecondary.withValues(alpha: 0.12),
+                  ),
+                ),
+                child: Text(
+                  monthLabel,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: kPrimaryBlue,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: kSealRed.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  isToday ? '今日优先' : '当前日期',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: kSealRed,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            dateLabel,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 8),
+          Text(
+            nextActionText,
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+          ),
+          const SizedBox(height: 18),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 560 ? 3 : 2;
+              final itemWidth =
+                  (constraints.maxWidth - 12 * (columns - 1)) / columns;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.52),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: kInkSecondary.withValues(alpha: 0.12),
-                            ),
-                          ),
-                          child: Text(
-                            monthLabel,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: kPrimaryBlue,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          isToday ? '今日课堂札记' : '当日课时摘录',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: kInkSecondary.withValues(alpha: 0.86),
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          dateLabel,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontFamily: 'MaShanZheng',
-                            fontWeight: FontWeight.w600,
-                            fontSize: 30,
-                            height: 1.2,
-                            color: const Color(0xFF26221D),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          summaryText,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: kInkSecondary.withValues(alpha: 0.9),
-                            height: 1.55,
-                          ),
-                        ),
-                      ],
+                  SizedBox(
+                    width: itemWidth,
+                    child: _SummaryMetric(
+                      label: '今日记录',
+                      value: '$dayCount',
+                      hint: '当前日期',
+                      color: kSealRed,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
+                  SizedBox(
+                    width: itemWidth,
+                    child: _SummaryMetric(
+                      label: '本月课次',
+                      value: '$monthCount',
+                      hint: monthLabel,
+                      color: kPrimaryBlue,
                     ),
-                    decoration: BoxDecoration(
-                      color: kSealRed.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: kSealRed.withValues(alpha: 0.16),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          isToday ? '今' : '选',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: kSealRed,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '札记',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: kSealRed,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _SummaryMetric(
+                      label: '待办',
+                      value: taskCount?.toString() ?? '—',
+                      hint: taskCount == null ? '加载中' : '优先处理',
+                      color: kOrange,
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              const BrushStrokeDivider(
-                width: 156,
-                height: 12,
-                color: kPrimaryBlue,
-              ),
-              const SizedBox(height: 22),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 460;
-                  final itemWidth = compact
-                      ? (constraints.maxWidth - 14) / 2
-                      : (constraints.maxWidth - 28) / 3;
+              );
+            },
+          ),
+          const SizedBox(height: 18),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 520;
+              final primaryWidth = compact
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 12) / 2;
+              final secondaryWidth = compact
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 24) / 3;
 
-                  return Wrap(
-                    spacing: 14,
-                    runSpacing: 14,
-                    children: [
-                      SizedBox(
-                        width: itemWidth,
-                        child: _SummaryMetric(
-                          label: '当日记录',
-                          value: '$dayCount',
-                          hint: '当前日期',
-                          color: kSealRed,
-                        ),
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: primaryWidth,
+                    child: FilledButton.icon(
+                      onPressed: onQuickEntry,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: kSealRed,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      SizedBox(
-                        width: itemWidth,
-                        child: _SummaryMetric(
-                          label: '本月课次',
-                          value: '$monthCount',
-                          hint: '本月累计',
-                          color: kPrimaryBlue,
-                        ),
+                      icon: const Icon(Icons.brush_outlined),
+                      label: const Text('立即记课'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: secondaryWidth,
+                    child: OutlinedButton.icon(
+                      onPressed: onOpenStatistics,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      SizedBox(
-                        width: itemWidth,
-                        child: _SummaryMetric(
-                          label: '累计记录',
-                          value: '$totalCount',
-                          hint: '历次沉淀',
-                          color: kGreen,
-                        ),
+                      icon: const Icon(Icons.auto_graph_outlined),
+                      label: Text((taskCount ?? 0) > 0 ? '处理待办' : '经营统计'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: secondaryWidth,
+                    child: OutlinedButton.icon(
+                      onPressed: onOpenStudents,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                    ],
-                  );
-                },
-              ),
-            ],
+                      icon: const Icon(Icons.people_alt_outlined),
+                      label: const Text('学生档案'),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -413,74 +389,41 @@ class _DateSummaryCard extends StatelessWidget {
   }
 }
 
-class _SectionLead extends StatelessWidget {
-  final String eyebrow;
+class _SectionTitleRow extends StatelessWidget {
   final String title;
-  final String subtitle;
-  final String badgeText;
-  final Color badgeColor;
+  final String countText;
+  final Color color;
 
-  const _SectionLead({
-    required this.eyebrow,
+  const _SectionTitleRow({
     required this.title,
-    required this.subtitle,
-    required this.badgeText,
-    required this.badgeColor,
+    required this.countText,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                eyebrow,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: kInkSecondary.withValues(alpha: 0.88),
-                  letterSpacing: 2.0,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                title,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              BrushStrokeDivider(
-                width: title.length > 8 ? 128 : 112,
-                height: 12,
-                color: badgeColor,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  height: 1.5,
-                ),
-              ),
-            ],
+          child: Text(
+            title,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
-        const SizedBox(width: 16),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: badgeColor.withValues(alpha: 0.08),
+            color: color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: badgeColor.withValues(alpha: 0.14)),
+            border: Border.all(color: color.withValues(alpha: 0.14)),
           ),
           child: Text(
-            badgeText,
+            countText,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: badgeColor,
+              color: color,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -510,7 +453,7 @@ class _TodayAction extends StatelessWidget {
       ),
       onPressed: onPressed,
       icon: const Icon(Icons.today_outlined, size: 18),
-      label: const Text('回到今日'),
+      label: const Text('回到今天'),
     );
   }
 }
@@ -533,21 +476,15 @@ class _SummaryMetric extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.48),
-        borderRadius: BorderRadius.circular(18),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          BrushStrokeDivider(
-            width: 44,
-            height: 10,
-            color: color,
-          ),
-          const SizedBox(height: 12),
           Text(
             label,
             style: theme.textTheme.bodySmall?.copyWith(
@@ -557,7 +494,7 @@ class _SummaryMetric extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontFamily: 'NotoSansSC',
               color: color,
               fontWeight: FontWeight.w800,
@@ -574,9 +511,7 @@ class _SummaryMetric extends StatelessWidget {
 class _QuickEntryAction extends StatelessWidget {
   final VoidCallback onPressed;
 
-  const _QuickEntryAction({
-    required this.onPressed,
-  });
+  const _QuickEntryAction({required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -585,9 +520,9 @@ class _QuickEntryAction extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: kSealRed.withValues(alpha: 0.22),
-            blurRadius: 22,
-            offset: const Offset(0, 12),
+            color: kSealRed.withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -606,7 +541,7 @@ class _QuickEntryAction extends StatelessWidget {
         extendedPadding: const EdgeInsets.symmetric(horizontal: 18),
         icon: const Icon(Icons.brush_outlined),
         label: const Text(
-          '快速记课',
+          '立即记课',
           style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.4),
         ),
       ),

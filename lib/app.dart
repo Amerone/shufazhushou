@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
@@ -15,7 +15,6 @@ import 'features/students/screens/student_detail_screen.dart';
 import 'features/students/screens/student_form_screen.dart';
 import 'features/students/screens/student_import_screen.dart';
 import 'features/students/screens/student_list_screen.dart';
-import 'shared/widgets/brush_stroke_divider.dart';
 import 'shared/theme.dart';
 import 'shared/utils/interaction_feedback.dart';
 
@@ -27,9 +26,7 @@ final _router = GoRouter(
       builder: (context, state, shell) => _ScaffoldWithNav(shell: shell),
       branches: [
         StatefulShellBranch(
-          routes: [
-            GoRoute(path: '/', builder: (ctx, s) => const HomeScreen()),
-          ],
+          routes: [GoRoute(path: '/', builder: (ctx, s) => const HomeScreen())],
         ),
         StatefulShellBranch(
           routes: [
@@ -37,15 +34,23 @@ final _router = GoRouter(
               path: '/students',
               builder: (ctx, s) => const StudentListScreen(),
               routes: [
-                GoRoute(path: 'create', builder: (ctx, s) => const StudentFormScreen()),
-                GoRoute(path: 'import', builder: (ctx, s) => const StudentImportScreen()),
+                GoRoute(
+                  path: 'create',
+                  builder: (ctx, s) => const StudentFormScreen(),
+                ),
+                GoRoute(
+                  path: 'import',
+                  builder: (ctx, s) => const StudentImportScreen(),
+                ),
                 GoRoute(
                   path: ':id',
-                  builder: (ctx, s) => StudentDetailScreen(studentId: s.pathParameters['id']!),
+                  builder: (ctx, s) =>
+                      StudentDetailScreen(studentId: s.pathParameters['id']!),
                   routes: [
                     GoRoute(
                       path: 'edit',
-                      builder: (ctx, s) => StudentFormScreen(studentId: s.pathParameters['id']!),
+                      builder: (ctx, s) =>
+                          StudentFormScreen(studentId: s.pathParameters['id']!),
                     ),
                   ],
                 ),
@@ -55,7 +60,10 @@ final _router = GoRouter(
         ),
         StatefulShellBranch(
           routes: [
-            GoRoute(path: '/statistics', builder: (ctx, s) => const StatisticsScreen()),
+            GoRoute(
+              path: '/statistics',
+              builder: (ctx, s) => const StatisticsScreen(),
+            ),
           ],
         ),
         StatefulShellBranch(
@@ -64,11 +72,26 @@ final _router = GoRouter(
               path: '/settings',
               builder: (ctx, s) => const SettingsScreen(),
               routes: [
-                GoRoute(path: 'templates', builder: (ctx, s) => const TemplateScreen()),
-                GoRoute(path: 'signature', builder: (ctx, s) => const SignatureScreen()),
-                GoRoute(path: 'backup', builder: (ctx, s) => const BackupScreen()),
-                GoRoute(path: 'ai', builder: (ctx, s) => const AiSettingsScreen()),
-                GoRoute(path: 'seal', builder: (ctx, s) => const SealStampScreen()),
+                GoRoute(
+                  path: 'templates',
+                  builder: (ctx, s) => const TemplateScreen(),
+                ),
+                GoRoute(
+                  path: 'signature',
+                  builder: (ctx, s) => const SignatureScreen(),
+                ),
+                GoRoute(
+                  path: 'backup',
+                  builder: (ctx, s) => const BackupScreen(),
+                ),
+                GoRoute(
+                  path: 'ai',
+                  builder: (ctx, s) => const AiSettingsScreen(),
+                ),
+                GoRoute(
+                  path: 'seal',
+                  builder: (ctx, s) => const SealStampScreen(),
+                ),
               ],
             ),
           ],
@@ -88,13 +111,10 @@ class _ScaffoldWithNav extends StatelessWidget {
 
     return Scaffold(
       extendBody: true,
-      body: _ShellBodyMotion(
-        index: shell.currentIndex,
-        child: shell,
-      ),
+      body: _ShellBodyMotion(index: shell.currentIndex, child: shell),
       bottomNavigationBar: SafeArea(
         top: false,
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
         child: _BrushNavigationBar(
           currentIndex: shell.currentIndex,
           onSelect: shell.goBranch,
@@ -109,10 +129,7 @@ class _ShellBodyMotion extends StatefulWidget {
   final int index;
   final Widget child;
 
-  const _ShellBodyMotion({
-    required this.index,
-    required this.child,
-  });
+  const _ShellBodyMotion({required this.index, required this.child});
 
   @override
   State<_ShellBodyMotion> createState() => _ShellBodyMotionState();
@@ -132,16 +149,11 @@ class _ShellBodyMotionState extends State<_ShellBodyMotion>
       duration: const Duration(milliseconds: 260),
       value: 1,
     );
-    _opacity = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    );
-    _scale = Tween<double>(begin: 0.988, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    _opacity = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    _scale = Tween<double>(
+      begin: 0.988,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
   }
 
   @override
@@ -161,10 +173,7 @@ class _ShellBodyMotionState extends State<_ShellBodyMotion>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _opacity,
-      child: ScaleTransition(
-        scale: _scale,
-        child: widget.child,
-      ),
+      child: ScaleTransition(scale: _scale, child: widget.child),
     );
   }
 }
@@ -207,33 +216,19 @@ class _BrushNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.88),
-            Colors.white.withValues(alpha: 0.72),
-          ],
-        ),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.7),
-        ),
+        borderRadius: BorderRadius.circular(24),
+        color: Colors.white.withValues(alpha: 0.86),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.84)),
         boxShadow: [
           BoxShadow(
-            color: shadowColor.withValues(alpha: 0.08),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-          BoxShadow(
-            color: const Color(0xFF8B7D6B).withValues(alpha: 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: shadowColor.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         child: Row(
           children: List.generate(_items.length, (index) {
             final item = _items[index];
@@ -292,9 +287,9 @@ class _BrushNavItem extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: selected
-                ? Colors.white.withValues(alpha: 0.32)
+                ? kPrimaryBlue.withValues(alpha: 0.08)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -312,16 +307,17 @@ class _BrushNavItem extends StatelessWidget {
                   fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 7),
-              AnimatedOpacity(
+              const SizedBox(height: 6),
+              AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
-                opacity: selected ? 1 : 0,
-                child: BrushStrokeDivider(
-                  width: 38,
-                  height: 8,
-                  color: selected ? kSealRed : Colors.transparent,
-                  alignment: Alignment.center,
+                width: selected ? 26 : 8,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? kSealRed.withValues(alpha: 0.9)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
             ],

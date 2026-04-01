@@ -4,10 +4,12 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import '../models/export_template.dart';
 import '../models/seal_config.dart';
 import '../models/student.dart';
 import '../models/attendance.dart';
 import '../models/payment.dart';
+import '../services/student_growth_summary_service.dart';
 import '../../shared/constants.dart';
 
 class PdfGenerator {
@@ -42,6 +44,7 @@ class PdfGenerator {
     required String message,
     required bool watermark,
     required SealConfig sealConfig,
+    required ExportTemplateId template,
     String? aiAnalysis,
     String institutionName = kDefaultInstitutionName,
   }) async {
@@ -108,6 +111,10 @@ class PdfGenerator {
     final messageText = message.trim();
     final aiAnalysisText = aiAnalysis?.trim() ?? '';
     final aiAnalysisParagraphs = _splitAiAnalysisParagraphs(aiAnalysisText);
+    final growthSummary = const StudentGrowthSummaryService().build(
+      records: sortedRecords,
+      now: DateTime.now(),
+    );
 
     final pdf = pw.Document(
       theme: pw.ThemeData.withFont(base: ttf, bold: ttf),
@@ -457,6 +464,37 @@ class PdfGenerator {
       );
     }
 
+    pw.Widget buildSnapshotCard({
+      required String label,
+      required String value,
+      required PdfColor accent,
+      int maxLines = 3,
+    }) {
+      return pw.Container(
+        width: 180,
+        padding: const pw.EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: pw.BoxDecoration(
+          color: _paperPanel,
+          border: pw.Border.all(color: _frameLine, width: 0.7),
+          borderRadius: pw.BorderRadius.circular(10),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Container(width: 26, height: 3, color: accent),
+            pw.SizedBox(height: 10),
+            pw.Text(label, style: subtle),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              value.trim().isEmpty ? '-' : value,
+              style: bodyStrong.copyWith(fontSize: 10.8, color: accent),
+              maxLines: maxLines,
+            ),
+          ],
+        ),
+      );
+    }
+
     pw.Widget buildPanel({
       required String title,
       String? subtitle,
@@ -755,17 +793,103 @@ class PdfGenerator {
         build: (_) {
           final chips = <pw.Widget>[
             buildInfoChip('\u5468\u671f', '$from \u81f3 $to'),
+            buildInfoChip('\u6a21\u677f', template.label),
             buildInfoChip(
               '\u6388\u8bfe\u6559\u5e08',
               teacherName.trim().isEmpty ? institutionName : teacherName.trim(),
             ),
-            buildInfoChip('\u8bfe\u6b21', '${sortedRecords.length} \u8282'),
           ];
           if (student.parentName?.trim().isNotEmpty ?? false) {
             chips.add(
               buildInfoChip('\u5bb6\u957f', student.parentName!.trim()),
             );
           }
+
+          final coverTitle = switch (template) {
+            ExportTemplateId.parentMonthly => '\u6210\u957f\u6708\u62a5',
+            ExportTemplateId.teacherDetailed => '\u5b66\u4e60\u8be6\u62a5',
+            ExportTemplateId.financeStatement =>
+              '\u8d39\u7528\u5bf9\u8d26\u5355',
+          };
+          final coverSubtitle = switch (template) {
+            ExportTemplateId.parentMonthly =>
+              '\u9996\u9875\u805a\u7126\u5bb6\u957f\u6700\u5173\u5fc3\u7684\u4f59\u989d\u3001\u8fdb\u6b65\u70b9\u4e0e\u8bfe\u540e\u5efa\u8bae\u3002',
+            ExportTemplateId.teacherDetailed =>
+              '\u6c47\u603b\u8bfe\u6b21\u3001\u8bfe\u5802\u8bb0\u5f55\u4e0e\u7ed3\u7b97\u4fe1\u606f\uff0c\u65b9\u4fbf\u6559\u5b66\u7559\u6863\u3002',
+            ExportTemplateId.financeStatement =>
+              '\u9996\u9875\u805a\u7126\u5e94\u6536\u3001\u5df2\u6536\u4e0e\u4f59\u989d\uff0c\u4fbf\u4e8e\u6708\u672b\u6838\u5bf9\u3002',
+          };
+
+          final coverSnapshots = switch (template) {
+            ExportTemplateId.parentMonthly => <pw.Widget>[
+              buildSnapshotCard(
+                label: balanceLabel,
+                value: balanceValue,
+                accent: balanceAccent,
+              ),
+              buildSnapshotCard(
+                label: '\u4e0b\u6b21\u8bfe',
+                value: growthSummary.nextLessonLabel,
+                accent: _sealRed,
+              ),
+              buildSnapshotCard(
+                label: '\u8fdb\u6b65\u70b9',
+                value: growthSummary.progressPoint,
+                accent: _metricGreen,
+              ),
+              buildSnapshotCard(
+                label: '\u5f85\u5de9\u56fa\u70b9',
+                value: growthSummary.attentionPoint,
+                accent: _sealRed,
+              ),
+              buildSnapshotCard(
+                label: '\u8bfe\u540e\u5efa\u8bae',
+                value: growthSummary.practiceSummary,
+                accent: _inkPrimary,
+              ),
+            ],
+            ExportTemplateId.teacherDetailed => <pw.Widget>[
+              buildSnapshotCard(
+                label: '\u8bfe\u6b21',
+                value: '${sortedRecords.length} \u8282',
+                accent: _inkPrimary,
+              ),
+              buildSnapshotCard(
+                label: '\u6700\u8fd1\u8bfe\u5802',
+                value: growthSummary.latestLessonLabel,
+                accent: _sealRed,
+              ),
+              buildSnapshotCard(
+                label: '\u8bfe\u5802\u91cd\u70b9',
+                value: growthSummary.focusTags.isEmpty
+                    ? '\u6682\u65e0'
+                    : growthSummary.focusTags.join('\u3001'),
+                accent: _metricGreen,
+              ),
+            ],
+            ExportTemplateId.financeStatement => <pw.Widget>[
+              buildSnapshotCard(
+                label: '\u5e94\u6536',
+                value: 'CNY ${totalFee.toStringAsFixed(2)}',
+                accent: _inkPrimary,
+              ),
+              buildSnapshotCard(
+                label: '\u5df2\u6536',
+                value: 'CNY ${totalPaid.toStringAsFixed(2)}',
+                accent: _metricGreen,
+              ),
+              buildSnapshotCard(
+                label: balanceLabel,
+                value: balanceValue,
+                accent: balanceAccent,
+              ),
+              buildSnapshotCard(
+                label: '\u6700\u8fd1\u8bfe\u5802',
+                value: growthSummary.latestLessonLabel,
+                accent: _sealRed,
+              ),
+            ],
+          };
 
           return pw.Stack(
             children: [
@@ -796,7 +920,7 @@ class PdfGenerator {
                       pw.Text(student.name, style: calliHero),
                       pw.SizedBox(height: 10),
                       pw.Text(
-                        '\u5b66\u4e60\u62a5\u544a',
+                        coverTitle,
                         style: bodyStrong.copyWith(
                           fontSize: 15.2,
                           letterSpacing: 2,
@@ -807,7 +931,7 @@ class PdfGenerator {
                       pw.Container(width: 96, height: 2.4, color: _sealRed),
                       pw.SizedBox(height: 16),
                       pw.Text(
-                        '\u6c47\u603b\u8bfe\u6b21\u3001\u8bfe\u5802\u8bb0\u5f55\u4e0e\u7ed3\u7b97\u4fe1\u606f\uff0c\u65b9\u4fbf\u5bb6\u6821\u5171\u540c\u67e5\u770b\u3002',
+                        coverSubtitle,
                         style: body.copyWith(
                           fontSize: 11,
                           color: _inkSecondary,
@@ -822,6 +946,21 @@ class PdfGenerator {
                         alignment: pw.WrapAlignment.center,
                         children: chips,
                       ),
+                      pw.SizedBox(height: 18),
+                      pw.Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        alignment: pw.WrapAlignment.center,
+                        children: coverSnapshots,
+                      ),
+                      if (template == ExportTemplateId.parentMonthly) ...[
+                        pw.SizedBox(height: 14),
+                        pw.Text(
+                          '\u6570\u636e\u622a\u6b62\u81f3 ${growthSummary.dataFreshness}',
+                          style: subtle,
+                          textAlign: pw.TextAlign.center,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -879,7 +1018,8 @@ class PdfGenerator {
       ),
     );
 
-    if (feedbackRecords.isNotEmpty) {
+    if (feedbackRecords.isNotEmpty &&
+        template != ExportTemplateId.financeStatement) {
       pdf.addPage(
         pw.MultiPage(
           pageTheme: buildTheme(),
@@ -957,7 +1097,8 @@ class PdfGenerator {
       ),
     );
 
-    if (aiAnalysisText.isNotEmpty) {
+    if (aiAnalysisText.isNotEmpty &&
+        template != ExportTemplateId.financeStatement) {
       pdf.addPage(
         pw.MultiPage(
           pageTheme: buildTheme(),
@@ -1000,7 +1141,8 @@ class PdfGenerator {
       );
     }
 
-    if (messageText.isNotEmpty) {
+    if (messageText.isNotEmpty &&
+        template != ExportTemplateId.financeStatement) {
       pdf.addPage(
         pw.Page(
           pageTheme: buildTheme(),

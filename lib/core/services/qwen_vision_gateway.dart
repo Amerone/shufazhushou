@@ -11,10 +11,8 @@ class QwenVisionGateway implements VisionAnalysisGateway {
   final QwenVisionConfig config;
   final HttpClient _httpClient;
 
-  QwenVisionGateway({
-    required this.config,
-    HttpClient? httpClient,
-  }) : _httpClient = httpClient ?? HttpClient();
+  QwenVisionGateway({required this.config, HttpClient? httpClient})
+    : _httpClient = httpClient ?? HttpClient();
 
   void dispose() {
     _httpClient.close(force: true);
@@ -22,19 +20,17 @@ class QwenVisionGateway implements VisionAnalysisGateway {
 
   @override
   Future<VisionAnalysisResult> analyze(VisionAnalysisRequest request) async {
-    if (!config.isConfigured) {
-      throw const VisionAnalysisException(
-        'Qwen API key is not configured.',
-      );
+    if (!config.hasApiKey) {
+      throw const VisionAnalysisException('Qwen API key is not configured.');
     }
 
-    final endpoint = _resolveEndpoint(config.baseUrl);
+    final endpoint = _resolveEndpoint(
+      config.baseUrl,
+      allowCustomEndpoint: config.allowCustomEndpoint,
+    );
 
     try {
-      final payload = await buildPayload(
-        config: config,
-        request: request,
-      );
+      final payload = await buildPayload(config: config, request: request);
 
       final httpRequest = await _httpClient
           .postUrl(endpoint)
@@ -57,7 +53,8 @@ class QwenVisionGateway implements VisionAnalysisGateway {
       final decoded = _decodeBody(body);
 
       if (httpResponse.statusCode < 200 || httpResponse.statusCode >= 300) {
-        final message = _extractErrorMessage(decoded) ??
+        final message =
+            _extractErrorMessage(decoded) ??
             'Qwen request failed with HTTP ${httpResponse.statusCode}.';
         throw VisionAnalysisException(message);
       }
@@ -95,19 +92,17 @@ class QwenVisionGateway implements VisionAnalysisGateway {
 
   @override
   Future<VisionAnalysisResult> analyzeText(TextAnalysisRequest request) async {
-    if (!config.isConfigured) {
-      throw const VisionAnalysisException(
-        'Qwen API key is not configured.',
-      );
+    if (!config.hasApiKey) {
+      throw const VisionAnalysisException('Qwen API key is not configured.');
     }
 
-    final endpoint = _resolveEndpoint(config.baseUrl);
+    final endpoint = _resolveEndpoint(
+      config.baseUrl,
+      allowCustomEndpoint: config.allowCustomEndpoint,
+    );
 
     try {
-      final payload = await buildTextPayload(
-        config: config,
-        request: request,
-      );
+      final payload = await buildTextPayload(config: config, request: request);
 
       final httpRequest = await _httpClient
           .postUrl(endpoint)
@@ -130,7 +125,8 @@ class QwenVisionGateway implements VisionAnalysisGateway {
       final decoded = _decodeBody(body);
 
       if (httpResponse.statusCode < 200 || httpResponse.statusCode >= 300) {
-        final message = _extractErrorMessage(decoded) ??
+        final message =
+            _extractErrorMessage(decoded) ??
             'Qwen request failed with HTTP ${httpResponse.statusCode}.';
         throw VisionAnalysisException(message);
       }
@@ -174,19 +170,13 @@ class QwenVisionGateway implements VisionAnalysisGateway {
     final messages = <Map<String, dynamic>>[];
 
     if (config.systemPrompt.isNotEmpty) {
-      messages.add({
-        'role': 'system',
-        'content': config.systemPrompt,
-      });
+      messages.add({'role': 'system', 'content': config.systemPrompt});
     }
 
     messages.add({
       'role': 'user',
       'content': [
-        {
-          'type': 'text',
-          'text': request.prompt,
-        },
+        {'type': 'text', 'text': request.prompt},
         {
           'type': 'image_url',
           'image_url': {'url': normalizedImage},
@@ -214,16 +204,10 @@ class QwenVisionGateway implements VisionAnalysisGateway {
     final messages = <Map<String, dynamic>>[];
 
     if (config.systemPrompt.isNotEmpty) {
-      messages.add({
-        'role': 'system',
-        'content': config.systemPrompt,
-      });
+      messages.add({'role': 'system', 'content': config.systemPrompt});
     }
 
-    messages.add({
-      'role': 'user',
-      'content': prompt,
-    });
+    messages.add({'role': 'user', 'content': prompt});
 
     return {
       'model': config.model,
@@ -250,9 +234,7 @@ class QwenVisionGateway implements VisionAnalysisGateway {
         ? File.fromUri(uri)
         : File(trimmed);
     if (!await file.exists()) {
-      throw VisionAnalysisException(
-        'Image file does not exist: ${file.path}',
-      );
+      throw VisionAnalysisException('Image file does not exist: ${file.path}');
     }
 
     final bytes = await file.readAsBytes();
@@ -295,9 +277,7 @@ class QwenVisionGateway implements VisionAnalysisGateway {
         return decoded;
       }
     } on FormatException {
-      throw const VisionAnalysisException(
-        'Qwen returned malformed JSON.',
-      );
+      throw const VisionAnalysisException('Qwen returned malformed JSON.');
     }
     throw const VisionAnalysisException(
       'Qwen returned an unsupported response structure.',
@@ -324,13 +304,17 @@ class QwenVisionGateway implements VisionAnalysisGateway {
     return 'image/jpeg';
   }
 
-  static Uri _resolveEndpoint(String baseUrl) {
-    final endpoint = Uri.tryParse(baseUrl.trim());
-    if (endpoint == null ||
-        !endpoint.isAbsolute ||
-        (endpoint.scheme != 'http' && endpoint.scheme != 'https')) {
-      throw const VisionAnalysisException('Qwen endpoint URL is invalid.');
+  static Uri _resolveEndpoint(
+    String baseUrl, {
+    bool allowCustomEndpoint = false,
+  }) {
+    final error = QwenVisionConfig.validateBaseUrl(
+      baseUrl,
+      allowCustomEndpoint: allowCustomEndpoint,
+    );
+    if (error != null) {
+      throw VisionAnalysisException(error);
     }
-    return endpoint;
+    return Uri.parse(baseUrl.trim());
   }
 }

@@ -1,161 +1,61 @@
-# 技术选型文档
+# 技术选型说明
 
 ## 结论
 
-**Flutter (Dart)** — Android 离线 App
-
----
+`Flutter (Dart)` 适合作为本项目的 Android 离线优先技术底座。
 
 ## 选型理由
 
 | 维度 | 说明 |
-|------|------|
-| AI 开发友好 | Dart 语法清晰，AI 生成代码质量稳定，错误率低 |
-| 离线优先 | SQLite 本地存储，无需网络 |
-| 生态完整 | PDF、Excel、图表、数据库均有成熟 package |
-| 性能 | 原生渲染，冷启动 < 2s 可达 |
-| 单平台 | 仅需 Android，无跨平台负担 |
-
----
+| --- | --- |
+| 离线优先 | 核心数据保存在 SQLite，本地主链路无需网络 |
+| 可选 AI 联网 | AI 功能通过用户配置的 `https://` 端点访问远端，和本地主流程解耦 |
+| 开发效率 | Dart 语法清晰，Flutter 工程化成熟 |
+| 生态完整 | PDF、Excel、图表、数据库、权限处理都有稳定依赖 |
+| Android 聚焦 | 当前只需服务 Android，技术栈足够轻量 |
 
 ## 核心依赖
 
-### 数据库
-| Package | 用途 |
-|---------|------|
-| `sqflite: ^2.3.3` | SQLite 本地数据库 |
-| `path: ^1.9.0` | 数据库文件路径 |
+| 分类 | 依赖 | 作用 |
+| --- | --- | --- |
+| 数据库 | `sqflite` | SQLite 本地存储 |
+| 路径 | `path` | 数据库与文件路径处理 |
+| 状态管理 | `flutter_riverpod` | 全局状态与依赖注入 |
+| 路由 | `go_router` | 页面路由与壳层导航 |
+| 图表 | `fl_chart` | 收入趋势、排行、分布图 |
+| 日历 | `table_calendar` | 出勤日历视图 |
+| PDF | `pdf` / `printing` | PDF 生成与预览 |
+| Excel | `excel` | Excel 导入导出 |
+| 文件 | `path_provider` / `file_picker` / `share_plus` | 本地文件访问、选择、分享 |
+| 权限 | `permission_handler` / `image_picker` | 媒体访问、拍照与选图 |
 
-### 状态管理
-| Package | 用途 |
-|---------|------|
-| `flutter_riverpod: ^2.5.1` | 全局状态管理，Provider 模式 |
+## 架构约束
 
-### 导航
-| Package | 用途 |
-|---------|------|
-| `go_router: ^14.2.0` | 声明式路由 |
-
-### UI 组件
-| Package | 用途 |
-|---------|------|
-| `table_calendar: ^3.1.2` | 首页月历组件 |
-| `fl_chart: ^0.68.0` | 折线图、柱状图、环形图 |
-
-### 字体
-| 资源 | 用途 |
-|------|------|
-| `NotoSansSC-Regular.ttf` | PDF 中文字体（必须嵌入，否则中文显示为方块） |
-
-在 `pubspec.yaml` 中声明：
-```yaml
-flutter:
-  fonts:
-    - family: NotoSansSC
-      fonts:
-        - asset: assets/fonts/NotoSansSC-Regular.ttf
-  assets:
-    - assets/fonts/
-```
-
-### 导出
-| Package | 用途 |
-|---------|------|
-| `pdf: ^3.11.1` | 生成 PDF |
-| `printing: ^5.13.1` | PDF 预览与分享 |
-| `excel: ^4.0.6` | 生成 Excel |
-| `share_plus: ^9.0.0` | 调用系统分享菜单 |
-
-### 文件与权限
-| Package | 用途 |
-|---------|------|
-| `path_provider: ^2.1.3` | 获取本地存储路径 |
-| `permission_handler: ^11.3.1` | 运行时权限申请 |
-| `image_picker: ^1.1.2` | 签名图片上传（相机/相册） |
-| `file_picker: ^8.1.2` | Excel 批量导入学生 |
-
-### 工具
-| Package | 用途 |
-|---------|------|
-| `intl: ^0.19.0` | 日期格式化、中文本地化 |
-| `uuid: ^4.4.2` | 生成唯一 ID |
-| `restart_app: ^1.2.1` | 备份恢复后重启 App |
-
----
-
-## 架构模式
-
-```
-lib/
-├── main.dart
-├── app.dart                  # 路由、主题配置
-├── core/
-│   ├── database/
-│   │   ├── database_helper.dart   # SQLite 初始化、迁移
-│   │   └── dao/                   # 各表的数据访问对象
-│   │       ├── student_dao.dart
-│   │       ├── attendance_dao.dart
-│   │       ├── payment_dao.dart
-│   │       ├── settings_dao.dart
-│   │       └── dismissed_insight_dao.dart
-│   ├── models/               # 数据模型 (fromMap/toMap)
-│   │   ├── student.dart
-│   │   ├── attendance.dart
-│   │   ├── payment.dart
-│   │   ├── class_template.dart
-│   │   └── dismissed_insight.dart
-│   ├── providers/            # Riverpod providers
-│   └── utils/
-│       ├── fee_calculator.dart    # 费用计算逻辑
-│       └── backup_helper.dart     # 数据库备份/恢复
-├── features/
-│   ├── home/                 # 首页（出勤）
-│   ├── students/             # 学生档案
-│   ├── statistics/           # 数据统计
-│   ├── settings/             # 我的设置
-│   └── export/               # 导出配置页
-└── shared/
-    ├── widgets/              # 公共组件（empty_state, attendance_edit_sheet 等）
-    ├── utils/                # toast.dart 等工具
-    └── theme.dart            # 品牌色、字体
-```
-
-**分层规则：**
-- `features/xxx/` 下各含 `screens/`、`widgets/`、`providers/`
-- 业务逻辑在 Provider 中，UI 只调用 Provider
-- 数据库操作只在 DAO 中，Provider 调用 DAO
-
----
+- `features/` 负责按业务拆分页面与组件。
+- `core/dao/` 负责数据库访问。
+- `core/providers/` 负责依赖注入和状态组合。
+- UI 不直接拼装数据库读写或远端请求。
+- AI 能力作为可选扩展存在，不影响离线主链路。
 
 ## Android 配置
 
-**最低版本：** Android 8.0 (API 26)
-**目标版本：** Android 14 (API 34)
+最低版本：Android 8.0（API 26）
 
-`AndroidManifest.xml` 权限声明：
+Manifest 中涉及的权限：
+
 ```xml
-<!-- Android 9 及以下使用，10+ 自动忽略 -->
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission
+    android:name="android.permission.READ_EXTERNAL_STORAGE"
     android:maxSdkVersion="28"/>
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+<uses-permission
+    android:name="android.permission.WRITE_EXTERNAL_STORAGE"
     android:maxSdkVersion="28"/>
 <uses-permission android:name="android.permission.CAMERA"/>
 ```
 
-**Android 10+ 存储说明：**
-- 写入 `Downloads/` 目录使用 `MediaStore.Downloads` API，无需额外权限
-- `path_provider` 的 `getExternalStorageDirectory()` 在 Android 10+ 返回 App 私有目录，不可用于备份
-- 备份/导出文件统一通过 `MediaStore` 写入公共 Downloads，代码示例在 P5-1 任务中提供
+说明：
 
----
-
-## 主题色规范
-
-| 用途 | 颜色 |
-|------|------|
-| 主色（品牌蓝） | `#1565C0` |
-| 辅助绿（全出勤） | `#2E7D32` |
-| 辅助橙（警告） | `#E65100` |
-| 辅助灰（禁用） | `#757575` |
-| 余额负数（预存） | `#2E7D32` |
-| 余额正数（欠费） | `#C62828` |
+- `INTERNET` 仅用于可选 AI 能力和 Flutter 调试通信。
+- Android 10+ 的导出与备份优先走 `MediaStore`。
+- AI 端点仅允许 `https://`，避免和 Android 明文流量策略冲突。

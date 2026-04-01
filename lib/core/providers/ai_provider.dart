@@ -9,8 +9,15 @@ import '../services/vision_analysis_gateway.dart';
 import 'settings_provider.dart';
 
 final qwenVisionConfigProvider = Provider<QwenVisionConfig>((ref) {
-  final settings = ref.watch(settingsProvider).valueOrNull ?? const <String, String>{};
+  final settings =
+      ref.watch(settingsProvider).valueOrNull ?? const <String, String>{};
   return QwenVisionConfig.fromSettings(settings);
+});
+
+final aiIncludeStudentNameProvider = Provider<bool>((ref) {
+  final settings =
+      ref.watch(settingsProvider).valueOrNull ?? const <String, String>{};
+  return settings[QwenVisionConfig.settingIncludeStudentName] == 'true';
 });
 
 final visionAnalysisGatewayProvider = Provider<VisionAnalysisGateway?>((ref) {
@@ -23,20 +30,23 @@ final visionAnalysisGatewayProvider = Provider<VisionAnalysisGateway?>((ref) {
 
 final handwritingAnalysisServiceProvider =
     Provider<HandwritingAnalysisService?>((ref) {
-  final gateway = ref.watch(visionAnalysisGatewayProvider);
-  if (gateway == null) return null;
-  return HandwritingAnalysisService(gateway: gateway);
-});
+      final gateway = ref.watch(visionAnalysisGatewayProvider);
+      if (gateway == null) return null;
+      return HandwritingAnalysisService(
+        gateway: gateway,
+        includeStudentNameByDefault: ref.watch(aiIncludeStudentNameProvider),
+      );
+    });
 
-final progressAnalysisServiceProvider =
-    Provider<ProgressAnalysisService?>((ref) {
+final progressAnalysisServiceProvider = Provider<ProgressAnalysisService?>((
+  ref,
+) {
   final gateway = ref.watch(visionAnalysisGatewayProvider);
   if (gateway == null) return null;
   return ProgressAnalysisService(gateway: gateway);
 });
 
-final dataInsightServiceProvider =
-    Provider<DataInsightService?>((ref) {
+final dataInsightServiceProvider = Provider<DataInsightService?>((ref) {
   final gateway = ref.watch(visionAnalysisGatewayProvider);
   if (gateway == null) return null;
   return DataInsightService(gateway: gateway);

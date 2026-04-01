@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,15 +10,73 @@ import 'package:moyun/core/services/vision_analysis_gateway.dart';
 void main() {
   group('QwenVisionConfig', () {
     test('uses defaults when optional settings are missing', () {
-      final config = QwenVisionConfig.fromSettings(
-        const {QwenVisionConfig.settingApiKey: 'sk-test'},
-      );
+      final config = QwenVisionConfig.fromSettings(const {
+        QwenVisionConfig.settingApiKey: 'sk-test',
+      });
 
       expect(config.apiKey, 'sk-test');
       expect(config.baseUrl, QwenVisionConfig.defaultBaseUrl);
       expect(config.model, QwenVisionConfig.defaultModel);
       expect(config.systemPrompt, isNotEmpty);
     });
+
+    test('treats insecure remote http endpoints as invalid', () {
+      const config = QwenVisionConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'http://example.com/v1/chat/completions',
+        model: 'qwen3-vl-plus',
+        systemPrompt: 'analyze text',
+      );
+
+      expect(config.hasApiKey, isTrue);
+      expect(config.hasValidBaseUrl, isFalse);
+      expect(config.isConfigured, isFalse);
+      expect(
+        QwenVisionConfig.validateBaseUrl(config.baseUrl),
+        QwenVisionConfig.insecureBaseUrlMessage,
+      );
+    });
+
+    test('allows local http endpoints for debug-only testing', () {
+      expect(QwenVisionConfig.validateBaseUrl('http://127.0.0.1:8080'), isNull);
+    });
+
+    test('rejects non-official https endpoints by default', () {
+      const config = QwenVisionConfig(
+        apiKey: 'sk-test',
+        baseUrl: 'https://example.com/v1/chat/completions',
+        model: 'qwen3-vl-plus',
+        systemPrompt: 'analyze text',
+      );
+
+      expect(config.hasValidBaseUrl, isFalse);
+      expect(
+        QwenVisionConfig.validateBaseUrl(config.baseUrl),
+        QwenVisionConfig.restrictedBaseUrlMessage,
+      );
+    });
+
+    test(
+      'allows non-official https endpoints when advanced mode is enabled',
+      () {
+        const config = QwenVisionConfig(
+          apiKey: 'sk-test',
+          baseUrl: 'https://example.com/v1/chat/completions',
+          model: 'qwen3-vl-plus',
+          systemPrompt: 'analyze text',
+          allowCustomEndpoint: true,
+        );
+
+        expect(config.hasValidBaseUrl, isTrue);
+        expect(
+          QwenVisionConfig.validateBaseUrl(
+            config.baseUrl,
+            allowCustomEndpoint: true,
+          ),
+          isNull,
+        );
+      },
+    );
   });
 
   group('QwenVisionGateway', () {
@@ -41,11 +100,16 @@ void main() {
       expect(payload['model'], 'qwen3-vl-plus');
       expect(payload['stream'], isFalse);
       expect(payload['messages'], hasLength(2));
-      final userMessage = (payload['messages'] as List)[1] as Map<String, dynamic>;
+      final userMessage =
+          (payload['messages'] as List)[1] as Map<String, dynamic>;
       final content = userMessage['content'] as List;
-      expect((content[0] as Map<String, dynamic>)['text'], 'summarize this homework image');
       expect(
-        ((content[1] as Map<String, dynamic>)['image_url'] as Map<String, dynamic>)['url'],
+        (content[0] as Map<String, dynamic>)['text'],
+        'summarize this homework image',
+      );
+      expect(
+        ((content[1] as Map<String, dynamic>)['image_url']
+            as Map<String, dynamic>)['url'],
         'https://example.com/work.png',
       );
     });
@@ -57,9 +121,7 @@ void main() {
         model: 'qwen3-vl-plus',
         systemPrompt: 'analyze text',
       );
-      const request = TextAnalysisRequest(
-        prompt: 'summarize recent progress',
-      );
+      const request = TextAnalysisRequest(prompt: 'summarize recent progress');
 
       final payload = await QwenVisionGateway.buildTextPayload(
         config: config,
@@ -69,13 +131,10 @@ void main() {
       expect(payload['model'], 'qwen3-vl-plus');
       expect(payload['stream'], isFalse);
       expect(payload['messages'], hasLength(2));
-      expect(
-        (payload['messages'] as List).last,
-        {
-          'role': 'user',
-          'content': 'summarize recent progress',
-        },
-      );
+      expect((payload['messages'] as List).last, {
+        'role': 'user',
+        'content': 'summarize recent progress',
+      });
     });
 
     test('rejects empty text-only prompts', () async {
@@ -107,9 +166,9 @@ void main() {
         QwenVisionGateway.extractText({
           'choices': [
             {
-              'message': {'content': 'analysis done'}
-            }
-          ]
+              'message': {'content': 'analysis done'},
+            },
+          ],
         }),
         'analysis done',
       );
@@ -122,10 +181,10 @@ void main() {
                 'content': [
                   {'text': 'first line'},
                   {'text': 'second line'},
-                ]
-              }
-            }
-          ]
+                ],
+              },
+            },
+          ],
         }),
         'first line\nsecond line',
       );
@@ -134,7 +193,7 @@ void main() {
     test('analyzeText rejects requests when API key is missing', () async {
       const config = QwenVisionConfig(
         apiKey: '',
-        baseUrl: 'http://127.0.0.1:8080',
+        baseUrl: QwenVisionConfig.defaultBaseUrl,
         model: 'qwen3-vl-plus',
         systemPrompt: 'analyze text',
       );
@@ -152,175 +211,16 @@ void main() {
       );
     });
 
-    test('analyzeText surfaces server error message from response body', () async {
-      await _withTestServer(
-        statusCode: 500,
-        body: {
-          'error': {'message': 'bad key'},
-        },
-        run: (baseUrl) async {
-          final gateway = QwenVisionGateway(
-            config: QwenVisionConfig(
-              apiKey: 'sk-test',
-              baseUrl: baseUrl,
-              model: 'qwen3-vl-plus',
-              systemPrompt: 'analyze text',
-            ),
-          );
-
-          await expectLater(
-            () => gateway.analyzeText(
-              const TextAnalysisRequest(prompt: 'summarize progress'),
-            ),
-            throwsA(
-              isA<VisionAnalysisException>().having(
-                (error) => error.message,
-                'message',
-                'bad key',
-              ),
-            ),
-          );
-        },
-      );
-    });
-
-    test('analyzeText falls back to HTTP status when error message is missing', () async {
-      await _withTestServer(
-        statusCode: 500,
-        body: const {},
-        run: (baseUrl) async {
-          final gateway = QwenVisionGateway(
-            config: QwenVisionConfig(
-              apiKey: 'sk-test',
-              baseUrl: baseUrl,
-              model: 'qwen3-vl-plus',
-              systemPrompt: 'analyze text',
-            ),
-          );
-
-          await expectLater(
-            () => gateway.analyzeText(
-              const TextAnalysisRequest(prompt: 'summarize progress'),
-            ),
-            throwsA(
-              isA<VisionAnalysisException>().having(
-                (error) => error.message,
-                'message',
-                'Qwen request failed with HTTP 500.',
-              ),
-            ),
-          );
-        },
-      );
-    });
-
-    test('analyzeText reports malformed JSON responses', () async {
-      await _withTestServer(
-        statusCode: 200,
-        body: 'oops',
-        run: (baseUrl) async {
-          final gateway = QwenVisionGateway(
-            config: QwenVisionConfig(
-              apiKey: 'sk-test',
-              baseUrl: baseUrl,
-              model: 'qwen3-vl-plus',
-              systemPrompt: 'analyze text',
-            ),
-          );
-
-          await expectLater(
-            () => gateway.analyzeText(
-              const TextAnalysisRequest(prompt: 'summarize progress'),
-            ),
-            throwsA(
-              isA<VisionAnalysisException>().having(
-                (error) => error.message,
-                'message',
-                'Qwen returned malformed JSON.',
-              ),
-            ),
-          );
-        },
-      );
-    });
-
-    test('analyzeText reports unsupported response structures', () async {
-      await _withTestServer(
-        statusCode: 200,
-        body: const [],
-        run: (baseUrl) async {
-          final gateway = QwenVisionGateway(
-            config: QwenVisionConfig(
-              apiKey: 'sk-test',
-              baseUrl: baseUrl,
-              model: 'qwen3-vl-plus',
-              systemPrompt: 'analyze text',
-            ),
-          );
-
-          await expectLater(
-            () => gateway.analyzeText(
-              const TextAnalysisRequest(prompt: 'summarize progress'),
-            ),
-            throwsA(
-              isA<VisionAnalysisException>().having(
-                (error) => error.message,
-                'message',
-                'Qwen returned an unsupported response structure.',
-              ),
-            ),
-          );
-        },
-      );
-    });
-
-    test('analyzeText reports empty text responses', () async {
-      await _withTestServer(
-        statusCode: 200,
-        body: {
-          'choices': [
-            {
-              'message': {'content': ''}
-            },
-          ],
-        },
-        run: (baseUrl) async {
-          final gateway = QwenVisionGateway(
-            config: QwenVisionConfig(
-              apiKey: 'sk-test',
-              baseUrl: baseUrl,
-              model: 'qwen3-vl-plus',
-              systemPrompt: 'analyze text',
-            ),
-          );
-
-          await expectLater(
-            () => gateway.analyzeText(
-              const TextAnalysisRequest(prompt: 'summarize progress'),
-            ),
-            throwsA(
-              isA<VisionAnalysisException>().having(
-                (error) => error.message,
-                'message',
-                'Qwen returned an empty response.',
-              ),
-            ),
-          );
-        },
-      );
-    });
-
-    test('analyzeText maps socket exceptions to a user-friendly message', () async {
-      final reserved = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      final baseUrl = 'http://${reserved.address.address}:${reserved.port}';
-      await reserved.close(force: true);
-
+    test('analyzeText rejects insecure non-local http endpoints', () async {
       final gateway = QwenVisionGateway(
-        config: QwenVisionConfig(
+        config: const QwenVisionConfig(
           apiKey: 'sk-test',
-          baseUrl: baseUrl,
+          baseUrl: 'http://example.com/v1/chat/completions',
           model: 'qwen3-vl-plus',
           systemPrompt: 'analyze text',
+        ),
+        httpClient: _FakeHttpClient(
+          onPostUrl: (_) async => throw StateError('Should not be called'),
         ),
       );
 
@@ -332,35 +232,275 @@ void main() {
           isA<VisionAnalysisException>().having(
             (error) => error.message,
             'message',
-            'Unable to connect to Qwen. Check the network or endpoint settings.',
+            QwenVisionConfig.insecureBaseUrlMessage,
           ),
         ),
       );
     });
+
+    test(
+      'analyzeText surfaces server error message from response body',
+      () async {
+        final gateway = _createGateway(
+          httpClient: _responseClient(
+            statusCode: 500,
+            body: {
+              'error': {'message': 'bad key'},
+            },
+          ),
+        );
+
+        await expectLater(
+          () => gateway.analyzeText(
+            const TextAnalysisRequest(prompt: 'summarize progress'),
+          ),
+          throwsA(
+            isA<VisionAnalysisException>().having(
+              (error) => error.message,
+              'message',
+              'bad key',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'analyzeText falls back to HTTP status when error message is missing',
+      () async {
+        final gateway = _createGateway(
+          httpClient: _responseClient(statusCode: 500, body: const {}),
+        );
+
+        await expectLater(
+          () => gateway.analyzeText(
+            const TextAnalysisRequest(prompt: 'summarize progress'),
+          ),
+          throwsA(
+            isA<VisionAnalysisException>().having(
+              (error) => error.message,
+              'message',
+              'Qwen request failed with HTTP 500.',
+            ),
+          ),
+        );
+      },
+    );
+
+    test('analyzeText reports malformed JSON responses', () async {
+      final gateway = _createGateway(
+        httpClient: _responseClient(statusCode: 200, body: 'oops'),
+      );
+
+      await expectLater(
+        () => gateway.analyzeText(
+          const TextAnalysisRequest(prompt: 'summarize progress'),
+        ),
+        throwsA(
+          isA<VisionAnalysisException>().having(
+            (error) => error.message,
+            'message',
+            'Qwen returned malformed JSON.',
+          ),
+        ),
+      );
+    });
+
+    test('analyzeText reports unsupported response structures', () async {
+      final gateway = _createGateway(
+        httpClient: _responseClient(statusCode: 200, body: const []),
+      );
+
+      await expectLater(
+        () => gateway.analyzeText(
+          const TextAnalysisRequest(prompt: 'summarize progress'),
+        ),
+        throwsA(
+          isA<VisionAnalysisException>().having(
+            (error) => error.message,
+            'message',
+            'Qwen returned an unsupported response structure.',
+          ),
+        ),
+      );
+    });
+
+    test('analyzeText reports empty text responses', () async {
+      final gateway = _createGateway(
+        httpClient: _responseClient(
+          statusCode: 200,
+          body: {
+            'choices': [
+              {
+                'message': {'content': ''},
+              },
+            ],
+          },
+        ),
+      );
+
+      await expectLater(
+        () => gateway.analyzeText(
+          const TextAnalysisRequest(prompt: 'summarize progress'),
+        ),
+        throwsA(
+          isA<VisionAnalysisException>().having(
+            (error) => error.message,
+            'message',
+            'Qwen returned an empty response.',
+          ),
+        ),
+      );
+    });
+
+    test(
+      'analyzeText maps socket exceptions to a user-friendly message',
+      () async {
+        final gateway = _createGateway(
+          httpClient: _FakeHttpClient(
+            onPostUrl: (_) async => throw SocketException('Connection refused'),
+          ),
+        );
+
+        await expectLater(
+          () => gateway.analyzeText(
+            const TextAnalysisRequest(prompt: 'summarize progress'),
+          ),
+          throwsA(
+            isA<VisionAnalysisException>().having(
+              (error) => error.message,
+              'message',
+              'Unable to connect to Qwen. Check the network or endpoint settings.',
+            ),
+          ),
+        );
+      },
+    );
   });
 }
 
-Future<void> _withTestServer({
-  required int statusCode,
-  required Object body,
-  required Future<void> Function(String baseUrl) run,
-}) async {
-  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-  final requestFuture = server.first.then((request) async {
-    request.response.statusCode = statusCode;
-    if (body is String) {
-      request.response.write(body);
-    } else {
-      request.response.headers.contentType = ContentType.json;
-      request.response.write(jsonEncode(body));
-    }
-    await request.response.close();
-  });
+QwenVisionGateway _createGateway({
+  required HttpClient httpClient,
+  String baseUrl = QwenVisionConfig.defaultBaseUrl,
+}) {
+  return QwenVisionGateway(
+    config: QwenVisionConfig(
+      apiKey: 'sk-test',
+      baseUrl: baseUrl,
+      model: 'qwen3-vl-plus',
+      systemPrompt: 'analyze text',
+    ),
+    httpClient: httpClient,
+  );
+}
 
-  try {
-    await run('http://${server.address.address}:${server.port}');
-    await requestFuture;
-  } finally {
-    await server.close(force: true);
+HttpClient _responseClient({required int statusCode, required Object body}) {
+  return _FakeHttpClient(
+    onPostUrl: (url) async {
+      expect(url.scheme, 'https');
+      return _FakeHttpClientRequest(
+        onClose: (bodyBytes, headers) async {
+          expect(
+            headers.values[HttpHeaders.authorizationHeader],
+            'Bearer sk-test',
+          );
+          expect(
+            headers.values[HttpHeaders.contentTypeHeader],
+            'application/json',
+          );
+          final payload =
+              jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+          expect(payload['model'], 'qwen3-vl-plus');
+          expect(payload['messages'], isNotEmpty);
+          return _FakeHttpClientResponse(statusCode: statusCode, body: body);
+        },
+      );
+    },
+  );
+}
+
+class _FakeHttpClient implements HttpClient {
+  _FakeHttpClient({required this.onPostUrl});
+
+  final Future<HttpClientRequest> Function(Uri url) onPostUrl;
+
+  @override
+  Future<HttpClientRequest> postUrl(Uri url) => onPostUrl(url);
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeHttpClientRequest implements HttpClientRequest {
+  _FakeHttpClientRequest({required this.onClose});
+
+  final Future<HttpClientResponse> Function(
+    List<int> bodyBytes,
+    _FakeHttpHeaders headers,
+  )
+  onClose;
+  final _bodyBytes = <int>[];
+  final _FakeHttpHeaders _headers = _FakeHttpHeaders();
+
+  @override
+  HttpHeaders get headers => _headers;
+
+  @override
+  void add(List<int> data) {
+    _bodyBytes.addAll(data);
   }
+
+  @override
+  Future<HttpClientResponse> close() {
+    return onClose(List<int>.unmodifiable(_bodyBytes), _headers);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeHttpHeaders implements HttpHeaders {
+  final values = <String, Object>{};
+
+  @override
+  void set(String name, Object value, {bool preserveHeaderCase = false}) {
+    values[name] = value;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeHttpClientResponse extends Stream<List<int>>
+    implements HttpClientResponse {
+  _FakeHttpClientResponse({required this.statusCode, required Object body})
+    : _stream = Stream<List<int>>.fromIterable([
+        utf8.encode(body is String ? body : jsonEncode(body)),
+      ]);
+
+  final Stream<List<int>> _stream;
+
+  @override
+  final int statusCode;
+
+  @override
+  StreamSubscription<List<int>> listen(
+    void Function(List<int> event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    return _stream.listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'brush_stroke_divider.dart';
 import '../theme.dart';
 
 class PageHeader extends StatelessWidget {
@@ -28,7 +27,7 @@ class PageHeader extends StatelessWidget {
     return Container(
       padding: EdgeInsets.only(
         top: topPadding + 18,
-        bottom: 22,
+        bottom: 18,
         left: 24,
         right: 24,
       ),
@@ -41,9 +40,7 @@ class PageHeader extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: kInkSecondary.withValues(alpha: 0.2),
-                ),
+                border: Border.all(color: kInkSecondary.withValues(alpha: 0.2)),
               ),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new, size: 18),
@@ -68,28 +65,9 @@ class PageHeader extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const BrushStrokeDivider(
-                  width: 116,
-                  height: 12,
-                  color: kPrimaryBlue,
-                ),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.56),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: kInkSecondary.withValues(alpha: 0.14),
-                      ),
-                    ),
-                    child: Text(
-                      subtitle!,
-                      style: subtitleStyle,
-                    ),
-                  ),
+                  const SizedBox(height: 6),
+                  Text(subtitle!, style: subtitleStyle),
                 ],
               ],
             ),

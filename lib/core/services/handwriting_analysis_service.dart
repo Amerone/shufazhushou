@@ -17,6 +17,7 @@ class HandwritingAnalysisInput {
   final CalligraphyScriptType scriptType;
   final String? customPrompt;
   final String? studentName;
+  final bool? includeStudentName;
   final double temperature;
 
   const HandwritingAnalysisInput({
@@ -24,15 +25,18 @@ class HandwritingAnalysisInput {
     this.scriptType = CalligraphyScriptType.kaishu,
     this.customPrompt,
     this.studentName,
+    this.includeStudentName,
     this.temperature = 0.2,
   });
 }
 
 class HandwritingAnalysisService {
   final VisionAnalysisGateway gateway;
+  final bool includeStudentNameByDefault;
 
   const HandwritingAnalysisService({
     required this.gateway,
+    this.includeStudentNameByDefault = false,
   });
 
   Future<HandwritingAnalysisResult> analyze(
@@ -45,7 +49,11 @@ class HandwritingAnalysisService {
 
     final result = await gateway.analyze(
       VisionAnalysisRequest(
-        prompt: buildPrompt(input),
+        prompt: buildPrompt(
+          input,
+          includeStudentName:
+              input.includeStudentName ?? includeStudentNameByDefault,
+        ),
         imageSource: imageSource,
         temperature: input.temperature,
       ),
@@ -57,14 +65,14 @@ class HandwritingAnalysisService {
     );
   }
 
-  static String buildPrompt(HandwritingAnalysisInput input) {
-    final sections = <String>[
-      '请分析这张书法练习图片。',
-      '书体：${input.scriptType.label}。',
-    ];
+  static String buildPrompt(
+    HandwritingAnalysisInput input, {
+    bool includeStudentName = true,
+  }) {
+    final sections = <String>['请分析这张书法练习图片。', '书体：${input.scriptType.label}。'];
 
     final studentName = input.studentName?.trim();
-    if (studentName != null && studentName.isNotEmpty) {
+    if (includeStudentName && studentName != null && studentName.isNotEmpty) {
       sections.add('学生：$studentName。');
     }
 
