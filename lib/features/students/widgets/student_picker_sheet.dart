@@ -46,6 +46,33 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
         (student.parentPhone?.contains(_query) ?? false);
   }
 
+  int _compareStudents(StudentWithMeta a, StudentWithMeta b) {
+    final aActive = a.student.status == 'active';
+    final bActive = b.student.status == 'active';
+    if (aActive != bActive) {
+      return aActive ? -1 : 1;
+    }
+
+    final aLast = a.lastAttendanceDate;
+    final bLast = b.lastAttendanceDate;
+    if (aLast != null && bLast != null && aLast != bLast) {
+      return bLast.compareTo(aLast);
+    }
+    if (aLast != null && bLast == null) return -1;
+    if (aLast == null && bLast != null) return 1;
+    if (a.student.createdAt != b.student.createdAt) {
+      return b.student.createdAt.compareTo(a.student.createdAt);
+    }
+    return a.student.name.compareTo(b.student.name);
+  }
+
+  String _attendanceHint(StudentWithMeta meta) {
+    if (meta.lastAttendanceDate == null || meta.lastAttendanceDate!.isEmpty) {
+      return '未记过课';
+    }
+    return '最近上课 ${meta.lastAttendanceDate}';
+  }
+
   Future<void> _openStudentRoute(String route) async {
     await InteractionFeedback.pageTurn(context);
     if (!mounted) return;
@@ -132,14 +159,16 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                   child: Text('加载学生失败：$error'),
                 ),
                 data: (students) {
-                  final visibleStudents = students
-                      .where(
-                        (item) =>
-                            !widget.activeOnly ||
-                            item.student.status == 'active',
-                      )
-                      .where((item) => _matchesQuery(item.student))
-                      .toList(growable: false);
+                  final visibleStudents =
+                      students
+                          .where(
+                            (item) =>
+                                !widget.activeOnly ||
+                                item.student.status == 'active',
+                          )
+                          .where((item) => _matchesQuery(item.student))
+                          .toList()
+                        ..sort(_compareStudents);
                   final displayNames = buildDisplayNameMap(
                     visibleStudents.map((item) => item.student).toList(),
                   );
@@ -194,133 +223,181 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                     );
                   }
 
-                  return ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 420),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: visibleStudents.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final meta = visibleStudents[index];
-                        final student = meta.student;
-                        final displayName =
-                            displayNames[student.id] ?? student.name;
-                        final detailLine = [
-                          if (student.parentName?.isNotEmpty ?? false)
-                            student.parentName!,
-                          if (student.parentPhone?.isNotEmpty ?? false)
-                            student.parentPhone!,
-                        ].join(' · ');
-                        final statusColor = student.status == 'active'
-                            ? kGreen
-                            : kOrange;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_query.isEmpty) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: kPrimaryBlue.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: kPrimaryBlue.withValues(alpha: 0.1),
+                            ),
+                          ),
+                          child: Text(
+                            '已按最近上课排序，今天刚上课或最近常上的学生会排在前面。',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: kPrimaryBlue,
+                              fontWeight: FontWeight.w600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 420),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: visibleStudents.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final meta = visibleStudents[index];
+                            final student = meta.student;
+                            final displayName =
+                                displayNames[student.id] ?? student.name;
+                            final detailLine = [
+                              if (student.parentName?.isNotEmpty ?? false)
+                                student.parentName!,
+                              if (student.parentPhone?.isNotEmpty ?? false)
+                                student.parentPhone!,
+                            ].join(' · ');
+                            final statusColor = student.status == 'active'
+                                ? kGreen
+                                : kOrange;
 
-                        return Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(18),
-                            onTap: () async {
-                              await InteractionFeedback.selection(context);
-                              if (!context.mounted) return;
-                              Navigator.of(context).pop(
-                                StudentWithMeta(
-                                  student,
-                                  meta.lastAttendanceDate,
-                                ),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.56),
+                            return Material(
+                              color: Colors.transparent,
+                              child: InkWell(
                                 borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: statusColor.withValues(alpha: 0.12),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(14),
+                                onTap: () async {
+                                  await InteractionFeedback.selection(context);
+                                  if (!context.mounted) return;
+                                  Navigator.of(context).pop(
+                                    StudentWithMeta(
+                                      student,
+                                      meta.lastAttendanceDate,
                                     ),
-                                    child: Icon(
-                                      Icons.person_outline,
-                                      color: statusColor,
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.56),
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(
+                                      color: statusColor.withValues(
+                                        alpha: 0.12,
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          displayName,
-                                          style: theme.textTheme.titleSmall
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                        ),
-                                        if (detailLine.isNotEmpty) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            detailLine,
-                                            style: theme.textTheme.bodySmall,
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 42,
+                                        height: 42,
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withValues(
+                                            alpha: 0.1,
                                           ),
-                                        ],
-                                        const SizedBox(height: 8),
-                                        Wrap(
-                                          spacing: 8,
-                                          runSpacing: 8,
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.person_outline,
+                                          color: statusColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            _StudentMetaChip(
-                                              icon: Icons.payments_outlined,
-                                              label:
-                                                  '¥${student.pricePerClass.toStringAsFixed(0)}/节',
-                                              color: kPrimaryBlue,
+                                            Text(
+                                              displayName,
+                                              style: theme.textTheme.titleSmall
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
                                             ),
-                                            _StudentMetaChip(
-                                              icon: Icons.flag_outlined,
-                                              label: student.status == 'active'
-                                                  ? '在读'
-                                                  : '休学',
-                                              color: statusColor,
+                                            if (detailLine.isNotEmpty) ...[
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                detailLine,
+                                                style:
+                                                    theme.textTheme.bodySmall,
+                                              ),
+                                            ],
+                                            const SizedBox(height: 8),
+                                            Wrap(
+                                              spacing: 8,
+                                              runSpacing: 8,
+                                              children: [
+                                                _StudentMetaChip(
+                                                  icon: Icons.history_outlined,
+                                                  label: _attendanceHint(meta),
+                                                  color:
+                                                      meta.lastAttendanceDate ==
+                                                          null
+                                                      ? kInkSecondary
+                                                      : kSealRed,
+                                                ),
+                                                _StudentMetaChip(
+                                                  icon: Icons.payments_outlined,
+                                                  label:
+                                                      '¥${student.pricePerClass.toStringAsFixed(0)}/节',
+                                                  color: kPrimaryBlue,
+                                                ),
+                                                _StudentMetaChip(
+                                                  icon: Icons.flag_outlined,
+                                                  label:
+                                                      student.status == 'active'
+                                                      ? '在读'
+                                                      : '休学',
+                                                  color: statusColor,
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  TextButton.icon(
-                                    onPressed: () async {
-                                      await InteractionFeedback.selection(
-                                        context,
-                                      );
-                                      if (!context.mounted) return;
-                                      Navigator.of(context).pop(
-                                        StudentWithMeta(
-                                          student,
-                                          meta.lastAttendanceDate,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      TextButton.icon(
+                                        onPressed: () async {
+                                          await InteractionFeedback.selection(
+                                            context,
+                                          );
+                                          if (!context.mounted) return;
+                                          Navigator.of(context).pop(
+                                            StudentWithMeta(
+                                              student,
+                                              meta.lastAttendanceDate,
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(
+                                          Icons.arrow_outward_outlined,
                                         ),
-                                      );
-                                    },
-                                    icon: const Icon(
-                                      Icons.arrow_outward_outlined,
-                                    ),
-                                    label: Text(widget.actionLabel),
+                                        label: Text(widget.actionLabel),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),

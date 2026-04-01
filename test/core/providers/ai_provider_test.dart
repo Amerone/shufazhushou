@@ -41,6 +41,7 @@ void main() {
       expect(container.read(handwritingAnalysisServiceProvider), isNull);
       expect(container.read(progressAnalysisServiceProvider), isNull);
       expect(container.read(dataInsightServiceProvider), isNull);
+      expect(container.read(studentInsightAnalysisServiceProvider), isNull);
     });
 
     test('student name outbound switch defaults to false', () async {
@@ -86,6 +87,10 @@ void main() {
         expect(container.read(handwritingAnalysisServiceProvider), isNotNull);
         expect(container.read(progressAnalysisServiceProvider), isNotNull);
         expect(container.read(dataInsightServiceProvider), isNotNull);
+        expect(
+          container.read(studentInsightAnalysisServiceProvider),
+          isNotNull,
+        );
       },
     );
 
@@ -112,6 +117,7 @@ void main() {
         expect(container.read(handwritingAnalysisServiceProvider), isNull);
         expect(container.read(progressAnalysisServiceProvider), isNull);
         expect(container.read(dataInsightServiceProvider), isNull);
+        expect(container.read(studentInsightAnalysisServiceProvider), isNull);
       },
     );
 

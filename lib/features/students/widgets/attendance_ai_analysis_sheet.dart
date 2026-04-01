@@ -19,8 +19,7 @@ class AttendanceAiAnalysisSheet extends StatefulWidget {
       _AttendanceAiAnalysisSheetState();
 }
 
-class _AttendanceAiAnalysisSheetState
-    extends State<AttendanceAiAnalysisSheet> {
+class _AttendanceAiAnalysisSheetState extends State<AttendanceAiAnalysisSheet> {
   bool _applying = false;
 
   Future<void> _handleApply() async {
@@ -40,8 +39,7 @@ class _AttendanceAiAnalysisSheetState
     final theme = Theme.of(context);
     final result = widget.result;
     final suggestions = result.practiceSuggestions;
-    final canApply =
-        suggestions.isNotEmpty || result.summary.trim().isNotEmpty;
+    final canApply = suggestions.isNotEmpty || result.summary.trim().isNotEmpty;
 
     return SafeArea(
       top: false,
@@ -50,7 +48,8 @@ class _AttendanceAiAnalysisSheetState
           left: 16,
           right: 16,
           top: 8,
-          bottom: MediaQuery.of(context).viewInsets.bottom +
+          bottom:
+              MediaQuery.of(context).viewInsets.bottom +
               MediaQuery.of(context).padding.bottom +
               16,
         ),
@@ -82,8 +81,10 @@ class _AttendanceAiAnalysisSheetState
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: kPrimaryBlue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(999),
@@ -118,7 +119,16 @@ class _AttendanceAiAnalysisSheetState
                   label: '\u7ae0\u6cd5\u89c2\u5bdf',
                   content: result.layoutObservation,
                 ),
-              if (suggestions.isNotEmpty) _SuggestionSection(items: suggestions),
+              if (suggestions.isNotEmpty)
+                _SuggestionSection(items: suggestions),
+              const SizedBox(height: 4),
+              Text(
+                '保存后会同步更新课后练习建议，并把这次作品分析纳入学生 AI 洞察。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: kPrimaryBlue,
+                  height: 1.45,
+                ),
+              ),
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
@@ -135,9 +145,7 @@ class _AttendanceAiAnalysisSheetState
                         )
                       : const Icon(Icons.edit_note_outlined, size: 18),
                   label: Text(
-                    _applying
-                        ? '\u5199\u5165\u4e2d...'
-                        : '\u66f4\u65b0\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae',
+                    _applying ? '\u5199\u5165\u4e2d...' : '写入建议并保存分析',
                   ),
                 ),
               ),
@@ -153,10 +161,7 @@ class _AnalysisSection extends StatelessWidget {
   final String label;
   final String content;
 
-  const _AnalysisSection({
-    required this.label,
-    required this.content,
-  });
+  const _AnalysisSection({required this.label, required this.content});
 
   @override
   Widget build(BuildContext context) {

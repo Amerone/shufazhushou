@@ -13,8 +13,11 @@ import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
+import '../../../core/services/ai_analysis_note_codec.dart';
+import '../../../core/services/student_artwork_timeline_service.dart';
 import '../../../core/services/student_growth_summary_service.dart';
 import '../../../core/services/handwriting_analysis_service.dart';
+import '../../../core/services/student_parent_message_service.dart';
 import '../../../core/utils/fee_calculator.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
@@ -27,9 +30,12 @@ import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../export/screens/export_config_screen.dart';
 import '../widgets/attendance_ai_analysis_sheet.dart';
+import '../widgets/student_ai_insight_card.dart';
+import '../widgets/student_artwork_timeline_card.dart';
 import '../widgets/payment_bottom_sheet.dart';
 import '../widgets/student_ai_progress_card.dart';
 import '../widgets/student_growth_workbench_card.dart';
+import '../widgets/student_parent_message_card.dart';
 
 enum _StudentDetailAnchor { finance, growth, actions, payments, attendance }
 
@@ -226,6 +232,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
             final applied = await _applyPracticeSuggestion(
               record,
               nextPracticeNote,
+              analysisResult: result,
             );
             if (applied && sheetContext.mounted) {
               Navigator.of(sheetContext).pop();
@@ -248,8 +255,9 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
 
   Future<bool> _applyPracticeSuggestion(
     Attendance record,
-    String suggestion,
-  ) async {
+    String suggestion, {
+    HandwritingAnalysisResult? analysisResult,
+  }) async {
     final normalizedSuggestion = suggestion.trim();
     if (normalizedSuggestion.isEmpty) {
       AppToast.showError(
@@ -284,23 +292,135 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       );
 
       await attendanceDao.update(updated);
+      if (analysisResult != null) {
+        await _saveHandwritingAnalysisToStudentNote(
+          latestRecord,
+          analysisResult,
+        );
+      }
       invalidateAfterAttendanceChange(ref);
       await _reloadAttendanceRecords();
       if (!mounted) return true;
       AppToast.showSuccess(
         context,
-        '\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae\u5df2\u66f4\u65b0\u3002',
+        analysisResult == null
+            ? '\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae\u5df2\u66f4\u65b0\u3002'
+            : '\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae\u5df2\u66f4\u65b0\uff0c\u5e76\u5df2\u7eb3\u5165\u5b66\u751f AI \u6d1e\u5bdf\u3002',
       );
       return true;
     } catch (_) {
       if (mounted) {
         AppToast.showError(
           context,
-          '\u66f4\u65b0\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002',
+          analysisResult == null
+              ? '\u66f4\u65b0\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002'
+              : '\u4fdd\u5b58\u8bfe\u540e\u5efa\u8bae\u6216\u4f5c\u54c1\u5206\u6790\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002',
         );
       }
       return false;
     }
+  }
+
+  Future<void> _saveHandwritingAnalysisToStudentNote(
+    Attendance record,
+    HandwritingAnalysisResult result,
+  ) async {
+    final studentDao = ref.read(studentDaoProvider);
+    final currentStudent = await studentDao.getById(widget.studentId);
+    if (currentStudent == null) {
+      throw StateError('Student not found for handwriting analysis save');
+    }
+
+    final noteContent = _buildHandwritingAnalysisNoteContent(record, result);
+    final latestContent = AiAnalysisNoteCodec.latestContent(
+      currentStudent.note,
+      type: 'handwriting',
+    );
+    if (latestContent?.trim() == noteContent) {
+      return;
+    }
+
+    final mergedNote = AiAnalysisNoteCodec.appendHandwritingAnalysis(
+      existingNote: currentStudent.note,
+      analysisText: noteContent,
+      analyzedAt: DateTime.now(),
+    );
+
+    await studentDao.update(
+      currentStudent.copyWith(
+        note: mergedNote,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+    await ref.read(studentProvider.notifier).reload();
+  }
+
+  /*
+  String _buildHandwritingAnalysisNoteContent(
+    Attendance record,
+    HandwritingAnalysisResult result,
+  ) {
+    final lines = <String>[
+      '课堂日期：${record.date} ${record.startTime}-${record.endTime}',
+    ];
+
+    if (result.summary.trim().isNotEmpty) {
+      lines.add('总体概览：${result.summary.trim()}');
+    }
+    if (result.strokeObservation.trim().isNotEmpty) {
+      lines.add('笔画观察：${result.strokeObservation.trim()}');
+    }
+    if (result.structureObservation.trim().isNotEmpty) {
+      lines.add('结构观察：${result.structureObservation.trim()}');
+    }
+    if (result.layoutObservation.trim().isNotEmpty) {
+      lines.add('章法观察：${result.layoutObservation.trim()}');
+    }
+    if (result.practiceSuggestions.isNotEmpty) {
+      lines.add('练习建议：');
+      for (var i = 0; i < result.practiceSuggestions.length; i++) {
+        lines.add('${i + 1}. ${result.practiceSuggestions[i]}');
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+*/
+  String _buildHandwritingAnalysisNoteContent(
+    Attendance record,
+    HandwritingAnalysisResult result,
+  ) {
+    final lines = <String>[
+      '\u8bfe\u5802\u65e5\u671f\uff1a${record.date} ${record.startTime}-${record.endTime}',
+    ];
+
+    if (result.summary.trim().isNotEmpty) {
+      lines.add('\u603b\u4f53\u6982\u89c8\uff1a${result.summary.trim()}');
+    }
+    if (result.strokeObservation.trim().isNotEmpty) {
+      lines.add(
+        '\u7b14\u753b\u89c2\u5bdf\uff1a${result.strokeObservation.trim()}',
+      );
+    }
+    if (result.structureObservation.trim().isNotEmpty) {
+      lines.add(
+        '\u7ed3\u6784\u89c2\u5bdf\uff1a${result.structureObservation.trim()}',
+      );
+    }
+    if (result.layoutObservation.trim().isNotEmpty) {
+      lines.add(
+        '\u7ae0\u6cd5\u89c2\u5bdf\uff1a${result.layoutObservation.trim()}',
+      );
+    }
+    if (result.practiceSuggestions.isNotEmpty) {
+      lines.add('\u7ec3\u4e60\u5efa\u8bae\uff1a');
+      for (var i = 0; i < result.practiceSuggestions.length; i++) {
+        lines.add('${i + 1}. ${result.practiceSuggestions[i]}');
+      }
+    }
+
+    return lines.join('\n');
   }
 
   String _buildPracticeSuggestionText(HandwritingAnalysisResult result) {
@@ -359,6 +479,10 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       records: _records,
       now: now,
     );
+    final artworkTimeline = const StudentArtworkTimelineService().build(
+      studentNote: student.note,
+      records: _records,
+    );
 
     final feeAsync = ref.watch(
       feeSummaryProvider(
@@ -367,6 +491,13 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     );
     final allTimeFeeAsync = ref.watch(
       feeSummaryProvider(FeeSummaryParams(widget.studentId)),
+    );
+    final parentDraft = const StudentParentMessageService().build(
+      student: student,
+      growthSummary: growthSummary,
+      artworkTimeline: artworkTimeline,
+      balance: allTimeFeeAsync.valueOrNull?.balance ?? 0,
+      pricePerClass: student.pricePerClass,
     );
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -915,6 +1046,17 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    StudentAiInsightCard(student: student),
+                    const SizedBox(height: 16),
+                    StudentParentMessageCard(
+                      draft: parentDraft,
+                      onOpenPayment: () {
+                        _openPaymentSheet();
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    StudentArtworkTimelineCard(entries: artworkTimeline),
                     const SizedBox(height: 16),
                     StudentAiProgressCard(student: student),
                     const SizedBox(height: 22),

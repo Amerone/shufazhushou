@@ -21,19 +21,65 @@ import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/time_wheel_picker.dart';
 
+const quickEntryDefaultStartTimeSettingKey = 'quick_entry_default_start_time';
+const quickEntryDefaultEndTimeSettingKey = 'quick_entry_default_end_time';
+const quickEntryDefaultStatusSettingKey = 'quick_entry_default_status';
+const quickEntryRecentStudentIdsSettingKey = 'quick_entry_recent_student_ids';
+
+const quickEntryStatuses = <(String, String)>[
+  ('present', '出勤'),
+  ('late', '迟到'),
+  ('leave', '请假'),
+  ('absent', '缺勤'),
+  ('trial', '试听'),
+];
+
+bool isQuickEntryValidTimeValue(String? value) {
+  if (value == null) return false;
+  final segments = value.split(':');
+  if (segments.length != 2) return false;
+  final hour = int.tryParse(segments[0]);
+  final minute = int.tryParse(segments[1]);
+  if (hour == null || minute == null) return false;
+  return hour >= 0 && hour < 24 && minute >= 0 && minute < 60;
+}
+
+Set<String> parseQuickEntryRecentStudentIds(Map<String, String> settings) {
+  final raw = settings[quickEntryRecentStudentIdsSettingKey]?.trim();
+  if (raw == null || raw.isEmpty) return const <String>{};
+  return raw
+      .split(',')
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty)
+      .toSet();
+}
+
+String quickEntryStatusLabel(String? status) {
+  for (final item in quickEntryStatuses) {
+    if (item.$1 == status) return item.$2;
+  }
+  return status ?? '';
+}
+
 class QuickEntrySheet extends ConsumerStatefulWidget {
-  const QuickEntrySheet({super.key});
+  final Set<String> initialSelectedIds;
+  final String? initialStartTime;
+  final String? initialEndTime;
+  final String? initialStatus;
+
+  const QuickEntrySheet({
+    super.key,
+    this.initialSelectedIds = const <String>{},
+    this.initialStartTime,
+    this.initialEndTime,
+    this.initialStatus,
+  });
 
   @override
   ConsumerState<QuickEntrySheet> createState() => _QuickEntrySheetState();
 }
 
 class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
-  static const _defaultStartTimeKey = 'quick_entry_default_start_time';
-  static const _defaultEndTimeKey = 'quick_entry_default_end_time';
-  static const _defaultStatusKey = 'quick_entry_default_status';
-  static const _recentStudentIdsKey = 'quick_entry_recent_student_ids';
-
   int _step = 0;
   final Set<String> _selectedIds = {};
   String _searchQuery = '';
@@ -53,19 +99,26 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   late final ProviderSubscription<AsyncValue<Map<String, String>>>
   _settingsSubscription;
 
-  static const _statuses = [
-    ('present', '出勤'),
-    ('late', '迟到'),
-    ('leave', '请假'),
-    ('absent', '缺勤'),
-    ('trial', '试听'),
-  ];
-
   @override
   void initState() {
     super.initState();
     _date = ref.read(selectedDateProvider);
     _homePracticeCtrl = TextEditingController();
+    _selectedIds.addAll(widget.initialSelectedIds);
+    var hasExplicitPreset = false;
+    if (isQuickEntryValidTimeValue(widget.initialStartTime)) {
+      _startTime = widget.initialStartTime!;
+      hasExplicitPreset = true;
+    }
+    if (isQuickEntryValidTimeValue(widget.initialEndTime)) {
+      _endTime = widget.initialEndTime!;
+      hasExplicitPreset = true;
+    }
+    if (quickEntryStatuses.any((item) => item.$1 == widget.initialStatus)) {
+      _status = widget.initialStatus!;
+      hasExplicitPreset = true;
+    }
+    _customizedDefaults = hasExplicitPreset;
     _settingsSubscription = ref.listenManual(settingsProvider, (
       previous,
       next,
@@ -92,31 +145,22 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
 
   String _dateStr() => formatDate(_date);
 
-  bool _isValidTimeValue(String? value) {
-    if (value == null) return false;
-    final segments = value.split(':');
-    if (segments.length != 2) return false;
-    final hour = int.tryParse(segments[0]);
-    final minute = int.tryParse(segments[1]);
-    if (hour == null || minute == null) return false;
-    return hour >= 0 && hour < 24 && minute >= 0 && minute < 60;
-  }
-
   bool _restoreRememberedDefaults(Map<String, String> settings) {
-    final savedStartTime = settings[_defaultStartTimeKey]?.trim();
-    final savedEndTime = settings[_defaultEndTimeKey]?.trim();
-    final savedStatus = settings[_defaultStatusKey]?.trim();
+    final savedStartTime = settings[quickEntryDefaultStartTimeSettingKey]
+        ?.trim();
+    final savedEndTime = settings[quickEntryDefaultEndTimeSettingKey]?.trim();
+    final savedStatus = settings[quickEntryDefaultStatusSettingKey]?.trim();
     var restored = false;
 
-    if (_isValidTimeValue(savedStartTime)) {
+    if (isQuickEntryValidTimeValue(savedStartTime)) {
       _startTime = savedStartTime!;
       restored = true;
     }
-    if (_isValidTimeValue(savedEndTime)) {
+    if (isQuickEntryValidTimeValue(savedEndTime)) {
       _endTime = savedEndTime!;
       restored = true;
     }
-    if (_statuses.any((item) => item.$1 == savedStatus)) {
+    if (quickEntryStatuses.any((item) => item.$1 == savedStatus)) {
       _status = savedStatus!;
       restored = true;
     }
@@ -139,23 +183,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   }
 
   Set<String> _recentStudentIds(Map<String, String> settings) {
-    final raw = settings[_recentStudentIdsKey]?.trim();
-    if (raw == null || raw.isEmpty) return const <String>{};
-    return raw
-        .split(',')
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toSet();
+    return parseQuickEntryRecentStudentIds(settings);
   }
 
   Future<void> _persistQuickEntryPreferences(
     List<StudentWithMeta> selectedStudents,
   ) async {
     await ref.read(settingsProvider.notifier).setAll({
-      _defaultStartTimeKey: _startTime,
-      _defaultEndTimeKey: _endTime,
-      _defaultStatusKey: _status,
-      _recentStudentIdsKey: selectedStudents
+      quickEntryDefaultStartTimeSettingKey: _startTime,
+      quickEntryDefaultEndTimeSettingKey: _endTime,
+      quickEntryDefaultStatusSettingKey: _status,
+      quickEntryRecentStudentIdsSettingKey: selectedStudents
           .map((item) => item.student.id)
           .join(','),
     });
@@ -270,7 +308,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
 
   Future<void> _quickSaveWithDefaults() async {
     if (_saving || _selectedIds.isEmpty) return;
-    final statusLabel = _statuses.firstWhere((item) => item.$1 == _status).$2;
+    final statusLabel = quickEntryStatusLabel(_status);
     final confirmed = await AppToast.showConfirm(
       context,
       '将按默认设置直接保存：$_startTime-$_endTime，状态“$statusLabel”。是否继续？',
@@ -487,7 +525,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
               ),
               child: Text(
-                '当前默认：$_startTime-$_endTime / ${_statuses.firstWhere((item) => item.$1 == _status).$2}，可直接用“按当前默认直接保存”。',
+                '当前默认：$_startTime-$_endTime / ${quickEntryStatusLabel(_status)}，可直接用“按当前默认直接保存”。',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: kPrimaryBlue,
                   height: 1.45,
@@ -756,7 +794,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '已沿用上次常用设置：$_startTime-$_endTime，状态“${_statuses.firstWhere((item) => item.$1 == _status).$2}”。',
+                    '已沿用上次常用设置：$_startTime-$_endTime，状态“${quickEntryStatusLabel(_status)}”。',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: kPrimaryBlue,
                       height: 1.45,
@@ -900,7 +938,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: _statuses
+          children: quickEntryStatuses
               .map(
                 (s) => ChoiceChip(
                   label: Text(s.$2),
@@ -1068,9 +1106,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                         ),
                         _QuickInfoPill(
                           icon: Icons.flag_outlined,
-                          label: _statuses
-                              .firstWhere((s) => s.$1 == _status)
-                              .$2,
+                          label: quickEntryStatusLabel(_status),
                           color: statusColor(_status),
                         ),
                         _QuickInfoPill(

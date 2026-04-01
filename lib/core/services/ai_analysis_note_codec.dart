@@ -6,8 +6,9 @@ class AiAnalysisNoteCodec {
   static const _startTag = '[AI_ANALYSIS_START';
   static const _endTag = '[AI_ANALYSIS_END]';
   static final _displayTitlePattern = RegExp('^\u3010AI .+\u3011\$');
-  static final _legacyDisplayTitlePattern =
-      RegExp('^\uFFFD\uFFFDAI .+\uFFFD\uFFFD\$');
+  static final _legacyDisplayTitlePattern = RegExp(
+    '^\uFFFD\uFFFDAI .+\uFFFD\uFFFD\$',
+  );
   static final _legacyProgressTitlePatterns = <RegExp>[
     RegExp('^AI \\u5b66\\u4e60\\u5206\\u6790\$'),
     RegExp('^AI Progress Analysis\$'),
@@ -66,10 +67,35 @@ class AiAnalysisNoteCodec {
     );
   }
 
-  static String encodeEntry(
-    AiAnalysisNoteEntry entry, {
-    String? title,
+  static String appendHandwritingAnalysis({
+    String? existingNote,
+    required String analysisText,
+    DateTime? analyzedAt,
   }) {
+    return appendEntry(
+      existingNote,
+      type: 'handwriting',
+      analysisText: analysisText,
+      createdAt: analyzedAt,
+      title: 'AI 课堂作品分析',
+    );
+  }
+
+  static String appendStudentInsight({
+    String? existingNote,
+    required String analysisText,
+    DateTime? analyzedAt,
+  }) {
+    return appendEntry(
+      existingNote,
+      type: 'student_insight',
+      analysisText: analysisText,
+      createdAt: analyzedAt,
+      title: 'AI 学生洞察',
+    );
+  }
+
+  static String encodeEntry(AiAnalysisNoteEntry entry, {String? title}) {
     final timestamp = entry.createdAt.toIso8601String();
     final displayTime = _formatDisplayTime(entry.createdAt);
     final displayTitle = title ?? _titleForType(entry.type);
@@ -98,11 +124,7 @@ class AiAnalysisNoteCodec {
       }
 
       entries.add(
-        AiAnalysisNoteEntry(
-          type: type,
-          createdAt: createdAt,
-          content: content,
-        ),
+        AiAnalysisNoteEntry(type: type, createdAt: createdAt, content: content),
       );
     }
 
@@ -110,10 +132,7 @@ class AiAnalysisNoteCodec {
     return entries;
   }
 
-  static AiAnalysisNoteEntry? latestEntry(
-    String? note, {
-    String? type,
-  }) {
+  static AiAnalysisNoteEntry? latestEntry(String? note, {String? type}) {
     final entries = decodeEntries(note);
     if (entries.isEmpty) return null;
     if (type == null || type.trim().isEmpty) {
@@ -129,10 +148,7 @@ class AiAnalysisNoteCodec {
     return null;
   }
 
-  static String? latestContent(
-    String? note, {
-    String? type,
-  }) {
+  static String? latestContent(String? note, {String? type}) {
     final entry = latestEntry(note, type: type);
     if (entry == null) return null;
     final content = entry.content.trim();
@@ -249,6 +265,10 @@ class AiAnalysisNoteCodec {
         return 'AI \u5b66\u4e60\u5206\u6790';
       case 'business':
         return 'AI \u7ecf\u8425\u6d1e\u5bdf';
+      case 'handwriting':
+        return 'AI 课堂作品分析';
+      case 'student_insight':
+        return 'AI 学生洞察';
       default:
         return 'AI \u5206\u6790';
     }

@@ -5,6 +5,7 @@ import '../models/qwen_vision_config.dart';
 import '../services/handwriting_analysis_service.dart';
 import '../services/progress_analysis_service.dart';
 import '../services/qwen_vision_gateway.dart';
+import '../services/student_insight_analysis_service.dart';
 import '../services/vision_analysis_gateway.dart';
 import 'settings_provider.dart';
 
@@ -51,3 +52,10 @@ final dataInsightServiceProvider = Provider<DataInsightService?>((ref) {
   if (gateway == null) return null;
   return DataInsightService(gateway: gateway);
 });
+
+final studentInsightAnalysisServiceProvider =
+    Provider<StudentInsightAnalysisService?>((ref) {
+      final gateway = ref.watch(visionAnalysisGatewayProvider);
+      if (gateway == null) return null;
+      return StudentInsightAnalysisService(gateway: gateway);
+    });

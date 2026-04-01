@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/database/dao/student_dao.dart';
 import '../../../core/providers/attendance_provider.dart';
+import '../../../core/providers/class_template_provider.dart';
 import '../../../core/providers/home_workbench_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/student_provider.dart';
@@ -49,13 +50,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> _openQuickEntrySheet() async {
+  Future<void> _openQuickEntrySheet({
+    Set<String> initialSelectedIds = const <String>{},
+    String? initialStartTime,
+    String? initialEndTime,
+    String? initialStatus,
+  }) async {
     await InteractionFeedback.selection(context);
     if (!mounted) return;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const QuickEntrySheet(),
+      builder: (_) => QuickEntrySheet(
+        initialSelectedIds: initialSelectedIds,
+        initialStartTime: initialStartTime,
+        initialEndTime: initialEndTime,
+        initialStatus: initialStatus,
+      ),
     );
   }
 
@@ -112,6 +123,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final asyncRecords = ref.watch(attendanceProvider);
     final workbenchTasks = ref.watch(homeWorkbenchProvider);
     final asyncStudents = ref.watch(studentProvider);
+    final templates = ref.watch(classTemplateProvider).valueOrNull ?? const [];
     final settings = ref.watch(settingsProvider).valueOrNull ?? const {};
     final today = DateTime.now();
 
@@ -131,6 +143,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final studentCount = asyncStudents.valueOrNull?.length ?? 0;
     final hasStudents = studentCount > 0;
     final teacherReady = _isTeacherProfileReady(settings);
+    final studentIds = {
+      for (final item in asyncStudents.valueOrNull ?? const <StudentWithMeta>[])
+        item.student.id,
+    };
+    final recentSelectedIds = parseQuickEntryRecentStudentIds(
+      settings,
+    ).intersection(studentIds);
+    final recentStartTime = settings[quickEntryDefaultStartTimeSettingKey]
+        ?.trim();
+    final recentEndTime = settings[quickEntryDefaultEndTimeSettingKey]?.trim();
+    final recentStatus = settings[quickEntryDefaultStatusSettingKey]?.trim();
+    final recentTimeLabel =
+        isQuickEntryValidTimeValue(recentStartTime) &&
+            isQuickEntryValidTimeValue(recentEndTime)
+        ? '$recentStartTime-$recentEndTime'
+        : null;
 
     final monthLabel = DateFormat('yyyy年M月', 'zh_CN').format(selectedMonth);
     final dateLabel = DateFormat('M月d日 EEEE', 'zh_CN').format(selectedDate);
@@ -198,7 +226,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             studentCount: studentCount,
                             isToday: isToday,
                             hasStudents: hasStudents,
-                            onQuickEntry: _openQuickEntrySheet,
+                            onQuickEntry: () => _openQuickEntrySheet(),
                             onOpenStudents: () async {
                               await InteractionFeedback.pageTurn(context);
                               if (!context.mounted) return;
@@ -211,6 +239,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                       ),
+                      if (hasStudents &&
+                          (recentSelectedIds.isNotEmpty ||
+                              templates.isNotEmpty))
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                          sliver: SliverToBoxAdapter(
+                            child: _QuickLaunchPanel(
+                              recentGroupCount: recentSelectedIds.length,
+                              recentTimeLabel: recentTimeLabel,
+                              onOpenRecentGroup: recentSelectedIds.isEmpty
+                                  ? null
+                                  : () => _openQuickEntrySheet(
+                                      initialSelectedIds: recentSelectedIds,
+                                      initialStartTime:
+                                          isQuickEntryValidTimeValue(
+                                            recentStartTime,
+                                          )
+                                          ? recentStartTime
+                                          : null,
+                                      initialEndTime:
+                                          isQuickEntryValidTimeValue(
+                                            recentEndTime,
+                                          )
+                                          ? recentEndTime
+                                          : null,
+                                      initialStatus:
+                                          quickEntryStatuses.any(
+                                            (item) => item.$1 == recentStatus,
+                                          )
+                                          ? recentStatus
+                                          : null,
+                                    ),
+                              templateShortcuts: [
+                                for (final template in templates.take(3))
+                                  _QuickLaunchTemplateShortcut(
+                                    title: template.name,
+                                    timeLabel:
+                                        '${template.startTime}-${template.endTime}',
+                                    onTap: () => _openQuickEntrySheet(
+                                      initialStartTime: template.startTime,
+                                      initialEndTime: template.endTime,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
                       if (!hasStudents)
                         SliverPadding(
                           padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -590,6 +665,209 @@ class _HomeFocusCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickLaunchTemplateShortcut {
+  final String title;
+  final String timeLabel;
+  final VoidCallback onTap;
+
+  const _QuickLaunchTemplateShortcut({
+    required this.title,
+    required this.timeLabel,
+    required this.onTap,
+  });
+}
+
+class _QuickLaunchPanel extends StatelessWidget {
+  final int recentGroupCount;
+  final String? recentTimeLabel;
+  final VoidCallback? onOpenRecentGroup;
+  final List<_QuickLaunchTemplateShortcut> templateShortcuts;
+
+  const _QuickLaunchPanel({
+    required this.recentGroupCount,
+    required this.recentTimeLabel,
+    required this.onOpenRecentGroup,
+    required this.templateShortcuts,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '常用记课捷径',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: kSealRed.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '少走一步',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: kSealRed,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '直接按最近班级或常用时段开始记课，打开后仍可继续改人、改时间。',
+            style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+          ),
+          if (onOpenRecentGroup != null) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: kPrimaryBlue.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: kPrimaryBlue.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.history_outlined,
+                      color: kPrimaryBlue,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '按最近班级记课',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          recentTimeLabel == null
+                              ? '已预选最近同班的 $recentGroupCount 位学员。'
+                              : '已预选最近同班的 $recentGroupCount 位学员，沿用 $recentTimeLabel。',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton.tonal(
+                    onPressed: onOpenRecentGroup,
+                    child: const Text('去记课'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (templateShortcuts.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              '按常用时段打开',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 520;
+                final itemWidth = compact
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth - 12) / 2;
+
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    for (final shortcut in templateShortcuts)
+                      SizedBox(
+                        width: itemWidth,
+                        child: OutlinedButton(
+                          onPressed: shortcut.onTap,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.all(14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.schedule_outlined,
+                                    size: 18,
+                                    color: kPrimaryBlue,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      shortcut.title,
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  shortcut.timeLabel,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: kPrimaryBlue,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ],
         ],
