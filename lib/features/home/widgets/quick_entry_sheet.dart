@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/database/dao/student_dao.dart';
 import '../../../core/models/attendance.dart';
 import '../../../core/models/structured_attendance_feedback.dart';
 import '../../../core/models/student.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/class_template_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../core/utils/fee_calculator.dart';
 import '../../../shared/constants.dart';
@@ -26,6 +29,11 @@ class QuickEntrySheet extends ConsumerStatefulWidget {
 }
 
 class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
+  static const _defaultStartTimeKey = 'quick_entry_default_start_time';
+  static const _defaultEndTimeKey = 'quick_entry_default_end_time';
+  static const _defaultStatusKey = 'quick_entry_default_status';
+  static const _recentStudentIdsKey = 'quick_entry_recent_student_ids';
+
   int _step = 0;
   final Set<String> _selectedIds = {};
   String _searchQuery = '';
@@ -40,6 +48,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   double? _rhythmConsistency;
   bool _saving = false;
   bool _showSuspended = false;
+  bool _loadedRememberedDefaults = false;
+  bool _customizedDefaults = false;
+  late final ProviderSubscription<AsyncValue<Map<String, String>>>
+  _settingsSubscription;
 
   static const _statuses = [
     ('present', '出勤'),
@@ -54,15 +66,100 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     super.initState();
     _date = ref.read(selectedDateProvider);
     _homePracticeCtrl = TextEditingController();
+    _settingsSubscription = ref.listenManual(settingsProvider, (
+      previous,
+      next,
+    ) {
+      _maybeRestoreRememberedDefaults(next.valueOrNull);
+    });
+    _maybeRestoreRememberedDefaults(ref.read(settingsProvider).valueOrNull);
   }
 
   @override
   void dispose() {
+    _settingsSubscription.close();
     _homePracticeCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _openStudentRoute(String route) async {
+    await InteractionFeedback.pageTurn(context);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    if (!mounted) return;
+    context.push(route);
+  }
+
   String _dateStr() => formatDate(_date);
+
+  bool _isValidTimeValue(String? value) {
+    if (value == null) return false;
+    final segments = value.split(':');
+    if (segments.length != 2) return false;
+    final hour = int.tryParse(segments[0]);
+    final minute = int.tryParse(segments[1]);
+    if (hour == null || minute == null) return false;
+    return hour >= 0 && hour < 24 && minute >= 0 && minute < 60;
+  }
+
+  bool _restoreRememberedDefaults(Map<String, String> settings) {
+    final savedStartTime = settings[_defaultStartTimeKey]?.trim();
+    final savedEndTime = settings[_defaultEndTimeKey]?.trim();
+    final savedStatus = settings[_defaultStatusKey]?.trim();
+    var restored = false;
+
+    if (_isValidTimeValue(savedStartTime)) {
+      _startTime = savedStartTime!;
+      restored = true;
+    }
+    if (_isValidTimeValue(savedEndTime)) {
+      _endTime = savedEndTime!;
+      restored = true;
+    }
+    if (_statuses.any((item) => item.$1 == savedStatus)) {
+      _status = savedStatus!;
+      restored = true;
+    }
+
+    return restored;
+  }
+
+  void _maybeRestoreRememberedDefaults(Map<String, String>? settings) {
+    if (settings == null || _customizedDefaults || _loadedRememberedDefaults) {
+      return;
+    }
+    final restored = _restoreRememberedDefaults(settings);
+    if (!restored || !mounted) return;
+    setState(() => _loadedRememberedDefaults = true);
+  }
+
+  void _markDefaultsCustomized() {
+    _customizedDefaults = true;
+    _loadedRememberedDefaults = false;
+  }
+
+  Set<String> _recentStudentIds(Map<String, String> settings) {
+    final raw = settings[_recentStudentIdsKey]?.trim();
+    if (raw == null || raw.isEmpty) return const <String>{};
+    return raw
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+  }
+
+  Future<void> _persistQuickEntryPreferences(
+    List<StudentWithMeta> selectedStudents,
+  ) async {
+    await ref.read(settingsProvider.notifier).setAll({
+      _defaultStartTimeKey: _startTime,
+      _defaultEndTimeKey: _endTime,
+      _defaultStatusKey: _status,
+      _recentStudentIdsKey: selectedStudents
+          .map((item) => item.student.id)
+          .join(','),
+    });
+  }
 
   AttendanceProgressScores? _buildProgressScores() {
     if (_strokeQuality == null &&
@@ -156,6 +253,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         );
       }
 
+      await _persistQuickEntryPreferences(selectedStudents);
       await dao.batchInsertWithConflictReplace(records, conflictIds);
 
       invalidateAfterAttendanceChange(ref);
@@ -268,6 +366,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
 
   Widget _buildStep0(ScrollController controller) {
     final students = ref.watch(studentProvider).valueOrNull ?? [];
+    final settings = ref.watch(settingsProvider).valueOrNull ?? const {};
     final activeStudents = _showSuspended
         ? students
         : students.where((m) => m.student.status == 'active').toList();
@@ -285,6 +384,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     final allFilteredSelected =
         filteredIds.isNotEmpty &&
         filteredIds.every((id) => _selectedIds.contains(id));
+    final restorableStudents = _showSuspended ? students : activeStudents;
+    final restorableRecentIds = _recentStudentIds(
+      settings,
+    ).intersection(restorableStudents.map((item) => item.student.id).toSet());
+    final restoredRecentGroup =
+        restorableRecentIds.isNotEmpty &&
+        restorableRecentIds.every((id) => _selectedIds.contains(id));
 
     return Column(
       children: [
@@ -303,7 +409,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Row(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _QuickActionChip(
                 icon: allFilteredSelected ? Icons.deselect : Icons.select_all,
@@ -321,7 +430,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                         });
                       },
               ),
-              const SizedBox(width: 8),
               _QuickActionChip(
                 icon: _showSuspended ? Icons.visibility_off : Icons.visibility,
                 label: _showSuspended ? '隐藏休学' : '显示休学',
@@ -330,7 +438,23 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   setState(() => _showSuspended = !_showSuspended);
                 },
               ),
-              const Spacer(),
+              if (restorableRecentIds.isNotEmpty)
+                _QuickActionChip(
+                  icon: restoredRecentGroup
+                      ? Icons.checklist_rtl_outlined
+                      : Icons.history_outlined,
+                  label: restoredRecentGroup
+                      ? '上次同班已恢复'
+                      : '恢复上次同班（${restorableRecentIds.length}人）',
+                  onTap: restoredRecentGroup
+                      ? null
+                      : () {
+                          unawaited(InteractionFeedback.selection(context));
+                          setState(() {
+                            _selectedIds.addAll(restorableRecentIds);
+                          });
+                        },
+                ),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -351,13 +475,89 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
             ],
           ),
         ),
+        if (_loadedRememberedDefaults)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: kPrimaryBlue.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
+              ),
+              child: Text(
+                '当前默认：$_startTime-$_endTime / ${_statuses.firstWhere((item) => item.$1 == _status).$2}，可直接用“按当前默认直接保存”。',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: kPrimaryBlue,
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         const SizedBox(height: 10),
         Expanded(
           child: filtered.isEmpty
-              ? Center(
-                  child: Text(
-                    '没有找到符合条件的学员',
-                    style: Theme.of(context).textTheme.bodySmall,
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.54),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: kInkSecondary.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: Text(
+                              students.isEmpty
+                                  ? '还没有学生档案，先新增或导入学生，之后就能直接记课。'
+                                  : _searchQuery.isEmpty
+                                  ? '当前没有可记课的学员，可切换“显示休学”或先新增学生。'
+                                  : '没有找到符合条件的学员。',
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.copyWith(height: 1.5),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          if (students.isEmpty || _searchQuery.isEmpty) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () =>
+                                        _openStudentRoute('/students/import'),
+                                    icon: const Icon(
+                                      Icons.upload_file_outlined,
+                                    ),
+                                    label: const Text('批量导入'),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: () =>
+                                        _openStudentRoute('/students/create'),
+                                    icon: const Icon(Icons.person_add_alt_1),
+                                    label: const Text('新增学生'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 )
               : ListView.builder(
@@ -485,12 +685,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                           unawaited(InteractionFeedback.selection(context));
                           setState(() => _step = 1);
                         },
-                  onLongPress: _selectedIds.isEmpty
-                      ? null
-                      : () {
-                          unawaited(InteractionFeedback.selection(context));
-                          unawaited(_quickSaveWithDefaults());
-                        },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -500,9 +694,29 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   child: Text('下一步（已选 ${_selectedIds.length} 人）'),
                 ),
               ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _selectedIds.isEmpty
+                      ? null
+                      : () {
+                          unawaited(InteractionFeedback.selection(context));
+                          unawaited(_quickSaveWithDefaults());
+                        },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.flash_on_outlined),
+                  label: const Text('按当前默认直接保存'),
+                ),
+              ),
               const SizedBox(height: 8),
               Text(
-                '长按上方按钮可按默认时间快速保存',
+                '快速保存会直接使用当前日期、时间和出勤状态记课。',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -519,6 +733,42 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (_loadedRememberedDefaults) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: kPrimaryBlue.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Icon(
+                    Icons.history_toggle_off_outlined,
+                    size: 16,
+                    color: kPrimaryBlue,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '已沿用上次常用设置：$_startTime-$_endTime，状态“${_statuses.firstWhere((item) => item.$1 == _status).$2}”。',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: kPrimaryBlue,
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         if (templates.isNotEmpty) ...[
           Text('常用模板', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
@@ -536,6 +786,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     onPressed: () {
                       unawaited(InteractionFeedback.selection(context));
                       setState(() {
+                        _markDefaultsCustomized();
                         _startTime = t.startTime;
                         _endTime = t.endTime;
                       });
@@ -593,6 +844,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   await InteractionFeedback.selection(context);
                   if (!mounted) return;
                   setState(() {
+                    _markDefaultsCustomized();
                     _startTime = formatTime(t);
                   });
                 },
@@ -623,6 +875,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   await InteractionFeedback.selection(context);
                   if (!mounted) return;
                   setState(() {
+                    _markDefaultsCustomized();
                     _endTime = formatTime(t);
                   });
                 },
@@ -654,7 +907,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   selected: _status == s.$1,
                   onSelected: (_) {
                     unawaited(InteractionFeedback.selection(context));
-                    setState(() => _status = s.$1);
+                    setState(() {
+                      _markDefaultsCustomized();
+                      _status = s.$1;
+                    });
                   },
                 ),
               )

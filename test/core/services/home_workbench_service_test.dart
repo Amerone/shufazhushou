@@ -65,7 +65,7 @@ void main() {
 
     expect(tasks, hasLength(1));
     expect(tasks.first.type, HomeWorkbenchTaskType.renewal);
-    expect(tasks.first.actionLabel, '查看续费');
+    expect(tasks.first.actionLabel, '登记续费');
   });
 
   test('adds report-ready task for active student with two formal classes', () {

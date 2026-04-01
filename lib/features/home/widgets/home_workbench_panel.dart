@@ -2,13 +2,55 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/models/export_template.dart';
 import '../../../core/providers/home_workbench_provider.dart';
 import '../../../core/services/home_workbench_service.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/widgets/glass_card.dart';
+import '../../students/widgets/student_action_launcher.dart';
 
 class HomeWorkbenchPanel extends ConsumerWidget {
   const HomeWorkbenchPanel({super.key});
+
+  Future<void> _handleTaskTap(
+    BuildContext context,
+    HomeWorkbenchTask task,
+  ) async {
+    final studentId = task.studentId;
+    switch (task.type) {
+      case HomeWorkbenchTaskType.debt:
+      case HomeWorkbenchTaskType.renewal:
+        if (studentId == null) {
+          context.push('/statistics');
+          return;
+        }
+        await showStudentPaymentSheet(
+          context,
+          studentId: studentId,
+          studentName: task.studentName,
+        );
+        return;
+      case HomeWorkbenchTaskType.progress:
+      case HomeWorkbenchTaskType.reportReady:
+        if (studentId == null) {
+          context.push('/statistics');
+          return;
+        }
+        await showStudentExportSheet(
+          context,
+          studentId: studentId,
+          initialTemplate: ExportTemplateId.parentMonthly,
+        );
+        return;
+      case HomeWorkbenchTaskType.churn:
+      case HomeWorkbenchTaskType.trial:
+        if (studentId != null) {
+          context.push('/students/$studentId');
+          return;
+        }
+        context.push('/statistics');
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -95,7 +137,10 @@ class HomeWorkbenchPanel extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (var index = 0; index < visibleTasks.length; index++) ...[
-                    _WorkbenchTaskCard(task: visibleTasks[index]),
+                    _WorkbenchTaskCard(
+                      task: visibleTasks[index],
+                      onTap: () => _handleTaskTap(context, visibleTasks[index]),
+                    ),
                     if (index != visibleTasks.length - 1)
                       const SizedBox(height: 10),
                   ],
@@ -144,8 +189,9 @@ class _CountBadge extends StatelessWidget {
 
 class _WorkbenchTaskCard extends StatelessWidget {
   final HomeWorkbenchTask task;
+  final VoidCallback onTap;
 
-  const _WorkbenchTaskCard({required this.task});
+  const _WorkbenchTaskCard({required this.task, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -191,13 +237,7 @@ class _WorkbenchTaskCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 TextButton.icon(
-                  onPressed: () {
-                    if (task.studentId != null) {
-                      context.push('/students/${task.studentId}');
-                      return;
-                    }
-                    context.push('/statistics');
-                  },
+                  onPressed: onTap,
                   icon: Icon(config.actionIcon, size: 18),
                   label: Text(task.actionLabel),
                 ),
@@ -227,13 +267,13 @@ class _TaskVisualConfig {
         return const _TaskVisualConfig(
           color: kRed,
           icon: Icons.payments_outlined,
-          actionIcon: Icons.receipt_long_outlined,
+          actionIcon: Icons.add_card_outlined,
         );
       case HomeWorkbenchTaskType.renewal:
         return const _TaskVisualConfig(
           color: kSealRed,
           icon: Icons.event_repeat_outlined,
-          actionIcon: Icons.arrow_outward_outlined,
+          actionIcon: Icons.add_card_outlined,
         );
       case HomeWorkbenchTaskType.churn:
         return const _TaskVisualConfig(
@@ -251,13 +291,13 @@ class _TaskVisualConfig {
         return const _TaskVisualConfig(
           color: kGreen,
           icon: Icons.trending_up_outlined,
-          actionIcon: Icons.auto_graph_outlined,
+          actionIcon: Icons.description_outlined,
         );
       case HomeWorkbenchTaskType.reportReady:
         return const _TaskVisualConfig(
           color: kPrimaryBlue,
           icon: Icons.description_outlined,
-          actionIcon: Icons.description_outlined,
+          actionIcon: Icons.ios_share_outlined,
         );
     }
   }

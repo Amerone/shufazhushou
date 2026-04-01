@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/metrics_provider.dart';
 import '../../../shared/theme.dart';
@@ -15,18 +15,50 @@ class MetricsGrid extends ConsumerWidget {
       error: (e, _) => Text('加载失败: $e'),
       data: (m) {
         final total = m.presentCount + m.lateCount + m.absentCount;
-        final attendRate = total > 0 ? (m.presentCount + m.lateCount) / total * 100 : 0.0;
+        final attendRate = total > 0
+            ? (m.presentCount + m.lateCount) / total * 100
+            : 0.0;
         final metricItems = [
-          _MetricData('收入', '¥${m.totalFee.toStringAsFixed(0)}', Icons.payments_outlined, kPrimaryBlue),
-          _MetricData('出勤节数', '${m.presentCount + m.lateCount}节', Icons.event_available_outlined, kGreen),
-          _MetricData('活跃人数', '${m.activeStudentCount}人', Icons.groups_2_outlined, kSealRed),
-          _MetricData('出勤率', '${attendRate.toStringAsFixed(1)}%', Icons.trending_up_outlined, kOrange),
+          _MetricData(
+            '实收',
+            '¥${m.totalReceived.toStringAsFixed(0)}',
+            Icons.account_balance_wallet_outlined,
+            kSealRed,
+          ),
+          _MetricData(
+            '应收',
+            '¥${m.totalReceivable.toStringAsFixed(0)}',
+            Icons.payments_outlined,
+            kPrimaryBlue,
+          ),
+          _MetricData(
+            '出勤节数',
+            '${m.presentCount + m.lateCount}节',
+            Icons.event_available_outlined,
+            kGreen,
+          ),
+          _MetricData(
+            '活跃人数',
+            '${m.activeStudentCount}人',
+            Icons.groups_2_outlined,
+            kSealRed,
+          ),
+          _MetricData(
+            '出勤率',
+            '${attendRate.toStringAsFixed(1)}%',
+            Icons.trending_up_outlined,
+            kOrange,
+          ),
         ];
 
         return LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
-            final columns = width >= 840 ? 4 : width >= 520 ? 2 : 1;
+            final columns = width >= 840
+                ? 4
+                : width >= 520
+                ? 2
+                : 1;
             final itemWidth = (width - 12 * (columns - 1)) / columns;
 
             return Wrap(

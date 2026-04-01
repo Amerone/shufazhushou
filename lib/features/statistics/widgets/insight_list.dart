@@ -1,13 +1,18 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
+
 import '../../../core/models/dismissed_insight.dart';
+import '../../../core/models/export_template.dart';
+import '../../../core/providers/home_workbench_provider.dart';
 import '../../../core/providers/insight_provider.dart';
 import '../../../core/services/dismissed_insight_policy.dart';
+import '../../../core/services/insight_aggregation_service.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
+import '../../students/widgets/student_action_launcher.dart';
 
 class InsightList extends ConsumerWidget {
   const InsightList({super.key});
@@ -48,6 +53,56 @@ class InsightList extends ConsumerWidget {
     InsightType.progress: '建议生成成长快照并同步家长',
   };
 
+  Future<void> _handlePrimaryAction(
+    BuildContext context,
+    Insight insight,
+  ) async {
+    final studentId = insight.studentId;
+    if (studentId == null) return;
+
+    switch (insight.type) {
+      case InsightType.debt:
+      case InsightType.renewal:
+        await showStudentPaymentSheet(
+          context,
+          studentId: studentId,
+          studentName: insight.studentName,
+        );
+        return;
+      case InsightType.progress:
+        await showStudentExportSheet(
+          context,
+          studentId: studentId,
+          initialTemplate: ExportTemplateId.parentMonthly,
+        );
+        return;
+      case InsightType.churn:
+      case InsightType.trial:
+        context.push('/students/$studentId');
+        return;
+      case InsightType.peak:
+        return;
+    }
+  }
+
+  String? _primaryLabelFor(Insight insight) {
+    if (insight.studentId == null) return null;
+
+    switch (insight.type) {
+      case InsightType.debt:
+        return '记录缴费';
+      case InsightType.renewal:
+        return '登记续费';
+      case InsightType.progress:
+        return '生成月报';
+      case InsightType.churn:
+      case InsightType.trial:
+        return '查看档案';
+      case InsightType.peak:
+        return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -79,14 +134,20 @@ class InsightList extends ConsumerWidget {
         return Column(
           children: insights.map((insight) {
             final color = _typeColor[insight.type] ?? kPrimaryBlue;
-            final icon = _typeIcon[insight.type] ?? Icons.notifications_outlined;
+            final icon =
+                _typeIcon[insight.type] ?? Icons.notifications_outlined;
             final typeLabel = _typeLabel[insight.type] ?? '经营提醒';
-            final title = insight.studentName.isEmpty ? typeLabel : insight.studentName;
-            final snoozeDays =
-                DismissedInsightPolicy.retentionForInsight(insight.type).inDays;
+            final title = insight.studentName.isEmpty
+                ? typeLabel
+                : insight.studentName;
+            final snoozeDays = DismissedInsightPolicy.retentionForInsight(
+              insight.type,
+            ).inDays;
 
             return Container(
-              margin: EdgeInsets.only(bottom: insight == insights.last ? 0 : 10),
+              margin: EdgeInsets.only(
+                bottom: insight == insights.last ? 0 : 10,
+              ),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.56),
@@ -115,7 +176,9 @@ class InsightList extends ConsumerWidget {
                           children: [
                             Text(
                               title,
-                              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             const SizedBox(height: 6),
                             Wrap(
@@ -137,12 +200,17 @@ class InsightList extends ConsumerWidget {
                             const SizedBox(height: 10),
                             Text(
                               insight.message,
-                              style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                height: 1.5,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
                               decoration: BoxDecoration(
                                 color: kPrimaryBlue.withValues(alpha: 0.06),
                                 borderRadius: BorderRadius.circular(10),
@@ -150,15 +218,20 @@ class InsightList extends ConsumerWidget {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.lightbulb_outline, size: 16, color: kPrimaryBlue),
+                                  const Icon(
+                                    Icons.lightbulb_outline,
+                                    size: 16,
+                                    color: kPrimaryBlue,
+                                  ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       insight.suggestion,
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: kInkSecondary,
-                                        height: 1.4,
-                                      ),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: kInkSecondary,
+                                            height: 1.4,
+                                          ),
                                     ),
                                   ),
                                 ],
@@ -198,19 +271,22 @@ class InsightList extends ConsumerWidget {
                   ),
                   const SizedBox(height: 14),
                   _InsightActions(
-                    studentId: insight.studentId,
+                    primaryLabel: _primaryLabelFor(insight),
                     onPrimaryTap: insight.studentId == null
                         ? null
-                        : () => context.push('/students/${insight.studentId}'),
+                        : () => _handlePrimaryAction(context, insight),
                     onDismissTap: () async {
-                      await ref.read(dismissedInsightDaoProvider).insert(
-                        DismissedInsight(
-                          id: const Uuid().v4(),
-                          insightType: insight.type.name,
-                          studentId: insight.studentId,
-                          dismissedAt: DateTime.now().millisecondsSinceEpoch,
-                        ),
-                      );
+                      await ref
+                          .read(dismissedInsightDaoProvider)
+                          .insert(
+                            DismissedInsight(
+                              id: const Uuid().v4(),
+                              insightType: insight.type.name,
+                              studentId: insight.studentId,
+                              dismissedAt:
+                                  DateTime.now().millisecondsSinceEpoch,
+                            ),
+                          );
                       if (context.mounted) {
                         AppToast.showSuccess(
                           context,
@@ -218,6 +294,7 @@ class InsightList extends ConsumerWidget {
                         );
                       }
                       ref.invalidate(insightProvider);
+                      ref.invalidate(homeWorkbenchProvider);
                     },
                     snoozeLabel: '稍后 $snoozeDays 天提醒',
                   ),
@@ -258,9 +335,9 @@ class _InsightMetaChip extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -269,13 +346,13 @@ class _InsightMetaChip extends StatelessWidget {
 }
 
 class _InsightActions extends StatelessWidget {
-  final String? studentId;
+  final String? primaryLabel;
   final VoidCallback? onPrimaryTap;
   final VoidCallback onDismissTap;
   final String snoozeLabel;
 
   const _InsightActions({
-    required this.studentId,
+    required this.primaryLabel,
     required this.onPrimaryTap,
     required this.onDismissTap,
     required this.snoozeLabel,
@@ -297,28 +374,26 @@ class _InsightActions extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (studentId != null)
+              if (primaryLabel != null && onPrimaryTap != null)
                 FilledButton.tonalIcon(
                   onPressed: onPrimaryTap,
                   icon: const Icon(Icons.arrow_outward_outlined, size: 18),
-                  label: const Text('前往学生页处理'),
+                  label: Text(primaryLabel!),
                 ),
-              if (studentId != null) const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: dismissButton,
-              ),
+              if (primaryLabel != null && onPrimaryTap != null)
+                const SizedBox(height: 8),
+              Align(alignment: Alignment.centerRight, child: dismissButton),
             ],
           );
         }
 
         return Row(
           children: [
-            if (studentId != null)
+            if (primaryLabel != null && onPrimaryTap != null)
               FilledButton.tonalIcon(
                 onPressed: onPrimaryTap,
                 icon: const Icon(Icons.arrow_outward_outlined, size: 18),
-                label: const Text('前往处理'),
+                label: Text(primaryLabel!),
               ),
             const Spacer(),
             dismissButton,

@@ -1,4 +1,6 @@
 class Student {
+  static const Object _unset = Object();
+
   final String id;
   final String name;
   final String? parentName;
@@ -48,21 +50,25 @@ class Student {
   Student copyWith({
     String? id,
     String? name,
-    String? parentName,
-    String? parentPhone,
+    Object? parentName = _unset,
+    Object? parentPhone = _unset,
     double? pricePerClass,
     String? status,
-    String? note,
+    Object? note = _unset,
     int? createdAt,
     int? updatedAt,
   }) => Student(
     id: id ?? this.id,
     name: name ?? this.name,
-    parentName: parentName ?? this.parentName,
-    parentPhone: parentPhone ?? this.parentPhone,
+    parentName: identical(parentName, _unset)
+        ? this.parentName
+        : parentName as String?,
+    parentPhone: identical(parentPhone, _unset)
+        ? this.parentPhone
+        : parentPhone as String?,
     pricePerClass: pricePerClass ?? this.pricePerClass,
     status: status ?? this.status,
-    note: note ?? this.note,
+    note: identical(note, _unset) ? this.note : note as String?,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );

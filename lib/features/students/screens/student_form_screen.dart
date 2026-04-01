@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/database/dao/student_dao.dart';
 import '../../../core/models/student.dart';
 import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
@@ -48,22 +49,32 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
   @override
   void initState() {
     super.initState();
-    if (_isEdit) _loadStudent();
+    if (_isEdit) {
+      _syncStudentFromProvider(ref.read(studentProvider));
+    }
   }
 
-  Future<void> _loadStudent() async {
-    final list = ref.read(studentProvider).valueOrNull ?? [];
-    final meta = list.where((m) => m.student.id == widget.studentId).firstOrNull;
+  void _syncStudentFromProvider(
+    AsyncValue<List<StudentWithMeta>> asyncStudents,
+  ) {
+    if (!_isEdit || _original != null) return;
+
+    final list = asyncStudents.valueOrNull ?? const <StudentWithMeta>[];
+    final meta = list
+        .where((m) => m.student.id == widget.studentId)
+        .firstOrNull;
     if (meta == null) return;
 
     final s = meta.student;
-    _original = s;
     _nameCtrl.text = s.name;
     _parentNameCtrl.text = s.parentName ?? '';
     _parentPhoneCtrl.text = s.parentPhone ?? '';
     _priceCtrl.text = s.pricePerClass.toStringAsFixed(0);
     _noteCtrl.text = s.note ?? '';
-    setState(() => _status = s.status);
+    setState(() {
+      _original = s;
+      _status = s.status;
+    });
   }
 
   @override
@@ -89,8 +100,12 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
       if (_isEdit && _original != null) {
         final updated = _original!.copyWith(
           name: _nameCtrl.text.trim(),
-          parentName: _parentNameCtrl.text.trim().isEmpty ? null : _parentNameCtrl.text.trim(),
-          parentPhone: _parentPhoneCtrl.text.trim().isEmpty ? null : _parentPhoneCtrl.text.trim(),
+          parentName: _parentNameCtrl.text.trim().isEmpty
+              ? null
+              : _parentNameCtrl.text.trim(),
+          parentPhone: _parentPhoneCtrl.text.trim().isEmpty
+              ? null
+              : _parentPhoneCtrl.text.trim(),
           pricePerClass: price,
           status: _status,
           note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
@@ -101,8 +116,12 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
         final student = Student(
           id: const Uuid().v4(),
           name: _nameCtrl.text.trim(),
-          parentName: _parentNameCtrl.text.trim().isEmpty ? null : _parentNameCtrl.text.trim(),
-          parentPhone: _parentPhoneCtrl.text.trim().isEmpty ? null : _parentPhoneCtrl.text.trim(),
+          parentName: _parentNameCtrl.text.trim().isEmpty
+              ? null
+              : _parentNameCtrl.text.trim(),
+          parentPhone: _parentPhoneCtrl.text.trim().isEmpty
+              ? null
+              : _parentPhoneCtrl.text.trim(),
           pricePerClass: price,
           status: _status,
           note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
@@ -113,6 +132,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
       }
 
       await ref.read(studentProvider.notifier).reload();
+      invalidateAfterStudentChange(ref);
       if (_isEdit) ref.invalidate(feeSummaryProvider);
       if (mounted) context.pop();
     } catch (e) {
@@ -123,7 +143,10 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
   }
 
   Future<void> _delete() async {
-    final confirm = await AppToast.showConfirm(context, '确认删除该学生？相关出勤和缴费记录会一并删除。');
+    final confirm = await AppToast.showConfirm(
+      context,
+      '确认删除该学生？相关出勤和缴费记录会一并删除。',
+    );
     if (!confirm) return;
 
     setState(() => _loading = true);
@@ -141,6 +164,10 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<List<StudentWithMeta>>>(studentProvider, (_, next) {
+      _syncStudentFromProvider(next);
+    });
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: InkWashBackground(
@@ -161,7 +188,8 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
               child: Form(
                 key: _formKey,
                 child: ListView(
-                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                   children: [
                     GlassCard(
@@ -169,7 +197,10 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('基础信息', style: Theme.of(context).textTheme.titleMedium),
+                          Text(
+                            '基础信息',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
                           const SizedBox(height: 6),
                           Text(
                             '姓名会直接用于点名、统计和导出报告展示。',
@@ -184,7 +215,8 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
                               hintText: '请输入学生姓名',
                               icon: Icons.school_outlined,
                             ),
-                            validator: (v) => v == null || v.trim().isEmpty ? '请输入姓名' : null,
+                            validator: (v) =>
+                                v == null || v.trim().isEmpty ? '请输入姓名' : null,
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
@@ -216,7 +248,10 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('课程设置', style: Theme.of(context).textTheme.titleMedium),
+                          Text(
+                            '课程设置',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
                           const SizedBox(height: 14),
                           TextFormField(
                             controller: _priceCtrl,
@@ -226,10 +261,14 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
                               hintText: '请输入每节课的收费标准',
                               icon: Icons.payments_outlined,
                             ),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) return '请输入单价';
-                              if (double.tryParse(v.trim()) == null) return '请输入有效数字';
+                              if (double.tryParse(v.trim()) == null) {
+                                return '请输入有效数字';
+                              }
                               return null;
                             },
                           ),
@@ -243,14 +282,16 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
                           const SizedBox(height: 12),
                           Text(
                             '学习状态',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 10),
                           LayoutBuilder(
                             builder: (context, constraints) {
                               final compact = constraints.maxWidth < 440;
-                              final itemWidth =
-                                  compact ? constraints.maxWidth : (constraints.maxWidth - 12) / 2;
+                              final itemWidth = compact
+                                  ? constraints.maxWidth
+                                  : (constraints.maxWidth - 12) / 2;
 
                               return Wrap(
                                 spacing: 12,
@@ -262,7 +303,9 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
                                         child: _StatusOptionCard(
                                           option: option,
                                           selected: _status == option.value,
-                                          onTap: () => setState(() => _status = option.value),
+                                          onTap: () => setState(
+                                            () => _status = option.value,
+                                          ),
                                         ),
                                       ),
                                     )
@@ -325,10 +368,7 @@ class _FormHint extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _FormHint({
-    required this.icon,
-    required this.text,
-  });
+  const _FormHint({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -350,7 +390,9 @@ class _FormHint extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: kPrimaryBlue),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: kPrimaryBlue),
             ),
           ),
         ],
@@ -399,10 +441,14 @@ class _StatusOptionCard extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: selected ? option.color.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.54),
+            color: selected
+                ? option.color.withValues(alpha: 0.12)
+                : Colors.white.withValues(alpha: 0.54),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: selected ? option.color.withValues(alpha: 0.85) : kInkSecondary.withValues(alpha: 0.14),
+              color: selected
+                  ? option.color.withValues(alpha: 0.85)
+                  : kInkSecondary.withValues(alpha: 0.14),
               width: selected ? 1.4 : 1,
             ),
           ),
@@ -434,7 +480,12 @@ class _StatusOptionCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (selected) Icon(Icons.check_circle, size: 18, color: option.color),
+                        if (selected)
+                          Icon(
+                            Icons.check_circle,
+                            size: 18,
+                            color: option.color,
+                          ),
                       ],
                     ),
                     const SizedBox(height: 4),

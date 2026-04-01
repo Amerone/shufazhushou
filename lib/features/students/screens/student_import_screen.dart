@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -15,7 +15,8 @@ class StudentImportScreen extends ConsumerStatefulWidget {
   const StudentImportScreen({super.key});
 
   @override
-  ConsumerState<StudentImportScreen> createState() => _StudentImportScreenState();
+  ConsumerState<StudentImportScreen> createState() =>
+      _StudentImportScreenState();
 }
 
 class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
@@ -30,7 +31,13 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
       }
     });
     try {
-      final existing = ref.read(studentProvider).valueOrNull?.map((m) => m.student).toList() ?? [];
+      final existing =
+          ref
+              .read(studentProvider)
+              .valueOrNull
+              ?.map((m) => m.student)
+              .toList() ??
+          [];
       final preview = await ExcelImporter.pick(existing);
       if (preview != null && mounted) {
         setState(() => _preview = preview);
@@ -64,17 +71,22 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final preview = _preview;
-    final previewStudents = preview?.toInsert.take(5).toList() ?? const <Student>[];
-    final remainingPreviewCount = preview == null ? 0 : preview.toInsert.length - previewStudents.length;
-    final silentSkipped = preview == null ? 0 : preview.skipped - preview.errors.length;
+    final previewStudents =
+        preview?.toInsert.take(5).toList() ?? const <Student>[];
+    final remainingPreviewCount = preview == null
+        ? 0
+        : preview.toInsert.length - previewStudents.length;
+    final silentSkipped = preview == null
+        ? 0
+        : preview.skipped - preview.errors.length;
     final issueCount = preview?.errors.length ?? 0;
     final importState = preview == null
         ? ('等待选择文件', '先选择 Excel 文件，再查看导入预览。', kPrimaryBlue)
         : preview.toInsert.isEmpty
-            ? ('暂不可导入', '当前没有可写入的学生记录，请先处理问题项。', kOrange)
-            : issueCount > 0
-                ? ('可导入但需留意', '存在需要校对的行，确认后只会导入有效记录。', kSealRed)
-                : ('可以直接导入', '预览通过，可以一次性写入本次有效学生档案。', kGreen);
+        ? ('暂不可导入', '当前没有可写入的学生记录，请先处理问题项。', kOrange)
+        : issueCount > 0
+        ? ('可导入但需留意', '存在需要校对的行，确认后只会导入有效记录。', kSealRed)
+        : ('可以直接导入', '预览通过，可以一次性写入本次有效学生档案。', kGreen);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -88,7 +100,8 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
             ),
             Expanded(
               child: ListView(
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                 children: [
                   GlassCard(
@@ -108,7 +121,10 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                                 color: kPrimaryBlue.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: const Icon(Icons.upload_file_outlined, color: kPrimaryBlue),
+                              child: const Icon(
+                                Icons.upload_file_outlined,
+                                color: kPrimaryBlue,
+                              ),
                             ),
                             SizedBox(
                               width: 220,
@@ -117,11 +133,12 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                                 children: [
                                   Text(
                                     '导入流程',
-                                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w700),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '先选文件，再看预览，最后确认入库。重复姓名会自动跳过，错误行不会写入。',
+                                    '先选文件，再看预览，最后确认入库。同名且家长信息一致会自动跳过，错误行不会写入。',
                                     style: theme.textTheme.bodySmall,
                                   ),
                                 ],
@@ -146,7 +163,7 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                         ),
                         const _GuideLine(
                           icon: Icons.rule_folder_outlined,
-                          text: '预览会优先拦截空姓名和重复姓名，避免直接写入脏数据。',
+                          text: '预览会优先拦截空姓名和同名同家长信息的重复记录，避免直接写入脏数据。',
                         ),
                         const _GuideLine(
                           icon: Icons.tips_and_updates_outlined,
@@ -161,7 +178,9 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                             ),
                             onPressed: _loading
                                 ? null
-                                : () => _pick(clearExistingPreview: preview != null),
+                                : () => _pick(
+                                    clearExistingPreview: preview != null,
+                                  ),
                             icon: const Icon(Icons.upload_file_outlined),
                             label: Text(_loading ? '处理中...' : '选择 Excel 文件'),
                           ),
@@ -241,27 +260,30 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                             Text('需要处理的问题', style: theme.textTheme.titleSmall),
                             const SizedBox(height: 8),
                             ...preview.errors.asMap().entries.map(
-                                  (entry) => _ImportIssueLine(
-                                    index: entry.key + 1,
-                                    message: entry.value,
-                                  ),
-                                ),
+                              (entry) => _ImportIssueLine(
+                                index: entry.key + 1,
+                                message: entry.value,
+                              ),
+                            ),
                           ],
                           if (silentSkipped > 0) ...[
                             const SizedBox(height: 12),
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: kOrange.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Text(
-                                '另外有 $silentSkipped 条记录因姓名重复而自动跳过。',
+                                '另外有 $silentSkipped 条记录因同名且家长信息一致而自动跳过。',
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                      color: kOrange,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                  color: kOrange,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
@@ -290,14 +312,18 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                             if (remainingPreviewCount > 0)
                               Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   color: kPrimaryBlue.withValues(alpha: 0.06),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: Text(
                                   '还有 $remainingPreviewCount 位学生将在确认后一起导入。',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
                                         color: kPrimaryBlue,
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -337,7 +363,9 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                               ),
                               _ImportMetaBadge(
                                 icon: Icons.warning_amber_outlined,
-                                label: issueCount > 0 ? '需关注 $issueCount 项' : '无错误项',
+                                label: issueCount > 0
+                                    ? '需关注 $issueCount 项'
+                                    : '无错误项',
                                 color: issueCount > 0 ? kSealRed : kPrimaryBlue,
                               ),
                             ],
@@ -346,8 +374,9 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                           LayoutBuilder(
                             builder: (context, constraints) {
                               final compact = constraints.maxWidth < 420;
-                              final buttonWidth =
-                                  compact ? constraints.maxWidth : (constraints.maxWidth - 12) / 2;
+                              final buttonWidth = compact
+                                  ? constraints.maxWidth
+                                  : (constraints.maxWidth - 12) / 2;
 
                               return Wrap(
                                 spacing: 12,
@@ -357,9 +386,15 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                                     width: buttonWidth,
                                     child: OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
                                       ),
-                                      onPressed: _loading ? null : () => _pick(clearExistingPreview: true),
+                                      onPressed: _loading
+                                          ? null
+                                          : () => _pick(
+                                              clearExistingPreview: true,
+                                            ),
                                       icon: const Icon(Icons.refresh_outlined),
                                       label: const Text('重新选择'),
                                     ),
@@ -368,10 +403,17 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                                     width: buttonWidth,
                                     child: ElevatedButton.icon(
                                       style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
                                       ),
-                                      onPressed: _loading || preview.toInsert.isEmpty ? null : _confirm,
-                                      icon: const Icon(Icons.check_circle_outline),
+                                      onPressed:
+                                          _loading || preview.toInsert.isEmpty
+                                          ? null
+                                          : _confirm,
+                                      icon: const Icon(
+                                        Icons.check_circle_outline,
+                                      ),
                                       label: Text(_loading ? '处理中...' : '确认导入'),
                                     ),
                                   ),
@@ -397,10 +439,7 @@ class _GuideLine extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _GuideLine({
-    required this.icon,
-    required this.text,
-  });
+  const _GuideLine({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -424,10 +463,7 @@ class _ImportStepChip extends StatelessWidget {
   final String index;
   final String text;
 
-  const _ImportStepChip({
-    required this.index,
-    required this.text,
-  });
+  const _ImportStepChip({required this.index, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -452,18 +488,18 @@ class _ImportStepChip extends StatelessWidget {
             child: Text(
               index,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           const SizedBox(width: 8),
           Text(
             text,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: kPrimaryBlue,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: kPrimaryBlue,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -499,7 +535,9 @@ class _ImportStatusCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
-              preview.toInsert.isEmpty ? Icons.rule_outlined : Icons.fact_check_outlined,
+              preview.toInsert.isEmpty
+                  ? Icons.rule_outlined
+                  : Icons.fact_check_outlined,
               color: color,
             ),
           ),
@@ -511,14 +549,11 @@ class _ImportStatusCard extends StatelessWidget {
                 Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),
@@ -568,7 +603,9 @@ class _ImportSectionHeader extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.64),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
+                border: Border.all(
+                  color: kInkSecondary.withValues(alpha: 0.12),
+                ),
               ),
               child: Text(trailing, style: theme.textTheme.bodySmall),
             ),
@@ -606,9 +643,9 @@ class _ImportMetaBadge extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -659,10 +696,7 @@ class _ImportIssueLine extends StatelessWidget {
   final int index;
   final String message;
 
-  const _ImportIssueLine({
-    required this.index,
-    required this.message,
-  });
+  const _ImportIssueLine({required this.index, required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -688,16 +722,18 @@ class _ImportIssueLine extends StatelessWidget {
             child: Text(
               '$index',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: kOrange),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: kOrange),
             ),
           ),
         ],
@@ -713,14 +749,18 @@ class _ImportStudentTile extends StatelessWidget {
 
   String _formatPrice(double value) {
     if (value <= 0) return '待补充';
-    return value == value.truncateToDouble() ? '¥${value.toStringAsFixed(0)}' : '¥${value.toStringAsFixed(2)}';
+    return value == value.truncateToDouble()
+        ? '¥${value.toStringAsFixed(0)}'
+        : '¥${value.toStringAsFixed(2)}';
   }
 
   @override
   Widget build(BuildContext context) {
     final details = <String>[
-      if ((student.parentName ?? '').trim().isNotEmpty) '家长 ${student.parentName!.trim()}',
-      if ((student.parentPhone ?? '').trim().isNotEmpty) student.parentPhone!.trim(),
+      if ((student.parentName ?? '').trim().isNotEmpty)
+        '家长 ${student.parentName!.trim()}',
+      if ((student.parentPhone ?? '').trim().isNotEmpty)
+        student.parentPhone!.trim(),
     ];
     final hasPrice = student.pricePerClass > 0;
 
@@ -750,7 +790,9 @@ class _ImportStudentTile extends StatelessWidget {
               children: [
                 Text(
                   student.name,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -764,7 +806,9 @@ class _ImportStudentTile extends StatelessWidget {
                     ),
                     _ImportMetaBadge(
                       icon: Icons.payments_outlined,
-                      label: hasPrice ? _formatPrice(student.pricePerClass) : '待补充课时单价',
+                      label: hasPrice
+                          ? _formatPrice(student.pricePerClass)
+                          : '待补充课时单价',
                       color: hasPrice ? kGreen : kOrange,
                     ),
                   ],

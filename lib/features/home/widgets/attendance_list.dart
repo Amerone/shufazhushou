@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
@@ -13,6 +14,8 @@ import '../../../shared/widgets/attendance_edit_sheet.dart';
 import '../../../shared/widgets/brush_stroke_divider.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../core/models/student.dart';
+import '../../students/widgets/student_action_launcher.dart';
+import 'quick_entry_sheet.dart';
 
 class AttendanceList extends ConsumerWidget {
   const AttendanceList({super.key});
@@ -54,7 +57,32 @@ class AttendanceList extends ConsumerWidget {
           ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
         if (records.isEmpty) {
-          return const EmptyState(message: '当日暂无出勤记录');
+          if (students.isEmpty) {
+            return const EmptyState(message: '当日暂无出勤记录');
+          }
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const EmptyState(message: '当日暂无出勤记录'),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () async {
+                  await InteractionFeedback.selection(context);
+                  if (!context.mounted) return;
+                  await showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => const QuickEntrySheet(),
+                  );
+                },
+                icon: const Icon(Icons.brush_outlined),
+                label: const Text('立即记课'),
+              ),
+              const SizedBox(height: 8),
+              Text('记完后，这里会直接出现当天出勤名单。', style: theme.textTheme.bodySmall),
+            ],
+          );
         }
 
         return ListView.separated(
@@ -67,6 +95,7 @@ class AttendanceList extends ConsumerWidget {
             final status = statusLabel(r.status);
             final sColor = statusColor(r.status);
             final durationLabel = _durationLabel(r.startTime, r.endTime);
+            final studentName = nameMap[r.studentId] ?? r.studentId;
 
             return Container(
               decoration: BoxDecoration(
@@ -183,7 +212,7 @@ class AttendanceList extends ConsumerWidget {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            nameMap[r.studentId] ?? r.studentId,
+                                            studentName,
                                             style: theme.textTheme.titleSmall
                                                 ?.copyWith(
                                                   fontWeight: FontWeight.w700,
@@ -251,6 +280,47 @@ class AttendanceList extends ConsumerWidget {
                                     ),
                                   ),
                                 ],
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    FilledButton.tonalIcon(
+                                      onPressed: () async {
+                                        await InteractionFeedback.selection(
+                                          context,
+                                        );
+                                        if (!context.mounted) return;
+                                        await showStudentPaymentSheet(
+                                          context,
+                                          studentId: r.studentId,
+                                          studentName: studentName,
+                                        );
+                                      },
+                                      icon: const Icon(
+                                        Icons.payments_outlined,
+                                        size: 18,
+                                      ),
+                                      label: const Text('记录缴费'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: () async {
+                                        await InteractionFeedback.pageTurn(
+                                          context,
+                                        );
+                                        if (!context.mounted) return;
+                                        context.push(
+                                          '/students/${r.studentId}',
+                                        );
+                                      },
+                                      icon: const Icon(
+                                        Icons.person_outline_outlined,
+                                        size: 18,
+                                      ),
+                                      label: const Text('学生档案'),
+                                    ),
+                                  ],
+                                ),
                                 const SizedBox(height: 12),
                                 if (compact)
                                   Row(

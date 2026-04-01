@@ -43,6 +43,17 @@ void main() {
     expect(find.text('Carol'), findsNothing);
   });
 
+  testWidgets('shows direct payment entry on student cards', (tester) async {
+    _FakeStudentNotifier.seededStudents = _seededStudents;
+
+    await _pumpScreen(tester);
+    final verticalScrollable = find.byType(Scrollable).first;
+    await tester.drag(verticalScrollable, const Offset(0, -900));
+    await _settleUi(tester);
+
+    expect(find.text('记录缴费'), findsAtLeastNWidgets(1));
+  });
+
   testWidgets('clears search query and restores full list', (tester) async {
     _FakeStudentNotifier.seededStudents = _seededStudents;
 

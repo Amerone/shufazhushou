@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
 import 'features/home/screens/home_screen.dart';
+import 'features/home/screens/initial_setup_screen.dart';
 import 'features/home/screens/launch_screen.dart';
 import 'features/settings/screens/backup_screen.dart';
 import 'features/settings/screens/ai_settings_screen.dart';
@@ -22,6 +23,7 @@ final _router = GoRouter(
   initialLocation: '/launch',
   routes: [
     GoRoute(path: '/launch', builder: (ctx, s) => const LaunchScreen()),
+    GoRoute(path: '/setup', builder: (ctx, s) => const InitialSetupScreen()),
     StatefulShellRoute.indexedStack(
       builder: (context, state, shell) => _ScaffoldWithNav(shell: shell),
       branches: [

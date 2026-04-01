@@ -13,6 +13,7 @@ import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
+import '../widgets/student_action_launcher.dart';
 
 enum _StudentListFilter { all, active, suspended }
 
@@ -81,7 +82,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                     data: (list) => '学生档案 (${list.length})',
                   ) ??
                   '学生档案',
-              subtitle: '先找人，再看档案，再补充资料。',
+              subtitle: '先找人，再看档案，也可以直接记录缴费。',
             ),
             Expanded(
               child: RefreshIndicator(
@@ -580,16 +581,52 @@ class _StudentCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.tonalIcon(
-                    onPressed: () {
-                      unawaited(InteractionFeedback.pageTurn(context));
-                      context.push('/students/${student.id}');
-                    },
-                    icon: const Icon(Icons.arrow_outward_outlined, size: 18),
-                    label: const Text('查看档案'),
-                  ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxWidth < 360;
+                    final actionWidth = compact
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 12) / 2;
+
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.end,
+                      children: [
+                        SizedBox(
+                          width: actionWidth,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              await InteractionFeedback.selection(context);
+                              if (!context.mounted) return;
+                              await showStudentPaymentSheet(
+                                context,
+                                studentId: student.id,
+                                studentName:
+                                    displayNames[student.id] ?? student.name,
+                              );
+                            },
+                            icon: const Icon(Icons.payments_outlined, size: 18),
+                            label: const Text('记录缴费'),
+                          ),
+                        ),
+                        SizedBox(
+                          width: actionWidth,
+                          child: FilledButton.tonalIcon(
+                            onPressed: () {
+                              unawaited(InteractionFeedback.pageTurn(context));
+                              context.push('/students/${student.id}');
+                            },
+                            icon: const Icon(
+                              Icons.arrow_outward_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('查看档案'),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

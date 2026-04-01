@@ -15,19 +15,14 @@ class StudentAiProgressCard extends ConsumerStatefulWidget {
   final Student student;
   final VoidCallback? onSaved;
 
-  const StudentAiProgressCard({
-    super.key,
-    required this.student,
-    this.onSaved,
-  });
+  const StudentAiProgressCard({super.key, required this.student, this.onSaved});
 
   @override
   ConsumerState<StudentAiProgressCard> createState() =>
       _StudentAiProgressCardState();
 }
 
-class _StudentAiProgressCardState
-    extends ConsumerState<StudentAiProgressCard> {
+class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
   static const _maxAnalyzeRecords = 10;
 
   bool _analyzing = false;
@@ -158,9 +153,7 @@ class _StudentAiProgressCardState
   String _buildNoteContent(ProgressAnalysisResult result) {
     final lines = <String>[];
     if (result.overallAssessment.isNotEmpty) {
-      lines.add(
-        '\u603b\u4f53\u8bc4\u4ef7\uff1a${result.overallAssessment}',
-      );
+      lines.add('\u603b\u4f53\u8bc4\u4ef7\uff1a${result.overallAssessment}');
     }
     if (result.trendAnalysis.isNotEmpty) {
       lines.add('\u8d8b\u52bf\u5206\u6790\uff1a${result.trendAnalysis}');
@@ -169,9 +162,7 @@ class _StudentAiProgressCardState
       lines.add('\u4f18\u52bf\u65b9\u9762\uff1a${result.strengths}');
     }
     if (result.areasToImprove.isNotEmpty) {
-      lines.add(
-        '\u9700\u52a0\u5f3a\u65b9\u9762\uff1a${result.areasToImprove}',
-      );
+      lines.add('\u9700\u52a0\u5f3a\u65b9\u9762\uff1a${result.areasToImprove}');
     }
     if (result.teachingSuggestions.isNotEmpty) {
       lines.add('\u6559\u5b66\u5efa\u8bae\uff1a');
@@ -185,7 +176,9 @@ class _StudentAiProgressCardState
     }
 
     final fallback = result.rawText.trim();
-    return fallback.isEmpty ? '\u6682\u65e0\u5206\u6790\u7ed3\u679c\u3002' : fallback;
+    return fallback.isEmpty
+        ? '\u6682\u65e0\u5206\u6790\u7ed3\u679c\u3002'
+        : fallback;
   }
 
   String _formatTime(DateTime time) {
@@ -219,16 +212,16 @@ class _StudentAiProgressCardState
                 style: theme.textTheme.titleMedium,
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: kPrimaryBlue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  result == null
-                      ? '\u5f85\u751f\u6210'
-                      : '\u5df2\u751f\u6210',
+                  result == null ? '\u5f85\u751f\u6210' : '\u5df2\u751f\u6210',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: kPrimaryBlue,
                     fontWeight: FontWeight.w700,
@@ -260,6 +253,8 @@ class _StudentAiProgressCardState
               label: Text(
                 _analyzing
                     ? '\u5206\u6790\u4e2d...'
+                    : service == null
+                    ? '\u5148\u5b8c\u6210 AI \u914d\u7f6e'
                     : '\u5206\u6790\u8fd1\u671f\u5b66\u4e60\u8fdb\u5c55',
               ),
             ),
@@ -267,7 +262,7 @@ class _StudentAiProgressCardState
           if (service == null) ...[
             const SizedBox(height: 10),
             Text(
-              '\u4f7f\u7528\u524d\u8bf7\u5148\u5728\u8bbe\u7f6e\u9875\u5b8c\u6210 AI \u914d\u7f6e\u3002',
+              '\u672a\u914d\u7f6e\u65f6\u4e0d\u4f1a\u53d1\u8d77 AI \u8bf7\u6c42\uff0c\u8bf7\u5148\u5728\u8bbe\u7f6e\u9875\u5b8c\u6210 AI \u914d\u7f6e\u3002',
               style: theme.textTheme.bodySmall?.copyWith(color: kOrange),
             ),
           ],
@@ -359,8 +354,8 @@ class _StudentAiProgressCardState
                   _saving
                       ? '\u4fdd\u5b58\u4e2d...'
                       : _savedAt != null
-                          ? '\u5df2\u4fdd\u5b58\u5230\u5b66\u751f\u5907\u6ce8'
-                          : '\u4fdd\u5b58\u5206\u6790\u5230\u5b66\u751f\u5907\u6ce8',
+                      ? '\u5df2\u4fdd\u5b58\u5230\u5b66\u751f\u5907\u6ce8'
+                      : '\u4fdd\u5b58\u5206\u6790\u5230\u5b66\u751f\u5907\u6ce8',
                 ),
               ),
             ),
@@ -382,10 +377,7 @@ class _AnalysisBlock extends StatelessWidget {
   final String label;
   final String content;
 
-  const _AnalysisBlock({
-    required this.label,
-    required this.content,
-  });
+  const _AnalysisBlock({required this.label, required this.content});
 
   @override
   Widget build(BuildContext context) {

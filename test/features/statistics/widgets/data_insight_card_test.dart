@@ -293,6 +293,26 @@ class _FakeAttendanceDao extends AttendanceDao {
       ),
     ];
   }
+
+  @override
+  Future<Map<String, List<Attendance>>> getAllGroupedByStudent() async {
+    return {
+      'student-1': [
+        Attendance(
+          id: 'attendance-0',
+          studentId: 'student-1',
+          date: '2026-02-14',
+          startTime: '10:00',
+          endTime: '11:00',
+          status: 'present',
+          priceSnapshot: 200,
+          feeAmount: 200,
+          createdAt: 0,
+          updatedAt: 0,
+        ),
+      ],
+    };
+  }
 }
 
 class _FakePaymentDao extends PaymentDao {
@@ -306,6 +326,11 @@ class _FakePaymentDao extends PaymentDao {
     String? from,
     String? to,
   ) async {
+    return const {'student-1': 200};
+  }
+
+  @override
+  Future<Map<String, double>> getTotalByAllStudents() async {
     return const {'student-1': 200};
   }
 }

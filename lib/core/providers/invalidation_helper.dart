@@ -4,6 +4,7 @@ import 'class_template_provider.dart';
 import 'contribution_provider.dart';
 import 'fee_summary_provider.dart';
 import 'heatmap_provider.dart';
+import 'home_workbench_provider.dart';
 import 'insight_provider.dart';
 import 'metrics_provider.dart';
 import 'revenue_provider.dart';
@@ -22,6 +23,7 @@ void invalidateAfterAttendanceChange(WidgetRef ref) {
   ref.invalidate(statusDistributionProvider);
   ref.invalidate(heatmapProvider);
   ref.invalidate(insightProvider);
+  ref.invalidate(homeWorkbenchProvider);
 }
 
 /// Invalidate providers after a payment is created or deleted.
@@ -29,6 +31,7 @@ void invalidateAfterPaymentChange(WidgetRef ref) {
   ref.invalidate(feeSummaryProvider);
   ref.invalidate(revenueProvider);
   ref.invalidate(insightProvider);
+  ref.invalidate(homeWorkbenchProvider);
 }
 
 /// Invalidate providers after a student is deleted (cascade deletes attendance/payments).
@@ -42,6 +45,15 @@ void invalidateAfterStudentDelete(WidgetRef ref) {
   ref.invalidate(statusDistributionProvider);
   ref.invalidate(heatmapProvider);
   ref.invalidate(insightProvider);
+  ref.invalidate(homeWorkbenchProvider);
+}
+
+/// Invalidate providers after a student is created or edited.
+void invalidateAfterStudentChange(WidgetRef ref) {
+  ref.invalidate(studentProvider);
+  ref.invalidate(contributionProvider);
+  ref.invalidate(insightProvider);
+  ref.invalidate(homeWorkbenchProvider);
 }
 
 /// Invalidate all statistics-related providers (for refresh on statistics page).
@@ -53,6 +65,7 @@ void invalidateStatistics(WidgetRef ref) {
   ref.invalidate(statusDistributionProvider);
   ref.invalidate(heatmapProvider);
   ref.invalidate(insightProvider);
+  ref.invalidate(homeWorkbenchProvider);
 }
 
 /// Invalidate all data providers (for seed data / clear all data).
@@ -66,6 +79,7 @@ void invalidateAll(WidgetRef ref) {
   ref.invalidate(statusDistributionProvider);
   ref.invalidate(heatmapProvider);
   ref.invalidate(insightProvider);
+  ref.invalidate(homeWorkbenchProvider);
   ref.invalidate(settingsProvider);
   ref.invalidate(classTemplateProvider);
 }

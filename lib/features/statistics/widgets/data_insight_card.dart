@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/models/attendance.dart';
 import '../../../core/models/business_data_summary.dart';
 import '../../../core/models/data_insight_result.dart';
 import '../../../core/models/student.dart';
@@ -169,21 +168,18 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
   }) async {
     final attendance = await ref
         .read(attendanceDaoProvider)
-        .getByDateRange(range.from, range.to);
-    final payments = await ref
-        .read(paymentDaoProvider)
-        .getTotalByAllStudentsAndDateRange(range.from, range.to);
+        .getAllGroupedByStudent();
+    final payments = await ref.read(paymentDaoProvider).getTotalByAllStudents();
     final dismissedKeys = await ref
         .read(dismissedInsightDaoProvider)
         .getAllActiveKeys();
     final displayNames = buildDisplayNameMap(students);
-    final groupedAttendance = _groupAttendanceByStudent(attendance);
     final service = ref.read(insightServiceProvider);
 
     return service.buildInsights(
       students: students,
       displayNames: displayNames,
-      allAttendance: groupedAttendance,
+      allAttendance: attendance,
       allPayments: payments,
       dismissedKeys: dismissedKeys,
       activeStudentCount: activeStudentCount,
@@ -221,16 +217,6 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
           ..sort((a, b) => b.totalFee.compareTo(a.totalFee));
 
     return snapshots.take(5).toList(growable: false);
-  }
-
-  Map<String, List<Attendance>> _groupAttendanceByStudent(
-    List<Attendance> records,
-  ) {
-    final grouped = <String, List<Attendance>>{};
-    for (final record in records) {
-      grouped.putIfAbsent(record.studentId, () => <Attendance>[]).add(record);
-    }
-    return grouped;
   }
 
   String _periodLabel(StatisticsPeriod period) {
@@ -308,6 +294,8 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
               label: Text(
                 _analyzing
                     ? '\u5206\u6790\u4e2d...'
+                    : service == null
+                    ? '\u5148\u5b8c\u6210 AI \u914d\u7f6e'
                     : '\u83b7\u53d6\u6570\u636e\u6d1e\u5bdf',
               ),
             ),
@@ -315,7 +303,7 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
           if (service == null) ...[
             const SizedBox(height: 10),
             Text(
-              '\u4f7f\u7528\u524d\u8bf7\u5148\u5728\u8bbe\u7f6e\u9875\u5b8c\u6210 AI \u914d\u7f6e\u3002',
+              '\u672a\u914d\u7f6e\u65f6\u4e0d\u4f1a\u53d1\u8d77 AI \u8bf7\u6c42\uff0c\u8bf7\u5148\u5728\u8bbe\u7f6e\u9875\u5b8c\u6210 AI \u914d\u7f6e\u3002',
               style: theme.textTheme.bodySmall?.copyWith(color: kOrange),
             ),
           ],

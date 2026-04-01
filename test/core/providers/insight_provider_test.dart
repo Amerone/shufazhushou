@@ -16,61 +16,79 @@ import 'package:moyun/core/services/insight_aggregation_service.dart';
 import 'package:moyun/shared/constants.dart';
 
 void main() {
-  test('InsightNotifier wires DAOs, cleanup and display names correctly', () async {
-    const range = StatisticsRange(
-      period: StatisticsPeriod.month,
-      from: '2026-03-01',
-      to: '2026-03-31',
-    );
-    final studentDao = _FakeStudentDao([
-      const Student(
-        id: 'student-1',
-        name: 'Alex',
-        parentName: 'Parent A',
-        parentPhone: '13800000001',
-        pricePerClass: 100,
-        status: 'active',
-        note: null,
-        createdAt: 1,
-        updatedAt: 1,
-      ),
-      const Student(
-        id: 'student-2',
-        name: 'Alex',
-        parentName: 'Parent B',
-        parentPhone: '13800000002',
-        pricePerClass: 120,
-        status: 'active',
-        note: null,
-        createdAt: 2,
-        updatedAt: 2,
-      ),
-    ]);
-    final attendanceDao = _FakeAttendanceDao(
-      attendance: [
-        Attendance(
-          id: 'attendance-1',
-          studentId: 'student-1',
-          date: '2026-03-25',
-          startTime: '09:00',
-          endTime: '10:00',
-          status: 'present',
-          priceSnapshot: 100,
-          feeAmount: 100,
+  test(
+    'InsightNotifier wires DAOs, cleanup and display names correctly',
+    () async {
+      const range = StatisticsRange(
+        period: StatisticsPeriod.month,
+        from: '2026-03-01',
+        to: '2026-03-31',
+      );
+      final studentDao = _FakeStudentDao([
+        const Student(
+          id: 'student-1',
+          name: 'Alex',
+          parentName: 'Parent A',
+          parentPhone: '13800000001',
+          pricePerClass: 100,
+          status: 'active',
+          note: null,
           createdAt: 1,
           updatedAt: 1,
         ),
-      ],
-      metrics: const {'activeStudentCount': 2},
-    );
-    final paymentDao = _FakePaymentDao(
-      const {'student-1': 300, 'student-2': 0},
-    );
-    final dismissedDao = _FakeDismissedInsightDao(
-      const {'renewal:student-1'},
-    );
-    final spyService = _SpyInsightService(
-      const [
+        const Student(
+          id: 'student-2',
+          name: 'Alex',
+          parentName: 'Parent B',
+          parentPhone: '13800000002',
+          pricePerClass: 120,
+          status: 'active',
+          note: null,
+          createdAt: 2,
+          updatedAt: 2,
+        ),
+      ]);
+      final attendanceDao = _FakeAttendanceDao(
+        attendance: [
+          Attendance(
+            id: 'attendance-1',
+            studentId: 'student-1',
+            date: '2026-03-25',
+            startTime: '09:00',
+            endTime: '10:00',
+            status: 'present',
+            priceSnapshot: 100,
+            feeAmount: 100,
+            createdAt: 1,
+            updatedAt: 1,
+          ),
+        ],
+        groupedAttendance: {
+          'student-1': [
+            Attendance(
+              id: 'attendance-0',
+              studentId: 'student-1',
+              date: '2026-02-20',
+              startTime: '09:00',
+              endTime: '10:00',
+              status: 'present',
+              priceSnapshot: 100,
+              feeAmount: 100,
+              createdAt: 0,
+              updatedAt: 0,
+            ),
+          ],
+        },
+        metrics: const {'activeStudentCount': 2},
+      );
+      final paymentDao = _FakePaymentDao(const {
+        'student-1': 300,
+        'student-2': 0,
+      });
+      final dismissedDao = _FakeDismissedInsightDao(const {
+        'renewal:student-1',
+      });
+      final spyService = _SpyInsightService(const [
         Insight(
           type: InsightType.progress,
           studentId: 'student-1',
@@ -80,49 +98,50 @@ void main() {
           calcLogic: 'Generated when one score improves across 3 records.',
           dataFreshness: '2026-03-27 09:00',
         ),
-      ],
-    );
+      ]);
 
-    final container = ProviderContainer(
-      overrides: [
-        studentDaoProvider.overrideWithValue(studentDao),
-        attendanceDaoProvider.overrideWithValue(attendanceDao),
-        paymentDaoProvider.overrideWithValue(paymentDao),
-        dismissedInsightDaoProvider.overrideWithValue(dismissedDao),
-        insightServiceProvider.overrideWithValue(spyService),
-      ],
-    );
-    addTearDown(container.dispose);
-    container.read(statisticsPeriodProvider.notifier).state = range;
+      final container = ProviderContainer(
+        overrides: [
+          studentDaoProvider.overrideWithValue(studentDao),
+          attendanceDaoProvider.overrideWithValue(attendanceDao),
+          paymentDaoProvider.overrideWithValue(paymentDao),
+          dismissedInsightDaoProvider.overrideWithValue(dismissedDao),
+          insightServiceProvider.overrideWithValue(spyService),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(statisticsPeriodProvider.notifier).state = range;
 
-    final insights = await container.read(insightProvider.future);
+      final insights = await container.read(insightProvider.future);
 
-    expect(dismissedDao.deleteExpiredCalled, isTrue);
-    expect(dismissedDao.getAllActiveKeysCalled, isTrue);
-    expect(insights, hasLength(1));
-    expect(insights.single.type, InsightType.progress);
-    expect(spyService.capturedDismissedKeys, const {'renewal:student-1'});
-    expect(spyService.capturedActiveStudentCount, 2);
-    expect(spyService.capturedActivePeriodLabel, '\u672C\u6708');
-    expect(
-      spyService.capturedDisplayNames['student-1'],
-      'Alex\uFF08Parent A\uFF09',
-    );
-    expect(
-      spyService.capturedDisplayNames['student-2'],
-      'Alex\uFF08Parent B\uFF09',
-    );
-    expect(spyService.capturedAllPayments['student-1'], 300);
-    expect(spyService.capturedAllAttendance['student-1'], hasLength(1));
-    expect(attendanceDao.rangeFrom, range.from);
-    expect(attendanceDao.rangeTo, range.to);
-    expect(attendanceDao.metricsFrom, isNotNull);
-    expect(attendanceDao.metricsTo, isNotNull);
-    expect(attendanceDao.metricsFrom, range.from);
-    expect(attendanceDao.metricsTo, range.to);
-    expect(paymentDao.rangeFrom, range.from);
-    expect(paymentDao.rangeTo, range.to);
-  });
+      expect(dismissedDao.deleteExpiredCalled, isTrue);
+      expect(dismissedDao.getAllActiveKeysCalled, isTrue);
+      expect(insights, hasLength(1));
+      expect(insights.single.type, InsightType.progress);
+      expect(spyService.capturedDismissedKeys, const {'renewal:student-1'});
+      expect(spyService.capturedActiveStudentCount, 2);
+      expect(spyService.capturedActivePeriodLabel, '\u672C\u6708');
+      expect(
+        spyService.capturedDisplayNames['student-1'],
+        'Alex\uFF08Parent A\uFF09',
+      );
+      expect(
+        spyService.capturedDisplayNames['student-2'],
+        'Alex\uFF08Parent B\uFF09',
+      );
+      expect(spyService.capturedAllPayments['student-1'], 300);
+      expect(
+        spyService.capturedAllAttendance['student-1']?.single.date,
+        '2026-02-20',
+      );
+      expect(attendanceDao.groupedByStudentCalled, isTrue);
+      expect(attendanceDao.metricsFrom, isNotNull);
+      expect(attendanceDao.metricsTo, isNotNull);
+      expect(attendanceDao.metricsFrom, range.from);
+      expect(attendanceDao.metricsTo, range.to);
+      expect(paymentDao.totalByAllStudentsCalled, isTrue);
+    },
+  );
 }
 
 class _FakeStudentDao extends StudentDao {
@@ -136,22 +155,27 @@ class _FakeStudentDao extends StudentDao {
 
 class _FakeAttendanceDao extends AttendanceDao {
   final List<Attendance> attendance;
+  final Map<String, List<Attendance>> groupedAttendance;
   final Map<String, dynamic> metrics;
-  String? rangeFrom;
-  String? rangeTo;
+  bool groupedByStudentCalled = false;
   String? metricsFrom;
   String? metricsTo;
 
   _FakeAttendanceDao({
     required this.attendance,
+    required this.groupedAttendance,
     required this.metrics,
   }) : super(DatabaseHelper.instance);
 
   @override
-  Future<List<Attendance>> getByDateRange(String from, String to) async {
-    rangeFrom = from;
-    rangeTo = to;
-    return attendance;
+  Future<Map<String, List<Attendance>>> getAllGroupedByStudent() async {
+    groupedByStudentCalled = true;
+    return {
+      for (final entry in groupedAttendance.entries)
+        entry.key: List<Attendance>.from(entry.value),
+      if (!groupedAttendance.containsKey('student-1'))
+        'student-1': List<Attendance>.from(attendance),
+    };
   }
 
   @override
@@ -164,18 +188,13 @@ class _FakeAttendanceDao extends AttendanceDao {
 
 class _FakePaymentDao extends PaymentDao {
   final Map<String, double> totalsByStudent;
-  String? rangeFrom;
-  String? rangeTo;
+  bool totalByAllStudentsCalled = false;
 
   _FakePaymentDao(this.totalsByStudent) : super(DatabaseHelper.instance);
 
   @override
-  Future<Map<String, double>> getTotalByAllStudentsAndDateRange(
-    String? from,
-    String? to,
-  ) async {
-    rangeFrom = from;
-    rangeTo = to;
+  Future<Map<String, double>> getTotalByAllStudents() async {
+    totalByAllStudentsCalled = true;
     return totalsByStudent;
   }
 }

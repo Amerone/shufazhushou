@@ -18,6 +18,7 @@ class HomeWorkbenchTask {
   final String summary;
   final String actionLabel;
   final String? studentId;
+  final String? studentName;
 
   const HomeWorkbenchTask({
     required this.type,
@@ -25,6 +26,7 @@ class HomeWorkbenchTask {
     required this.summary,
     required this.actionLabel,
     this.studentId,
+    this.studentName,
   });
 }
 
@@ -92,40 +94,45 @@ class HomeWorkbenchService {
           type: HomeWorkbenchTaskType.debt,
           title: '$studentName 待核对费用',
           summary: '${insight.message}，${insight.suggestion}',
-          actionLabel: '核对账单',
+          actionLabel: '记录缴费',
           studentId: insight.studentId,
+          studentName: studentName,
         );
       case InsightType.renewal:
         return HomeWorkbenchTask(
           type: HomeWorkbenchTaskType.renewal,
           title: '$studentName 可沟通续费',
           summary: '${insight.message}，${insight.suggestion}',
-          actionLabel: '查看续费',
+          actionLabel: '登记续费',
           studentId: insight.studentId,
+          studentName: studentName,
         );
       case InsightType.churn:
         return HomeWorkbenchTask(
           type: HomeWorkbenchTaskType.churn,
           title: '$studentName 需要回访',
           summary: '${insight.message}，${insight.suggestion}',
-          actionLabel: '安排回访',
+          actionLabel: '查看档案',
           studentId: insight.studentId,
+          studentName: studentName,
         );
       case InsightType.trial:
         return HomeWorkbenchTask(
           type: HomeWorkbenchTaskType.trial,
           title: '$studentName 试听待跟进',
           summary: '${insight.message}，${insight.suggestion}',
-          actionLabel: '查看转化',
+          actionLabel: '查看档案',
           studentId: insight.studentId,
+          studentName: studentName,
         );
       case InsightType.progress:
         return HomeWorkbenchTask(
           type: HomeWorkbenchTaskType.progress,
           title: '$studentName 适合反馈进步',
           summary: '${insight.message}，${insight.suggestion}',
-          actionLabel: '查看成长',
+          actionLabel: '生成月报',
           studentId: insight.studentId,
+          studentName: studentName,
         );
       case InsightType.peak:
         return null;
@@ -166,6 +173,7 @@ class HomeWorkbenchService {
           summary: '本月已完成 $count 节正式课程，适合整理家长版学习快照。',
           actionLabel: '生成月报',
           studentId: student.id,
+          studentName: displayNames[student.id] ?? student.name,
         ),
       );
     }

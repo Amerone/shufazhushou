@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/constants.dart';
-import '../models/attendance.dart';
 import '../models/student.dart';
 import '../services/home_workbench_service.dart';
 import 'attendance_provider.dart';
@@ -31,11 +30,8 @@ final homeWorkbenchProvider = FutureProvider<List<HomeWorkbenchTask>>((
   final students = await studentDao.getAll();
   final displayNames = buildDisplayNameMap(students);
   final attendance = await attendanceDao.getByDateRange(from, to);
-  final allAttendance = _groupAttendanceByStudent(attendance);
-  final allPayments = await paymentDao.getTotalByAllStudentsAndDateRange(
-    from,
-    to,
-  );
+  final allAttendance = await attendanceDao.getAllGroupedByStudent();
+  final allPayments = await paymentDao.getTotalByAllStudents();
   final dismissedKeys = await dismissedDao.getAllActiveKeys();
   final metrics = await attendanceDao.getMetrics(from, to);
 
@@ -57,13 +53,3 @@ final homeWorkbenchProvider = FutureProvider<List<HomeWorkbenchTask>>((
     monthAttendance: attendance,
   );
 });
-
-Map<String, List<Attendance>> _groupAttendanceByStudent(
-  List<Attendance> records,
-) {
-  final grouped = <String, List<Attendance>>{};
-  for (final record in records) {
-    grouped.putIfAbsent(record.studentId, () => <Attendance>[]).add(record);
-  }
-  return grouped;
-}
