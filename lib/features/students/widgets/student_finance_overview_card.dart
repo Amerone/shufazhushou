@@ -56,8 +56,6 @@ class StudentFinanceOverviewCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text('按月查看应收、已收，余额会自动继承上月结转。', style: theme.textTheme.bodySmall),
               const SizedBox(height: 12),
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -108,13 +106,13 @@ class StudentFinanceOverviewCard extends StatelessWidget {
                   _FinanceBadge(
                     icon: Icons.history_toggle_off_outlined,
                     label:
-                        '上月结转 ¥${monthlyFee.openingBalance.toStringAsFixed(2)}',
+                        '期初结转 ¥${monthlyFee.openingBalance.toStringAsFixed(2)}',
                     color: _ledgerAmountColor(monthlyFee.openingBalance),
                   ),
                   _FinanceBadge(
                     icon: Icons.sync_alt_outlined,
                     label:
-                        '本月净变化 ¥${monthlyFee.periodNetChange.toStringAsFixed(2)}',
+                        '本期变化 ¥${monthlyFee.periodNetChange.toStringAsFixed(2)}',
                     color: _ledgerAmountColor(monthlyFee.periodNetChange),
                   ),
                 ],
@@ -228,11 +226,6 @@ class _AllTimeBalanceBanner extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(ledger.totalBalanceLabel, style: theme.textTheme.bodySmall),
-            const SizedBox(width: 4),
-            const Tooltip(
-              message: '总余额 = 累计已收 - 累计应收。正数表示结余，负数表示欠费。',
-              child: Icon(Icons.info_outline, size: 14, color: kInkSecondary),
-            ),
           ],
         );
         final value = Text(

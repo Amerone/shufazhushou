@@ -32,6 +32,73 @@ class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
   ProgressAnalysisResult? _analysisResult;
   DateTime? _analyzedAt;
   DateTime? _savedAt;
+  String? _savedProgressNoteSignature;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncSavedProgressFromNote(force: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant StudentAiProgressCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.student.id != widget.student.id) {
+      _syncSavedProgressFromNote(force: true);
+      return;
+    }
+    if (oldWidget.student.note != widget.student.note) {
+      _syncSavedProgressFromNote();
+    }
+  }
+
+  void _syncSavedProgressFromNote({bool force = false}) {
+    if (!force && _analysisResult != null && _savedAt == null) {
+      return;
+    }
+
+    final entry = AiAnalysisNoteCodec.latestEntry(
+      widget.student.note,
+      type: 'progress',
+    );
+    final signature = entry == null
+        ? null
+        : '${entry.createdAt.millisecondsSinceEpoch}|${entry.content.trim()}';
+    if (!force && signature == _savedProgressNoteSignature) {
+      return;
+    }
+
+    if (entry == null) {
+      final shouldClear = force
+          ? _analysisResult != null ||
+                _analyzedAt != null ||
+                _savedAt != null ||
+                _savedProgressNoteSignature != null ||
+                _errorText != null
+          : _savedProgressNoteSignature != null && _savedAt != null;
+      if (shouldClear) {
+        setState(() {
+          _analysisResult = null;
+          _analyzedAt = null;
+          _savedAt = null;
+          _savedProgressNoteSignature = null;
+          _errorText = null;
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _analysisResult = ProgressAnalysisResult.fromSavedNote(
+        rawText: entry.content,
+      );
+      _analyzedAt = entry.createdAt;
+      _savedAt = entry.createdAt;
+      _savedProgressNoteSignature = signature;
+      _errorText = null;
+      _expanded = true;
+    });
+  }
 
   Future<void> _analyzeProgress() async {
     final service = ref.read(progressAnalysisServiceProvider);
@@ -49,6 +116,7 @@ class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
       _analysisResult = null;
       _analyzedAt = null;
       _savedAt = null;
+      _savedProgressNoteSignature = null;
     });
 
     try {
@@ -74,13 +142,14 @@ class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
       setState(() {
         _analysisResult = result;
         _analyzedAt = DateTime.now();
+        _savedAt = null;
         _expanded = true;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _analysisResult = null;
-        _errorText = error.toString();
+        _errorText = _formatError(error);
       });
     } finally {
       if (mounted) {
@@ -135,6 +204,7 @@ class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
 
       if (!mounted) return;
       setState(() => _savedAt = DateTime.now());
+      _syncSavedProgressFromNote(force: true);
       widget.onSaved?.call();
       AppToast.showSuccess(
         context,
@@ -142,7 +212,7 @@ class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
       );
     } catch (error) {
       if (!mounted) return;
-      setState(() => _errorText = error.toString());
+      setState(() => _errorText = _formatError(error));
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -189,13 +259,35 @@ class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
     return '${time.year}-$month-$day $hour:$minute';
   }
 
+  String _formatError(Object error) {
+    final text = error.toString().trim();
+    const knownPrefixes = <String>[
+      'Exception: ',
+      'FormatException: ',
+      'VisionAnalysisException: ',
+    ];
+
+    for (final prefix in knownPrefixes) {
+      if (text.startsWith(prefix)) {
+        return text.substring(prefix.length).trim();
+      }
+    }
+
+    final separatorIndex = text.indexOf(': ');
+    if (separatorIndex > 0) {
+      return text.substring(separatorIndex + 2).trim();
+    }
+    return text;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final service = ref.watch(progressAnalysisServiceProvider);
     final canAnalyze = service != null && !_analyzing;
     final result = _analysisResult;
-    final canSave = result != null && !_saving && _savedAt == null;
+    final hasSavedResult = _savedAt != null;
+    final canSave = result != null && !_saving && !hasSavedResult;
 
     return GlassCard(
       padding: const EdgeInsets.all(18),
@@ -221,7 +313,11 @@ class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  result == null ? '\u5f85\u751f\u6210' : '\u5df2\u751f\u6210',
+                  hasSavedResult
+                      ? '\u5df2\u4fdd\u5b58'
+                      : result == null
+                      ? '\u5f85\u751f\u6210'
+                      : '\u5df2\u751f\u6210',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: kPrimaryBlue,
                     fontWeight: FontWeight.w700,
@@ -229,11 +325,6 @@ class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '\u603b\u7ed3\u6700\u8fd1 10 \u6761\u51fa\u52e4\u8bb0\u5f55\uff0c\u5e76\u7531\u4f60\u51b3\u5b9a\u662f\u5426\u4fdd\u5b58\u5230\u5b66\u751f\u5907\u6ce8\u3002',
-            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -254,8 +345,12 @@ class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
                 _analyzing
                     ? '\u5206\u6790\u4e2d...'
                     : service == null
-                    ? '\u5148\u5b8c\u6210 AI \u914d\u7f6e'
-                    : '\u5206\u6790\u8fd1\u671f\u5b66\u4e60\u8fdb\u5c55',
+                    ? result == null
+                          ? '\u5148\u5b8c\u6210 AI \u914d\u7f6e'
+                          : '\u5df2\u6709\u4fdd\u5b58\u7ed3\u679c'
+                    : result == null
+                    ? '\u5206\u6790\u8fd1\u671f\u5b66\u4e60\u8fdb\u5c55'
+                    : '\u66f4\u65b0\u8fd1\u671f\u5b66\u4e60\u8fdb\u5c55',
               ),
             ),
           ),
@@ -362,7 +457,9 @@ class _StudentAiProgressCardState extends ConsumerState<StudentAiProgressCard> {
             if (_savedAt != null) ...[
               const SizedBox(height: 8),
               Text(
-                '\u5df2\u4fdd\u5b58\u4e8e ${_formatTime(_savedAt!)}',
+                hasSavedResult
+                    ? '\u5df2\u4fdd\u5b58\u4e8e ${_formatTime(_savedAt!)}'
+                    : '\u5df2\u66f4\u65b0\u4e8e ${_formatTime(_savedAt!)}',
                 style: theme.textTheme.bodySmall?.copyWith(color: kGreen),
               ),
             ],

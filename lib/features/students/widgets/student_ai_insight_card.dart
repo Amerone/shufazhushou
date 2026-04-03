@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/models/ai_analysis_note_entry.dart';
 import '../../../core/models/student.dart';
 import '../../../core/models/student_insight_result.dart';
 import '../../../core/providers/ai_provider.dart';
@@ -10,6 +11,8 @@ import '../../../core/services/ai_analysis_note_codec.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/glass_card.dart';
+
+enum _InsightDisplaySource { none, saved, generated }
 
 class StudentAiInsightCard extends ConsumerStatefulWidget {
   final Student student;
@@ -32,6 +35,28 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
   StudentInsightResult? _result;
   DateTime? _analyzedAt;
   DateTime? _savedAt;
+  _InsightDisplaySource _displaySource = _InsightDisplaySource.none;
+  String? _savedInsightSignature;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreSavedInsight(initialLoad: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant StudentAiInsightCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.student.id != widget.student.id) {
+      _restoreSavedInsight(force: true);
+      return;
+    }
+    if (oldWidget.student.note != widget.student.note) {
+      _restoreSavedInsight(
+        force: _displaySource != _InsightDisplaySource.generated,
+      );
+    }
+  }
 
   Future<void> _analyzeInsight() async {
     final service = ref.read(studentInsightAnalysisServiceProvider);
@@ -46,6 +71,7 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
       _result = null;
       _analyzedAt = null;
       _savedAt = null;
+      _displaySource = _InsightDisplaySource.none;
     });
 
     try {
@@ -62,13 +88,14 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
         _result = result;
         _analyzedAt = DateTime.now();
         _expanded = true;
+        _displaySource = _InsightDisplaySource.generated;
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _result = null;
-        _errorText = error.toString();
-      });
+      final errorText = _formatError(error);
+      _restoreSavedInsight(force: true);
+      if (!mounted) return;
+      setState(() => _errorText = errorText);
     } finally {
       if (mounted) {
         setState(() => _analyzing = false);
@@ -97,7 +124,11 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
       );
       if (existingInsightContent?.trim() == noteContent) {
         if (!mounted) return;
-        setState(() => _savedAt = DateTime.now());
+        setState(() {
+          _savedAt = DateTime.now();
+          _displaySource = _InsightDisplaySource.saved;
+        });
+        _restoreSavedInsight(force: true);
         AppToast.showSuccess(context, '当前学生洞察已存在于学生备注中。');
         return;
       }
@@ -118,17 +149,97 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
       await ref.read(studentProvider.notifier).reload();
 
       if (!mounted) return;
-      setState(() => _savedAt = DateTime.now());
+      setState(() {
+        _savedAt = DateTime.now();
+        _displaySource = _InsightDisplaySource.saved;
+      });
       widget.onSaved?.call();
       AppToast.showSuccess(context, '学生洞察已保存到学生备注。');
     } catch (error) {
       if (!mounted) return;
-      setState(() => _errorText = error.toString());
+      setState(() => _errorText = _formatError(error));
     } finally {
       if (mounted) {
         setState(() => _saving = false);
       }
     }
+  }
+
+  void _restoreSavedInsight({bool initialLoad = false, bool force = false}) {
+    final latestEntry = AiAnalysisNoteCodec.latestEntry(
+      widget.student.note,
+      type: 'student_insight',
+    );
+    final savedContent = latestEntry?.content.trim();
+    final nextSignature = savedContent == null || savedContent.isEmpty
+        ? null
+        : '${latestEntry!.createdAt.toIso8601String()}::$savedContent';
+    final hasUnsavedGeneratedResult =
+        _displaySource == _InsightDisplaySource.generated &&
+        _result != null &&
+        _savedAt == null;
+
+    if (hasUnsavedGeneratedResult && !force) {
+      return;
+    }
+    if (!initialLoad && !force && nextSignature == _savedInsightSignature) {
+      return;
+    }
+
+    if (initialLoad) {
+      _applySavedInsight(latestEntry, savedContent, nextSignature);
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _applySavedInsight(latestEntry, savedContent, nextSignature);
+    });
+  }
+
+  void _applySavedInsight(
+    AiAnalysisNoteEntry? latestEntry,
+    String? savedContent,
+    String? nextSignature,
+  ) {
+    _savedInsightSignature = nextSignature;
+    if (savedContent == null || savedContent.isEmpty || latestEntry == null) {
+      if (_displaySource == _InsightDisplaySource.saved ||
+          _result == null ||
+          _savedAt != null) {
+        _result = null;
+        _analyzedAt = null;
+        _savedAt = null;
+        _displaySource = _InsightDisplaySource.none;
+      }
+      return;
+    }
+
+    _result = StudentInsightResult.fromSavedNote(rawText: savedContent);
+    _analyzedAt = latestEntry.createdAt;
+    _savedAt = latestEntry.createdAt;
+    _displaySource = _InsightDisplaySource.saved;
+    _expanded = true;
+    _errorText = null;
+  }
+
+  String _formatError(Object error) {
+    final text = error.toString().trim();
+    const knownPrefixes = <String>[
+      'Exception: ',
+      'FormatException: ',
+      'VisionAnalysisException: ',
+    ];
+    for (final prefix in knownPrefixes) {
+      if (text.startsWith(prefix)) {
+        return text.substring(prefix.length).trim();
+      }
+    }
+    final separatorIndex = text.indexOf(': ');
+    if (separatorIndex > 0) {
+      return text.substring(separatorIndex + 2).trim();
+    }
+    return text.isEmpty ? '分析失败，请稍后重试。' : text;
   }
 
   String _buildNoteContent(StudentInsightResult result) {
@@ -188,6 +299,12 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
         .length;
     final canAnalyze = service != null && !_analyzing;
     final canSave = _result != null && !_saving && _savedAt == null;
+    final statusLabel = switch (_displaySource) {
+      _InsightDisplaySource.saved => '已保存',
+      _InsightDisplaySource.generated => '已生成',
+      _ => '待生成',
+    };
+    final hasSavedInsight = _displaySource == _InsightDisplaySource.saved;
 
     return GlassCard(
       padding: const EdgeInsets.all(18),
@@ -210,7 +327,7 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  _result == null ? '待生成' : '已生成',
+                  statusLabel,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: kSealRed,
                     fontWeight: FontWeight.w700,
@@ -218,11 +335,6 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '结合上课规律、课堂记录和已保存的作品分析，给老师更适合备课和家长沟通的学生画像。',
-            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -244,7 +356,7 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
           if (handwritingCount == 0) ...[
             const SizedBox(height: 10),
             Text(
-              '提示：先在出勤记录里上传课堂作品并做 AI 分析，学生洞察会更准确。',
+              '先做作品分析，洞察会更准。',
               style: theme.textTheme.bodySmall?.copyWith(color: kOrange),
             ),
           ],
@@ -265,7 +377,9 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
                     ? '分析中...'
                     : service == null
                     ? '先完成 AI 配置'
-                    : '分析学生洞察',
+                    : _result == null
+                    ? '分析学生洞察'
+                    : '重新分析学生洞察',
               ),
             ),
           ),
@@ -292,6 +406,11 @@ class _StudentAiInsightCardState extends ConsumerState<StudentAiInsightCard> {
             ),
           ],
           if (_result != null) ...[
+            const SizedBox(height: 12),
+            _InsightQuickUsePanel(
+              result: _result!,
+              hasSavedInsight: hasSavedInsight,
+            ),
             const SizedBox(height: 12),
             Theme(
               data: theme.copyWith(dividerColor: Colors.transparent),
@@ -476,6 +595,129 @@ class _InsightListBlock extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _InsightQuickUsePanel extends StatelessWidget {
+  final StudentInsightResult result;
+  final bool hasSavedInsight;
+
+  const _InsightQuickUsePanel({
+    required this.result,
+    required this.hasSavedInsight,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lessonSuggestion = result.teachingSuggestions.isEmpty
+        ? ''
+        : result.teachingSuggestions.first;
+    final riskAlert = result.riskAlerts.isEmpty ? '' : result.riskAlerts.first;
+    final parentTip = result.parentCommunicationTip.trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kPrimaryBlue.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                hasSavedInsight ? '老师现在可直接用' : '这次分析建议先这样用',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: kPrimaryBlue,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (hasSavedInsight)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '已保存',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: kGreen,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (lessonSuggestion.isNotEmpty)
+            _QuickUseLine(
+              label: '下节课先做',
+              content: lessonSuggestion,
+              color: kGreen,
+            ),
+          if (riskAlert.isNotEmpty) ...[
+            if (lessonSuggestion.isNotEmpty) const SizedBox(height: 8),
+            _QuickUseLine(label: '课堂留意', content: riskAlert, color: kSealRed),
+          ],
+          if (parentTip.isNotEmpty) ...[
+            if (lessonSuggestion.isNotEmpty || riskAlert.isNotEmpty)
+              const SizedBox(height: 8),
+            _QuickUseLine(
+              label: '家长可说',
+              content: parentTip,
+              color: kPrimaryBlue,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickUseLine extends StatelessWidget {
+  final String label;
+  final String content;
+  final Color color;
+
+  const _QuickUseLine({
+    required this.label,
+    required this.content,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return RichText(
+      text: TextSpan(
+        style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
+        children: [
+          TextSpan(
+            text: '$label：',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextSpan(
+            text: content,
+            style: theme.textTheme.bodySmall?.copyWith(color: kInkSecondary),
+          ),
+        ],
       ),
     );
   }

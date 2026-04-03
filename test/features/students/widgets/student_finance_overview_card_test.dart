@@ -53,6 +53,7 @@ void main() {
 
     expect(find.text('截至当前待缴'), findsOneWidget);
     expect(find.text('总待缴'), findsOneWidget);
-    expect(find.text('上月结转 ¥-50.00'), findsOneWidget);
+    expect(find.text('期初结转 ¥-50.00'), findsOneWidget);
+    expect(find.text('本期变化 ¥-200.00'), findsOneWidget);
   });
 }

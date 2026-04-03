@@ -114,6 +114,61 @@ void main() {
       expect(_FakeStudentNotifier.reloadCount, 1);
     },
   );
+
+  testWidgets('restores saved insight note when reopening the card', (
+    tester,
+  ) async {
+    final student = Student(
+      id: 'student-saved',
+      name: 'Alice',
+      pricePerClass: 200,
+      status: 'active',
+      note: AiAnalysisNoteCodec.appendStudentInsight(
+        existingNote: null,
+        analysisText:
+            '总体画像：课堂状态稳定，进入持续进步阶段\n'
+            '上课规律：最近两周基本按时到课\n'
+            '作品观察：结构更稳，行气更顺\n'
+            '进步判断：近三次课堂里结构控制明显提升\n'
+            '风险提醒：\n'
+            '1. 请假后需要重新热身\n'
+            '教学建议：\n'
+            '1. 下节课先做控笔热身\n'
+            '2. 继续巩固中宫\n'
+            '3. 安排一组行气过渡练习\n'
+            '家长沟通：这段时间孩子状态比较稳，可以继续按现在节奏推进。',
+        analyzedAt: DateTime(2026, 3, 31, 20, 0),
+      ),
+      createdAt: 1,
+      updatedAt: 1,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          studentInsightAnalysisServiceProvider.overrideWithValue(null),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SafeArea(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: StudentAiInsightCard(student: student),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    expect(find.text('已保存'), findsWidgets);
+    expect(find.text('课堂状态稳定，进入持续进步阶段'), findsOneWidget);
+    expect(find.textContaining('请假后需要重新热身'), findsOneWidget);
+    expect(find.text('先完成 AI 配置'), findsOneWidget);
+  });
 }
 
 class _FakeStudentInsightAnalysisService extends StudentInsightAnalysisService {

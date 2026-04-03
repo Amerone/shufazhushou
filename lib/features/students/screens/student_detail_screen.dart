@@ -39,6 +39,7 @@ import '../widgets/student_ai_progress_card.dart';
 import '../widgets/student_finance_overview_card.dart';
 import '../widgets/student_growth_workbench_card.dart';
 import '../widgets/student_parent_message_card.dart';
+import '../widgets/student_primary_actions_card.dart';
 
 enum _StudentDetailAnchor {
   finance,
@@ -563,7 +564,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             builder: (context, constraints) {
                               final compact = constraints.maxWidth < 420;
                               final metricColumns = constraints.maxWidth >= 720
-                                  ? 4
+                                  ? 3
                                   : 2;
                               final metricWidth =
                                   (constraints.maxWidth -
@@ -615,7 +616,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                                   WrapCrossAlignment.center,
                                               children: [
                                                 Text(
-                                                  '\u5b66\u751f\u6863\u6848\u6982\u89c8',
+                                                  '\u6863\u6848\u6458\u8981',
                                                   style: theme
                                                       .textTheme
                                                       .titleMedium
@@ -630,18 +631,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                                   label: statusText,
                                                   color: statusColor,
                                                 ),
-                                                _ProfileBadge(
-                                                  icon: Icons.payments_outlined,
-                                                  label:
-                                                      '\u8bfe\u65f6\u5355\u4ef7 \u00a5${student.pricePerClass.toStringAsFixed(0)}',
-                                                  color: kPrimaryBlue,
-                                                ),
                                               ],
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              '\u5728\u8fd9\u91cc\u96c6\u4e2d\u67e5\u770b\u5bb6\u957f\u4fe1\u606f\u3001\u6700\u8fd1\u8bfe\u7a0b\u548c\u7f34\u8d39\u52a8\u6001\u3002',
-                                              style: theme.textTheme.bodySmall,
                                             ),
                                           ],
                                         ),
@@ -665,11 +655,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                           icon: Icons.call_outlined,
                                           label: student.parentPhone!,
                                         ),
-                                      _InfoChip(
-                                        icon: Icons.history_toggle_off_outlined,
-                                        label:
-                                            '\u6700\u8fd1\u51fa\u52e4\uff1a$lastAttendanceLabel',
-                                      ),
                                     ],
                                   ),
                                   const SizedBox(height: 16),
@@ -702,15 +687,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                           value: attendanceCountLabel,
                                           color: kSealRed,
                                           icon: Icons.fact_check_outlined,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: metricWidth,
-                                        child: _StudentSnapshot(
-                                          label: '\u72b6\u6001',
-                                          value: statusText,
-                                          color: statusColor,
-                                          icon: Icons.badge_outlined,
                                         ),
                                       ),
                                     ],
@@ -772,137 +748,12 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     const SizedBox(height: 16),
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.actions],
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  '\u5feb\u901f\u64cd\u4f5c',
-                                  style: theme.textTheme.titleMedium,
-                                ),
-                                _ProfileBadge(
-                                  icon: Icons.flash_on_outlined,
-                                  label: '\u5feb\u901f\u5165\u53e3',
-                                  color: kSealRed,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '\u4e0d\u79bb\u5f00\u5f53\u524d\u9875\u5373\u53ef\u751f\u6210\u62a5\u544a\u6216\u8bb0\u5f55\u7f34\u8d39\u3002',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 14),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: const [
-                                _ActionHintChip(
-                                  icon: Icons.description_outlined,
-                                  label: '\u5bfc\u51fa PDF \u62a5\u544a',
-                                ),
-                                _ActionHintChip(
-                                  icon: Icons.payments_outlined,
-                                  label:
-                                      '\u4fdd\u5b58\u540e\u81ea\u52a8\u5237\u65b0\u4f59\u989d',
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final width = constraints.maxWidth;
-                                final buttonWidth = width < 420
-                                    ? width
-                                    : (width - 10) / 2;
-
-                                return Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  children: [
-                                    SizedBox(
-                                      width: buttonWidth,
-                                      child: OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                          ),
-                                        ),
-                                        onPressed: _openExportSheet,
-                                        icon: const Icon(
-                                          Icons.description_outlined,
-                                        ),
-                                        label: const Text(
-                                          '\u5bfc\u51fa\u62a5\u544a',
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: buttonWidth,
-                                      child: ElevatedButton.icon(
-                                        style: ElevatedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                          ),
-                                        ),
-                                        onPressed: () =>
-                                            _openPaymentSheet(student),
-                                        icon: const Icon(
-                                          Icons.payments_outlined,
-                                        ),
-                                        label: const Text(
-                                          '\u65b0\u589e\u7f34\u8d39',
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: buttonWidth,
-                                      child: FilledButton.tonalIcon(
-                                        style: FilledButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                          ),
-                                        ),
-                                        onPressed: _openEditStudent,
-                                        icon: const Icon(
-                                          Icons.edit_note_outlined,
-                                        ),
-                                        label: const Text(
-                                          '\u7f16\u8f91\u6863\u6848',
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: buttonWidth,
-                                      child: FilledButton.tonalIcon(
-                                        style: FilledButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                          ),
-                                        ),
-                                        onPressed: () => _scrollToSection(
-                                          _StudentDetailAnchor.attendance,
-                                        ),
-                                        icon: const Icon(
-                                          Icons.fact_check_outlined,
-                                        ),
-                                        label: const Text(
-                                          '\u8df3\u81f3\u51fa\u52e4',
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
-                        ),
+                      child: StudentPrimaryActionsCard(
+                        onOpenPayment: () => _openPaymentSheet(student),
+                        onOpenAttendance: () =>
+                            _scrollToSection(_StudentDetailAnchor.attendance),
+                        onOpenExport: _openExportSheet,
+                        onEditStudent: _openEditStudent,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -939,11 +790,13 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                           ),
                           const SizedBox(height: 10),
                           if (_payments.isEmpty)
-                            const GlassCard(
-                              padding: EdgeInsets.all(18),
+                            GlassCard(
+                              padding: const EdgeInsets.all(18),
                               child: EmptyState(
                                 message:
                                     '\u6682\u65f6\u8fd8\u6ca1\u6709\u7f34\u8d39\u8bb0\u5f55\u3002',
+                                actionLabel: '\u65b0\u589e\u7f34\u8d39',
+                                onAction: () => _openPaymentSheet(student),
                               ),
                             )
                           else
@@ -988,11 +841,13 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                           ),
                           const SizedBox(height: 10),
                           if (_records.isEmpty && !_hasMore)
-                            const GlassCard(
-                              padding: EdgeInsets.all(18),
+                            GlassCard(
+                              padding: const EdgeInsets.all(18),
                               child: EmptyState(
                                 message:
                                     '\u6682\u65f6\u8fd8\u6ca1\u6709\u51fa\u52e4\u8bb0\u5f55\u3002',
+                                actionLabel: '\u53bb\u9996\u9875\u8bb0\u8bfe',
+                                onAction: () => context.go('/'),
                               ),
                             )
                           else
@@ -1081,22 +936,10 @@ class _StudentDetailQuickNavigator extends StatelessWidget {
       color: kPrimaryBlue,
     ),
     _StudentQuickNavItem(
-      anchor: _StudentDetailAnchor.growth,
-      icon: Icons.auto_graph_outlined,
-      label: '成长',
-      color: kGreen,
-    ),
-    _StudentQuickNavItem(
       anchor: _StudentDetailAnchor.communication,
       icon: Icons.chat_bubble_outline,
       label: '沟通',
       color: kPrimaryBlue,
-    ),
-    _StudentQuickNavItem(
-      anchor: _StudentDetailAnchor.actions,
-      icon: Icons.flash_on_outlined,
-      label: '快捷',
-      color: kSealRed,
     ),
     _StudentQuickNavItem(
       anchor: _StudentDetailAnchor.payments,
@@ -1125,14 +968,14 @@ class _StudentDetailQuickNavigator extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '区块导航',
+                  '快速定位',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
               Text(
-                '档案速览',
+                '常看区块',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: kInkSecondary,
                   fontWeight: FontWeight.w700,
@@ -1142,17 +985,13 @@ class _StudentDetailQuickNavigator extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '直接跳到费用、成长、缴费或出勤区块，减少长页面中的来回滚动。',
+            '只保留费用、沟通、缴费和出勤，减少长页面里的重复跳转。',
             style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
           ),
           const SizedBox(height: 14),
           LayoutBuilder(
             builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 720
-                  ? 4
-                  : constraints.maxWidth >= 460
-                  ? 3
-                  : 2;
+              final columns = constraints.maxWidth >= 640 ? 4 : 2;
               final itemWidth =
                   (constraints.maxWidth - 10 * (columns - 1)) / columns;
 
@@ -1415,47 +1254,24 @@ class _DetailNoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.58),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: kPrimaryBlue.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.sticky_note_2_outlined,
-              size: 18,
-              color: kPrimaryBlue,
-            ),
+          Text(
+            '\u5907\u6ce8',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '\u5907\u6ce8',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(note, style: theme.textTheme.bodyMedium),
-              ],
-            ),
-          ),
+          const SizedBox(height: 6),
+          Text(note),
         ],
       ),
     );
@@ -1491,39 +1307,6 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-class _ActionHintChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _ActionHintChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.68),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: kPrimaryBlue),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: kPrimaryBlue,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PaymentCard extends StatelessWidget {
   final Payment payment;
   final VoidCallback onDelete;
@@ -1542,22 +1325,6 @@ class _PaymentCard extends StatelessWidget {
           final deleteAction = _DangerActionButton(
             tooltip: '\u5220\u9664\u7f34\u8d39\u8bb0\u5f55',
             onPressed: onDelete,
-          );
-
-          final actionHint = Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
-            ),
-            child: Text(
-              '\u5220\u9664',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: kPrimaryBlue,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
           );
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1604,65 +1371,22 @@ class _PaymentCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: kGreen.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            '\u5df2\u6536',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: kGreen,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
+                        if (compact) deleteAction,
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _DetailMetaChip(
-                          icon: Icons.calendar_today_outlined,
-                          label: payment.paymentDate,
-                        ),
-                        _DetailMetaChip(
-                          icon: Icons.receipt_long_outlined,
-                          label: '\u5df2\u8ba1\u5165\u5b66\u751f\u4f59\u989d',
-                        ),
-                      ],
+                    _DetailMetaChip(
+                      icon: Icons.calendar_today_outlined,
+                      label: payment.paymentDate,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      payment.note?.isNotEmpty == true
-                          ? payment.note!
-                          : '\u8fd9\u7b14\u7f34\u8d39\u5df2\u8ba1\u5165\u5b66\u751f\u4f59\u989d\u3002',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 10),
-                    if (compact)
-                      Row(children: [actionHint, const Spacer(), deleteAction]),
+                    if (payment.note?.isNotEmpty == true) ...[
+                      const SizedBox(height: 8),
+                      Text(payment.note!, style: theme.textTheme.bodySmall),
+                    ],
                   ],
                 ),
               ),
-              if (!compact) ...[
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    actionHint,
-                    const SizedBox(height: 10),
-                    deleteAction,
-                  ],
-                ),
-              ],
+              if (!compact) ...[const SizedBox(width: 10), deleteAction],
             ],
           );
         },
@@ -1708,21 +1432,6 @@ class _AttendanceCard extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 420;
-          final actionHint = Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
-            ),
-            child: Text(
-              '\u70b9\u51fb\u7f16\u8f91',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: kPrimaryBlue,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          );
           final analysisAction = Container(
             decoration: BoxDecoration(
               color: kPrimaryBlue.withValues(alpha: 0.08),
@@ -1787,24 +1496,7 @@ class _AttendanceCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColorValue.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            statusLabel(record.status),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: statusColorValue,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
+                        if (compact) analysisAction,
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -1879,25 +1571,10 @@ class _AttendanceCard extends StatelessWidget {
                             .toList(growable: false),
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    if (compact)
-                      Row(
-                        children: [actionHint, const Spacer(), analysisAction],
-                      ),
                   ],
                 ),
               ),
-              if (!compact) ...[
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    analysisAction,
-                    const SizedBox(height: 10),
-                    actionHint,
-                  ],
-                ),
-              ],
+              if (!compact) ...[const SizedBox(width: 10), analysisAction],
             ],
           );
         },

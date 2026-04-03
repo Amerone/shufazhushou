@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/services/student_growth_summary_service.dart';
 import '../../../core/utils/fee_calculator.dart';
 import '../../../shared/theme.dart';
-import '../../../shared/widgets/brush_stroke_divider.dart';
 import '../../../shared/widgets/glass_card.dart';
 
 class StudentGrowthWorkbenchCard extends StatelessWidget {
@@ -71,13 +70,6 @@ class StudentGrowthWorkbenchCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          const BrushStrokeDivider(width: 138, height: 12, color: kPrimaryBlue),
-          const SizedBox(height: 10),
-          Text(
-            '把课堂反馈、练习建议和续费窗口放在一处，方便直接整理给家长。',
-            style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
           ),
           const SizedBox(height: 14),
           LayoutBuilder(

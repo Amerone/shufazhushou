@@ -51,6 +51,10 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
     return amount.toStringAsFixed(2);
   }
 
+  bool _hasQuickAmount(List<(String, double)> items, double amount) {
+    return items.any((item) => (item.$2 - amount).abs() < 0.01);
+  }
+
   void _applyQuickAmount(double amount) {
     final value = _formatAmount(amount);
     _amountCtrl.value = TextEditingValue(
@@ -99,13 +103,32 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
     final feeSummaryAsync = ref.watch(
       feeSummaryProvider(FeeSummaryParams(widget.studentId)),
     );
-    final quickAmounts = pricePerClass == null
+    final lessonQuickAmounts = pricePerClass == null
         ? const <(String, double)>[]
         : <(String, double)>[
             ('1课 ¥${_formatAmount(pricePerClass)}', pricePerClass),
             ('2课 ¥${_formatAmount(pricePerClass * 2)}', pricePerClass * 2),
             ('4课 ¥${_formatAmount(pricePerClass * 4)}', pricePerClass * 4),
           ];
+    final quickAmounts = <(String, double)>[];
+    final currentSummary = feeSummaryAsync.valueOrNull;
+    final currentDueAmount =
+        currentSummary == null || currentSummary.balance >= 0
+        ? null
+        : currentSummary.balance.abs();
+
+    if (currentDueAmount != null &&
+        !_hasQuickAmount(quickAmounts, currentDueAmount)) {
+      quickAmounts.add((
+        '补齐待缴 ¥${_formatAmount(currentDueAmount)}',
+        currentDueAmount,
+      ));
+    }
+
+    for (final item in lessonQuickAmounts) {
+      if (_hasQuickAmount(quickAmounts, item.$2)) continue;
+      quickAmounts.add(item);
+    }
 
     final description = widget.studentName?.trim().isNotEmpty == true
         ? pricePerClass != null
@@ -225,7 +248,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      '按课时单价快速填充',
+                      '快捷金额',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),

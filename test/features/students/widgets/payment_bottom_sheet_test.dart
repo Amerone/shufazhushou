@@ -150,6 +150,39 @@ void main() {
       expect(find.text('结余 ¥50.00'), findsOneWidget);
     },
   );
+
+  testWidgets('shows quick chip to fill current due amount', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          attendanceDaoProvider.overrideWithValue(_FakeAttendanceDao()),
+          paymentDaoProvider.overrideWithValue(_FakePaymentDao()),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: const Scaffold(
+            body: PaymentBottomSheet(
+              studentId: 'student-1',
+              studentName: 'Alice',
+              pricePerClass: 100,
+            ),
+          ),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    expect(find.text('补齐待缴 ¥200'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ActionChip, '补齐待缴 ¥200'));
+    await _settleUi(tester);
+
+    final amountField = tester.widget<TextFormField>(
+      find.byType(TextFormField).first,
+    );
+    expect(amountField.controller?.text, '200');
+  });
 }
 
 final _seededStudent = StudentWithMeta(
