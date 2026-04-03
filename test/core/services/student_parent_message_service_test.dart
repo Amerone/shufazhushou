@@ -24,7 +24,7 @@ void main() {
               '作品观察：结构更稳，行气更顺\n'
               '进步判断：近几次课堂里结构稳定性明显提升\n'
               '家长沟通：这段时间孩子在结构稳定性上进步很明显。',
-          analyzedAt: DateTime(2026, 3, 30, 12, 0),
+          analyzedAt: DateTime(2026, 3, 30, 22, 0),
         ),
         createdAt: 1,
         updatedAt: 1,
@@ -65,7 +65,7 @@ void main() {
       expect(draft.templates, hasLength(3));
       expect(draft.recommendedTemplateId, 'renewal');
       expect(draft.readyLine, contains('进步很明显'));
-      expect(draft.attendanceLine, contains('按时到课'));
+      expect(draft.attendanceLine, contains('最近一次课堂是 2026-03-30'));
       expect(draft.practiceLine, contains('保持起收笔节奏'));
       expect(draft.closingLine, contains('还剩 1.5 节课'));
       expect(
@@ -121,6 +121,105 @@ void main() {
             .label,
         '排课沟通',
       );
+    },
+  );
+
+  test('ignores stale AI insight when newer artwork data exists', () {
+    final student = Student(
+      id: 'student-3',
+      name: 'Cici',
+      pricePerClass: 180,
+      status: 'active',
+      note: AiAnalysisNoteCodec.appendStudentInsight(
+        existingNote: null,
+        analysisText:
+            '总体画像：旧的总体判断\n'
+            '上课规律：旧规律\n'
+            '作品观察：旧观察\n'
+            '进步判断：旧判断\n'
+            '家长沟通：这是过期话术。',
+        analyzedAt: DateTime(2026, 3, 20, 12, 0),
+      ),
+      createdAt: 1,
+      updatedAt: 1,
+    );
+
+    final draft = service.build(
+      student: student,
+      growthSummary: const StudentGrowthSummary(
+        progressPoint: '最近一堂课里结构表现更稳',
+        attentionPoint: '下一阶段继续巩固控笔稳定',
+        practiceSummary: '每天控笔 10 分钟。',
+        focusTags: ['控笔'],
+        latestLessonLabel: '2026-03-29',
+        nextLessonLabel: '待确认',
+        latestProgressSummary: '笔画 3.5',
+        dataFreshness: '2026-03-29 20:00',
+      ),
+      artworkTimeline: [
+        StudentArtworkTimelineEntry(
+          createdAt: DateTime(2026, 3, 31, 21, 0),
+          lessonDate: '2026-03-31',
+          lessonTimeRange: '18:00-19:30',
+          summary: '结构更稳，字形收得更集中',
+          strokeObservation: '起收笔更利落',
+          structureObservation: '左右留白更均衡',
+          layoutObservation: '整行节奏更顺',
+          practiceSuggestions: ['保持起收笔节奏'],
+          focusTags: ['结构'],
+          progressLabel: '较上次更稳',
+          scoreSummary: '笔画 3.8 / 结构 4.1',
+        ),
+      ],
+    );
+
+    expect(draft.usesAiInsight, isFalse);
+    expect(draft.readyLine, isNot(contains('过期话术')));
+    expect(draft.observationLine, contains('左右留白更均衡'));
+  });
+
+  test(
+    'ignores stale AI insight when newer class data exists without artwork',
+    () {
+      final student = Student(
+        id: 'student-4',
+        name: 'Dora',
+        pricePerClass: 180,
+        status: 'active',
+        note: AiAnalysisNoteCodec.appendStudentInsight(
+          existingNote: null,
+          analysisText:
+              '总体画像：old summary\n'
+              '上课规律：old attendance\n'
+              '作品观察：old observation\n'
+              '进步判断：STALE_PROGRESS\n'
+              '家长沟通：STALE_PARENT',
+          analyzedAt: DateTime(2026, 3, 20, 12, 0),
+        ),
+        createdAt: 1,
+        updatedAt: 1,
+      );
+
+      final draft = service.build(
+        student: student,
+        growthSummary: StudentGrowthSummary(
+          progressPoint: 'FRESH_PROGRESS',
+          attentionPoint: 'FRESH_ATTENTION',
+          practiceSummary: 'FRESH_PRACTICE',
+          focusTags: ['控笔'],
+          latestLessonLabel: '2026-03-29',
+          nextLessonLabel: '待确认',
+          latestProgressSummary: 'fresh summary',
+          dataFreshness: '2026-03-29 20:00',
+          latestDataAt: DateTime(2026, 3, 29, 20, 0),
+        ),
+        artworkTimeline: const [],
+      );
+
+      expect(draft.usesAiInsight, isFalse);
+      expect(draft.readyLine, isNot(contains('STALE_PARENT')));
+      expect(draft.observationLine, isNot(contains('STALE_PROGRESS')));
+      expect(draft.observationLine, contains('FRESH_ATTENTION'));
     },
   );
 }

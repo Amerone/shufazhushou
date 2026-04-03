@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/services/student_growth_summary_service.dart';
-import '../../../shared/constants.dart';
+import '../../../core/utils/fee_calculator.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/widgets/brush_stroke_divider.dart';
 import '../../../shared/widgets/glass_card.dart';
@@ -23,18 +23,19 @@ class StudentGrowthWorkbenchCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final remainingLessons = pricePerClass > 0 ? balance / pricePerClass : null;
+    final ledger = StudentLedgerView(
+      balance: balance,
+      pricePerClass: pricePerClass,
+      hasBalanceHistory: true,
+    );
     final showRenewalAlert =
-        balance < 0 ||
-        (remainingLessons != null &&
-            remainingLessons >= 0 &&
-            remainingLessons < kBalanceAlertLessonThreshold);
-    final renewalColor = balance < 0 ? kRed : kSealRed;
-    final renewalLabel = remainingLessons == null
+        ledger.needsPaymentAttention || ledger.needsRenewalAttention;
+    final renewalColor = ledger.needsPaymentAttention ? kRed : kSealRed;
+    final renewalLabel = ledger.remainingLessons == null
         ? '余额待跟进'
-        : balance < 0
-        ? '已欠费 ${balance.abs().toStringAsFixed(2)} 元'
-        : '约剩 ${remainingLessons.toStringAsFixed(1)} 节课';
+        : ledger.needsPaymentAttention
+        ? '已欠费 ${ledger.balance.abs().toStringAsFixed(2)} 元'
+        : '约剩 ${ledger.remainingLessons!.toStringAsFixed(1)} 节课';
 
     return GlassCard(
       padding: const EdgeInsets.all(18),

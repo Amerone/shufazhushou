@@ -4,11 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../core/database/dao/student_dao.dart';
 import '../../../core/models/payment.dart';
 import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
-import '../../../core/providers/student_provider.dart';
+import '../../../core/utils/fee_calculator.dart';
 import '../../../shared/constants.dart' show formatDate;
 import '../../../shared/theme.dart';
 import '../../../shared/utils/interaction_feedback.dart';
@@ -18,11 +17,13 @@ import '../../../shared/widgets/glass_card.dart';
 class PaymentBottomSheet extends ConsumerStatefulWidget {
   final String studentId;
   final String? studentName;
+  final double? pricePerClass;
 
   const PaymentBottomSheet({
     super.key,
     required this.studentId,
     this.studentName,
+    this.pricePerClass,
   });
 
   @override
@@ -58,6 +59,8 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
     );
   }
 
+  double? _parsedAmount() => double.tryParse(_amountCtrl.text.trim());
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_saving) return;
@@ -91,22 +94,24 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final students = ref.watch(studentProvider).valueOrNull ?? const [];
-    StudentWithMeta? currentStudent;
-    for (final item in students) {
-      if (item.student.id == widget.studentId) {
-        currentStudent = item;
-        break;
-      }
-    }
-    final pricePerClass = currentStudent?.student.pricePerClass;
+    final pricePerClass = widget.pricePerClass;
+    final enteredAmount = _parsedAmount();
+    final feeSummaryAsync = ref.watch(
+      feeSummaryProvider(FeeSummaryParams(widget.studentId)),
+    );
     final quickAmounts = pricePerClass == null
         ? const <(String, double)>[]
         : <(String, double)>[
-            ('1节 ¥${_formatAmount(pricePerClass)}', pricePerClass),
-            ('2节 ¥${_formatAmount(pricePerClass * 2)}', pricePerClass * 2),
-            ('4节 ¥${_formatAmount(pricePerClass * 4)}', pricePerClass * 4),
+            ('1课 ¥${_formatAmount(pricePerClass)}', pricePerClass),
+            ('2课 ¥${_formatAmount(pricePerClass * 2)}', pricePerClass * 2),
+            ('4课 ¥${_formatAmount(pricePerClass * 4)}', pricePerClass * 4),
           ];
+
+    final description = widget.studentName?.trim().isNotEmpty == true
+        ? pricePerClass != null
+              ? '当前学员：${widget.studentName}，单课时 ¥${_formatAmount(pricePerClass)}。保存后会自动刷新余额。'
+              : '当前学员：${widget.studentName}。保存后会自动刷新余额。'
+        : '录入本次收款金额和备注，保存后会自动刷新学员余额。';
 
     return SafeArea(
       top: false,
@@ -147,20 +152,80 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  widget.studentName?.trim().isNotEmpty == true
-                      ? pricePerClass != null
-                            ? '当前学员：${widget.studentName}，单节学费 ¥${_formatAmount(pricePerClass)}。保存后会自动刷新余额。'
-                            : '当前学员：${widget.studentName}。保存后会自动刷新余额。'
-                      : '录入本次收款金额和备注，保存后会自动刷新学员余额。',
+                  description,
                   style: theme.textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
+                feeSummaryAsync.whenOrNull(
+                      data: (summary) {
+                        final currentLedger = StudentLedgerView.fromSummary(
+                          summary,
+                          pricePerClass: pricePerClass ?? 0,
+                        );
+                        final projectedBalance =
+                            summary.balance + (enteredAmount ?? 0);
+                        final projectedLedger = StudentLedgerView(
+                          balance: projectedBalance,
+                          pricePerClass: pricePerClass ?? 0,
+                          hasBalanceHistory:
+                              currentLedger.hasBalanceHistory ||
+                              (enteredAmount ?? 0) > 0,
+                        );
+
+                        return Container(
+                          margin: const EdgeInsets.only(top: 16),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: kPrimaryBlue.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: kPrimaryBlue.withValues(alpha: 0.12),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '缴费预览',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: kPrimaryBlue,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              _BalancePreviewRow(
+                                label: '当前',
+                                status: currentLedger.balanceStatusLabel,
+                                amount: summary.balance,
+                              ),
+                              const SizedBox(height: 6),
+                              _BalancePreviewRow(
+                                label: '缴费后',
+                                status: projectedLedger.balanceStatusLabel,
+                                amount: projectedBalance,
+                                emphasize: enteredAmount != null,
+                              ),
+                              if (pricePerClass != null) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  '按单课时 ¥${_formatAmount(pricePerClass)} 估算，缴费后约 ${projectedLedger.remainingLessons?.toStringAsFixed(1) ?? '--'} 课。',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: kInkSecondary,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    ) ??
+                    const SizedBox.shrink(),
                 if (quickAmounts.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      '按课时单价快速填入',
+                      '按课时单价快速填充',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -194,7 +259,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
                   controller: _amountCtrl,
                   decoration: InputDecoration(
                     labelText: '缴费金额',
-                    hintText: '例如：600',
+                    hintText: '例如：200',
                     prefixText: '¥ ',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -205,6 +270,7 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
+                  onChanged: (_) => setState(() {}),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return '请输入缴费金额';
                     final n = double.tryParse(v.trim());
@@ -272,6 +338,47 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _BalancePreviewRow extends StatelessWidget {
+  final String label;
+  final String status;
+  final double amount;
+  final bool emphasize;
+
+  const _BalancePreviewRow({
+    required this.label,
+    required this.status,
+    required this.amount,
+    this.emphasize = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = amount < 0
+        ? kRed
+        : amount > 0
+        ? kGreen
+        : kInkSecondary;
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 52,
+          child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ),
+        Expanded(
+          child: Text(
+            '$status ¥${amount.abs().toStringAsFixed(2)}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: color,
+              fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

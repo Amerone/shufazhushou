@@ -659,8 +659,8 @@ class _StatisticsOverviewCard extends ConsumerWidget {
                   showSelectedIcon: false,
                   onSelectionChanged: (selection) {
                     unawaited(InteractionFeedback.selection(context));
-                    ref.read(statisticsPeriodProvider.notifier).state =
-                        buildStatisticsRange(selection.first);
+                    ref.read(statisticsPeriodSelectionProvider.notifier).state =
+                        selection.first;
                     onPeriodChanged();
                   },
                 ),

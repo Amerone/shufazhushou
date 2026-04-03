@@ -19,11 +19,6 @@ void main() {
   test(
     'InsightNotifier wires DAOs, cleanup and display names correctly',
     () async {
-      const range = StatisticsRange(
-        period: StatisticsPeriod.month,
-        from: '2026-03-01',
-        to: '2026-03-31',
-      );
       final studentDao = _FakeStudentDao([
         const Student(
           id: 'student-1',
@@ -107,10 +102,12 @@ void main() {
           paymentDaoProvider.overrideWithValue(paymentDao),
           dismissedInsightDaoProvider.overrideWithValue(dismissedDao),
           insightServiceProvider.overrideWithValue(spyService),
+          statisticsNowProvider.overrideWith((ref) => DateTime(2026, 3, 27)),
         ],
       );
       addTearDown(container.dispose);
-      container.read(statisticsPeriodProvider.notifier).state = range;
+      container.read(statisticsPeriodSelectionProvider.notifier).state =
+          StatisticsPeriod.month;
 
       final insights = await container.read(insightProvider.future);
 
@@ -137,8 +134,8 @@ void main() {
       expect(attendanceDao.groupedByStudentCalled, isTrue);
       expect(attendanceDao.metricsFrom, isNotNull);
       expect(attendanceDao.metricsTo, isNotNull);
-      expect(attendanceDao.metricsFrom, range.from);
-      expect(attendanceDao.metricsTo, range.to);
+      expect(attendanceDao.metricsFrom, '2026-03-01');
+      expect(attendanceDao.metricsTo, '2026-03-31');
       expect(paymentDao.totalByAllStudentsCalled, isTrue);
     },
   );

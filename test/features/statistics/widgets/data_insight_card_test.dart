@@ -45,6 +45,7 @@ void main() {
       ProviderScope(
         overrides: [
           dataInsightServiceProvider.overrideWithValue(service),
+          statisticsNowProvider.overrideWith((ref) => DateTime(2026, 4, 3)),
           studentDaoProvider.overrideWithValue(
             _FakeStudentDao(const [
               StudentWithMeta(
@@ -112,6 +113,7 @@ void main() {
         dataInsightServiceProvider.overrideWithValue(
           _CompleterDataInsightService(completer),
         ),
+        statisticsNowProvider.overrideWith((ref) => DateTime(2026, 4, 3)),
         studentDaoProvider.overrideWithValue(
           _FakeStudentDao(const [
             StudentWithMeta(
@@ -161,8 +163,8 @@ void main() {
     await tester.tap(find.byType(FilledButton));
     await tester.pump();
 
-    container.read(statisticsPeriodProvider.notifier).state =
-        buildStatisticsRange(StatisticsPeriod.week);
+    container.read(statisticsPeriodSelectionProvider.notifier).state =
+        StatisticsPeriod.week;
     await tester.pump();
 
     completer.complete(

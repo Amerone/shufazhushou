@@ -83,6 +83,13 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
     );
   }
 
+  double _currentFeePreview() {
+    final statusEnum = AttendanceStatus.values.firstWhere(
+      (item) => item.name == _status,
+    );
+    return FeeCalculator.calcFee(statusEnum, widget.record.priceSnapshot);
+  }
+
   Future<void> _save() async {
     if (_saving) return;
     if (_endTime.compareTo(_startTime) <= 0) {
@@ -237,6 +244,38 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                       ),
                     )
                     .toList(),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: kPrimaryBlue.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: kPrimaryBlue.withValues(alpha: 0.12),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '课时单价 ¥${widget.record.priceSnapshot.toStringAsFixed(0)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: kPrimaryBlue,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '本次扣费 ¥${_currentFeePreview().toStringAsFixed(0)}',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: kPrimaryBlue,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               InkWell(

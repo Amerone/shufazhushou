@@ -212,6 +212,30 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     );
   }
 
+  List<StudentWithMeta> _selectedStudentsFrom(List<StudentWithMeta> students) {
+    return students
+        .where((item) => _selectedIds.contains(item.student.id))
+        .toList(growable: false);
+  }
+
+  double _estimatedTotalFee(List<StudentWithMeta> selectedStudents) {
+    final statusEnum = AttendanceStatus.values.firstWhere(
+      (item) => item.name == _status,
+    );
+    return selectedStudents.fold<double>(
+      0,
+      (sum, item) =>
+          sum + FeeCalculator.calcFee(statusEnum, item.student.pricePerClass),
+    );
+  }
+
+  String _formatAmount(double amount) {
+    if (amount == amount.roundToDouble()) {
+      return amount.toStringAsFixed(0);
+    }
+    return amount.toStringAsFixed(2);
+  }
+
   Future<void> _save() async {
     if (_saving) return;
     if (_endTime.compareTo(_startTime) <= 0) {
@@ -308,10 +332,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
 
   Future<void> _quickSaveWithDefaults() async {
     if (_saving || _selectedIds.isEmpty) return;
+    final students = ref.read(studentProvider).valueOrNull ?? const [];
+    final selectedStudents = _selectedStudentsFrom(students);
+    final totalFee = _estimatedTotalFee(selectedStudents);
     final statusLabel = quickEntryStatusLabel(_status);
     final confirmed = await AppToast.showConfirm(
       context,
-      '将按默认设置直接保存：$_startTime-$_endTime，状态“$statusLabel”。是否继续？',
+      '将直接记课：${_dateStr()} $_startTime-$_endTime，状态“$statusLabel”，共 ${selectedStudents.length} 人，预计扣费 ¥${_formatAmount(totalFee)}。是否继续？',
     );
     if (!confirmed) return;
     await _save();
@@ -429,6 +456,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     final restoredRecentGroup =
         restorableRecentIds.isNotEmpty &&
         restorableRecentIds.every((id) => _selectedIds.contains(id));
+    final selectedStudents = _selectedStudentsFrom(students);
+    final estimatedTotalFee = _estimatedTotalFee(selectedStudents);
 
     return Column(
       children: [
@@ -749,12 +778,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     ),
                   ),
                   icon: const Icon(Icons.flash_on_outlined),
-                  label: const Text('按当前默认直接保存'),
+                  label: Text(
+                    '直接保存（${selectedStudents.length}人 / ¥${_formatAmount(estimatedTotalFee)}）',
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                '快速保存会直接使用当前日期、时间和出勤状态记课。',
+                '直接保存会按当前日期、时间和状态记课，预计扣费 ¥${_formatAmount(estimatedTotalFee)}。',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -1112,6 +1143,12 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                         _QuickInfoPill(
                           icon: Icons.groups_2_outlined,
                           label: '${selected.length} 位学员',
+                        ),
+                        _QuickInfoPill(
+                          icon: Icons.payments_outlined,
+                          label:
+                              '预计扣费 ¥${_formatAmount(_estimatedTotalFee(selected))}',
+                          color: kPrimaryBlue,
                         ),
                         if (_lessonFocusTags.isNotEmpty)
                           _QuickInfoPill(

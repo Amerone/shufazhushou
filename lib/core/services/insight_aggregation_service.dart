@@ -1,6 +1,7 @@
 import '../../shared/constants.dart';
 import '../models/attendance.dart';
 import '../models/student.dart';
+import '../utils/fee_calculator.dart';
 
 class Insight {
   final InsightType type;
@@ -52,18 +53,21 @@ class InsightAggregationService {
         0,
         (sum, item) => sum + item.feeAmount,
       );
-      final balance = totalReceived - totalReceivable;
-      final hasBalanceContext = totalReceived > 0 || totalReceivable > 0;
+      final ledger = StudentLedgerView.fromTotals(
+        totalReceivable: totalReceivable,
+        totalReceived: totalReceived,
+        pricePerClass: student.pricePerClass,
+      );
       final dataFreshness = _buildDataFreshness(records, currentTime);
 
       if (!_isDismissed(dismissedKeys, InsightType.debt, student.id) &&
-          balance < 0) {
+          ledger.needsPaymentAttention) {
         insights.add(
           Insight(
             type: InsightType.debt,
             studentId: student.id,
             studentName: studentName,
-            message: '欠费 ¥${(-balance).toStringAsFixed(2)}',
+            message: '欠费 ¥${ledger.balance.abs().toStringAsFixed(2)}',
             suggestion: '建议优先核对账单，并尽快联系家长确认补缴或续费安排。',
             calcLogic: '累计余额 = 累计已收 - 累计应收；当余额小于 0 时触发欠费提醒。',
             dataFreshness: dataFreshness,
@@ -71,28 +75,18 @@ class InsightAggregationService {
         );
       }
 
-      final remainingLessons = student.pricePerClass > 0
-          ? balance / student.pricePerClass
-          : null;
-      final hitAmountThreshold =
-          balance >= 0 && balance < kBalanceAlertAmountThreshold;
-      final hitLessonThreshold =
-          remainingLessons != null &&
-          remainingLessons >= 0 &&
-          remainingLessons < kBalanceAlertLessonThreshold;
-
-      if (hasBalanceContext &&
+      if (ledger.needsRenewalAttention &&
           !_isDismissed(dismissedKeys, InsightType.renewal, student.id) &&
-          (hitAmountThreshold || hitLessonThreshold)) {
-        final lessonText = remainingLessons == null
+          !ledger.needsPaymentAttention) {
+        final lessonText = ledger.remainingLessons == null
             ? '剩余课次不可估算'
-            : '约剩 ${remainingLessons.toStringAsFixed(1)} 节';
+            : '约剩 ${ledger.remainingLessons!.toStringAsFixed(1)} 节';
         insights.add(
           Insight(
             type: InsightType.renewal,
             studentId: student.id,
             studentName: studentName,
-            message: '余额 ¥${balance.toStringAsFixed(2)}，$lessonText',
+            message: '余额 ¥${ledger.balance.toStringAsFixed(2)}，$lessonText',
             suggestion: '建议本周内发起续费沟通，并同步下一阶段课程安排建议。',
             calcLogic:
                 '当余额小于 ¥${kBalanceAlertAmountThreshold.toStringAsFixed(0)} 或剩余课次少于 ${kBalanceAlertLessonThreshold.toStringAsFixed(1)} 节时触发。',

@@ -17,6 +17,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../core/services/ai_analysis_note_codec.dart';
 import '../../../core/utils/excel_exporter.dart';
+import '../../../core/utils/fee_calculator.dart';
 import '../../../core/utils/pdf_generator.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
@@ -129,11 +130,23 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     return _ExportData(records: records, payments: payments);
   }
 
+  Future<StudentFeeSummary> _loadFeeSummary() {
+    final from = _fmt(_from);
+    final to = _fmt(_to);
+    return ref.read(
+      feeSummaryProvider(
+        FeeSummaryParams(widget.studentId, from: from, to: to),
+      ).future,
+    );
+  }
+
   Future<_PreparedPdf> _buildPdf() async {
     final dataFuture = _loadData();
     final studentFuture = _loadStudent();
+    final feeSummaryFuture = _loadFeeSummary();
     final data = await dataFuture;
     final student = await studentFuture;
+    final feeSummary = await feeSummaryFuture;
     if (student == null) {
       throw Exception(
         '\u672a\u627e\u5230\u5b66\u751f\uff0c\u8bf7\u8fd4\u56de\u540e\u91cd\u8bd5\u3002',
@@ -151,6 +164,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       to: _fmt(_to),
       records: data.records,
       payments: data.payments,
+      feeSummary: feeSummary,
       teacherName: settings['teacher_name'] ?? kDefaultTeacherName,
       signaturePath: settings['signature_path'],
       message: _msgCtrl.text.trim(),
@@ -356,6 +370,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     try {
       final data = await _loadData();
       final student = await _loadStudent();
+      final feeSummary = await _loadFeeSummary();
       if (student == null) {
         throw Exception(
           '\u672a\u627e\u5230\u5b66\u751f\uff0c\u8bf7\u8fd4\u56de\u540e\u91cd\u8bd5\u3002',
@@ -367,6 +382,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
         to: _fmt(_to),
         records: data.records,
         payments: data.payments,
+        feeSummary: feeSummary,
       );
       if (!mounted) return;
       final shared = await _shareFile(context, path);

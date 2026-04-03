@@ -10,6 +10,7 @@ import '../models/student.dart';
 import '../models/attendance.dart';
 import '../models/payment.dart';
 import '../services/student_growth_summary_service.dart';
+import 'fee_calculator.dart';
 import '../../shared/constants.dart';
 
 class PdfGenerator {
@@ -39,6 +40,7 @@ class PdfGenerator {
     required String to,
     required List<Attendance> records,
     required List<Payment> payments,
+    StudentFeeSummary? feeSummary,
     required String teacherName,
     required String? signaturePath,
     required String message,
@@ -104,10 +106,19 @@ class PdfGenerator {
       0,
       (sum, payment) => sum + payment.amount,
     );
-    final balance = totalPaid - totalFee;
-    final balanceLabel = balance >= 0 ? '\u7ed3\u4f59' : '\u5f85\u7f34';
+    final ledger = StudentLedgerView(
+      balance: feeSummary?.balance ?? (totalPaid - totalFee),
+      pricePerClass: student.pricePerClass,
+      hasBalanceHistory: totalFee > 0 || totalPaid > 0,
+    );
+    final balance = ledger.balance;
+    final balanceLabel = ledger.balanceStatusLabel;
     final balanceValue = 'CNY ${balance.abs().toStringAsFixed(2)}';
-    final balanceAccent = balance >= 0 ? _metricGreen : _sealRed;
+    final balanceAccent = switch (ledger.balanceState) {
+      LedgerBalanceState.debt => _sealRed,
+      LedgerBalanceState.settled => _inkSecondary,
+      LedgerBalanceState.surplus => _metricGreen,
+    };
     final messageText = message.trim();
     final aiAnalysisText = aiAnalysis?.trim() ?? '';
     final aiAnalysisParagraphs = _splitAiAnalysisParagraphs(aiAnalysisText);

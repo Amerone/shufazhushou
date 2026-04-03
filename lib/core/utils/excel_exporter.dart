@@ -1,12 +1,15 @@
 import 'dart:io';
+
 import 'package:excel/excel.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import '../models/student.dart';
+
+import '../../shared/constants.dart';
 import '../models/attendance.dart';
 import '../models/payment.dart';
-import '../../shared/constants.dart';
+import '../models/student.dart';
+import 'fee_calculator.dart';
 
 class ExcelExporter {
   static final _invalidFileNameChars = RegExp(r'[\\/:*?"<>|]');
@@ -19,10 +22,10 @@ class ExcelExporter {
     required String to,
     required List<Attendance> records,
     required List<Payment> payments,
+    StudentFeeSummary? feeSummary,
   }) async {
     final excel = Excel.createExcel();
 
-    // Sheet1: 出勤明细
     final detail = excel['出勤明细'];
     detail.appendRow([
       TextCellValue('日期'),
@@ -39,56 +42,66 @@ class ExcelExporter {
         TextCellValue('课后练习');
     detail.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0)).value =
         TextCellValue('进步评分');
-    for (final r in records) {
+    for (final record in records) {
       final row = [
-        TextCellValue(r.date),
-        TextCellValue(r.startTime),
-        TextCellValue(r.endTime),
-        TextCellValue(statusLabel(r.status)),
-        DoubleCellValue(r.priceSnapshot),
-        DoubleCellValue(r.feeAmount),
-        TextCellValue(r.note ?? ''),
+        TextCellValue(record.date),
+        TextCellValue(record.startTime),
+        TextCellValue(record.endTime),
+        TextCellValue(statusLabel(record.status)),
+        DoubleCellValue(record.priceSnapshot),
+        DoubleCellValue(record.feeAmount),
+        TextCellValue(record.note ?? ''),
       ];
       row.addAll([
-        TextCellValue(_formatLessonFocusTags(r)),
-        TextCellValue(r.homePracticeNote ?? ''),
-        TextCellValue(_formatProgressSummary(r)),
+        TextCellValue(_formatLessonFocusTags(record)),
+        TextCellValue(record.homePracticeNote ?? ''),
+        TextCellValue(_formatProgressSummary(record)),
       ]);
       detail.appendRow(row);
-      // 条件格式：旷课行标红，请假行标灰
+
       final rowIdx = detail.maxRows - 1;
-      final bgColor = r.status == 'absent'
+      final bgColor = record.status == 'absent'
           ? ExcelColor.fromHexString('#FFCCCC')
-          : r.status == 'leave'
+          : record.status == 'leave'
           ? ExcelColor.fromHexString('#EEEEEE')
           : null;
-      if (bgColor != null) {
-        for (int col = 0; col < row.length; col++) {
-          final cell = detail.cell(
-            CellIndex.indexByColumnRow(columnIndex: col, rowIndex: rowIdx),
-          );
-          cell.cellStyle = CellStyle(backgroundColorHex: bgColor);
-        }
+      if (bgColor == null) {
+        continue;
+      }
+      for (var col = 0; col < row.length; col++) {
+        final cell = detail.cell(
+          CellIndex.indexByColumnRow(columnIndex: col, rowIndex: rowIdx),
+        );
+        cell.cellStyle = CellStyle(backgroundColorHex: bgColor);
       }
     }
 
-    // Sheet2: 费用汇总
     final summary = excel['费用汇总'];
-    final totalFee = records.fold<double>(0, (s, r) => s + r.feeAmount);
-    final totalPaid = payments.fold<double>(0, (s, p) => s + p.amount);
+    final totalFee =
+        feeSummary?.totalReceivable ??
+        records.fold<double>(0, (sum, item) => sum + item.feeAmount);
+    final totalPaid =
+        feeSummary?.totalReceived ??
+        payments.fold<double>(0, (sum, item) => sum + item.amount);
+    final openingBalance = feeSummary?.openingBalance ?? 0;
+    final periodNetChange =
+        feeSummary?.periodNetChange ?? (totalPaid - totalFee);
+    final endingBalance = feeSummary?.balance ?? (totalPaid - totalFee);
     summary.appendRow([TextCellValue('项目'), TextCellValue('金额')]);
+    summary.appendRow([TextCellValue('期初结转'), DoubleCellValue(openingBalance)]);
     summary.appendRow([TextCellValue('应收（出勤费用）'), DoubleCellValue(totalFee)]);
     summary.appendRow([TextCellValue('已收'), DoubleCellValue(totalPaid)]);
     summary.appendRow([
-      TextCellValue('余额'),
-      DoubleCellValue(totalPaid - totalFee),
+      TextCellValue('期内净变化'),
+      DoubleCellValue(periodNetChange),
     ]);
+    summary.appendRow([TextCellValue('期末余额'), DoubleCellValue(endingBalance)]);
     summary.appendRow([TextCellValue('')]);
     summary.appendRow([TextCellValue('缴费明细')]);
-    for (final pay in payments) {
+    for (final payment in payments) {
       summary.appendRow([
-        TextCellValue('${pay.paymentDate} ${pay.note ?? ''}'),
-        DoubleCellValue(pay.amount),
+        TextCellValue('${payment.paymentDate} ${payment.note ?? ''}'),
+        DoubleCellValue(payment.amount),
       ]);
     }
 
@@ -105,7 +118,6 @@ class ExcelExporter {
     return path;
   }
 
-  /// 导出指定时间范围内所有人的出勤情况
   static Future<String> exportAllAttendance({
     required String from,
     required String to,
@@ -114,10 +126,7 @@ class ExcelExporter {
   }) async {
     final excel = Excel.createExcel();
 
-    // Sheet1: 日期×时间段矩阵
     _buildMatrixSheet(excel, records, studentNames);
-
-    // Sheet2: 逐条明细
     _buildDetailSheet(excel, records, studentNames);
 
     excel.delete('Sheet1');
@@ -164,44 +173,41 @@ class ExcelExporter {
     Map<String, String> studentNames,
   ) {
     final sheet = excel['出勤总览'];
-    // 收集所有唯一时间段，按开始时间排序
     final timeSlotSet = <String>{};
-    for (final r in records) {
-      timeSlotSet.add('${r.startTime}-${r.endTime}');
+    for (final record in records) {
+      timeSlotSet.add('${record.startTime}-${record.endTime}');
     }
     final timeSlots = timeSlotSet.toList()..sort();
 
-    // 收集所有唯一日期，排序
     final dateSet = <String>{};
-    for (final r in records) {
-      dateSet.add(r.date);
+    for (final record in records) {
+      dateSet.add(record.date);
     }
     final dates = dateSet.toList()..sort();
 
-    // 构建 (date, slot) -> [names] 映射
-    final map = <String, Map<String, List<String>>>{};
-    for (final r in records) {
-      if (r.status == 'absent') continue;
-      final slot = '${r.startTime}-${r.endTime}';
-      final name = studentNames[r.studentId] ?? r.studentId;
-      map.putIfAbsent(r.date, () => {});
-      map[r.date]!.putIfAbsent(slot, () => []);
-      map[r.date]![slot]!.add(name);
+    final grouped = <String, Map<String, List<String>>>{};
+    for (final record in records) {
+      if (record.status == 'absent') {
+        continue;
+      }
+      final slot = '${record.startTime}-${record.endTime}';
+      final name = studentNames[record.studentId] ?? record.studentId;
+      grouped.putIfAbsent(record.date, () => <String, List<String>>{});
+      grouped[record.date]!.putIfAbsent(slot, () => <String>[]);
+      grouped[record.date]![slot]!.add(name);
     }
 
-    // 表头
     final header = <CellValue>[
       TextCellValue('日期'),
-      ...timeSlots.map((s) => TextCellValue(s)),
+      ...timeSlots.map((slot) => TextCellValue(slot)),
     ];
     sheet.appendRow(header);
 
-    // 数据行
     for (final date in dates) {
       final row = <CellValue>[
         TextCellValue(date),
         ...timeSlots.map((slot) {
-          final names = map[date]?[slot];
+          final names = grouped[date]?[slot];
           return TextCellValue(names != null ? names.join('、') : '');
         }),
       ];
@@ -224,7 +230,6 @@ class ExcelExporter {
       TextCellValue('费用'),
       TextCellValue('备注'),
     ]);
-
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0)).value =
         TextCellValue('课堂重点');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0)).value =
@@ -232,26 +237,28 @@ class ExcelExporter {
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0)).value =
         TextCellValue('进步评分');
 
-    final sorted = List<Attendance>.from(records)
-      ..sort((a, b) {
-        final d = a.date.compareTo(b.date);
-        if (d != 0) return d;
-        return a.startTime.compareTo(b.startTime);
+    final sortedRecords = List<Attendance>.from(records)
+      ..sort((left, right) {
+        final dateCompare = left.date.compareTo(right.date);
+        if (dateCompare != 0) {
+          return dateCompare;
+        }
+        return left.startTime.compareTo(right.startTime);
       });
 
-    for (final r in sorted) {
-      final name = studentNames[r.studentId] ?? r.studentId;
+    for (final record in sortedRecords) {
+      final name = studentNames[record.studentId] ?? record.studentId;
       sheet.appendRow([
-        TextCellValue(r.date),
-        TextCellValue(r.startTime),
-        TextCellValue(r.endTime),
+        TextCellValue(record.date),
+        TextCellValue(record.startTime),
+        TextCellValue(record.endTime),
         TextCellValue(name),
-        TextCellValue(statusLabel(r.status)),
-        DoubleCellValue(r.feeAmount),
-        TextCellValue(r.note ?? ''),
-        TextCellValue(_formatLessonFocusTags(r)),
-        TextCellValue(r.homePracticeNote ?? ''),
-        TextCellValue(_formatProgressSummary(r)),
+        TextCellValue(statusLabel(record.status)),
+        DoubleCellValue(record.feeAmount),
+        TextCellValue(record.note ?? ''),
+        TextCellValue(_formatLessonFocusTags(record)),
+        TextCellValue(record.homePracticeNote ?? ''),
+        TextCellValue(_formatProgressSummary(record)),
       ]);
     }
   }
@@ -263,7 +270,9 @@ class ExcelExporter {
 
   static String _formatProgressSummary(Attendance record) {
     final scores = record.progressScores;
-    if (scores == null || scores.isEmpty) return '';
+    if (scores == null || scores.isEmpty) {
+      return '';
+    }
 
     final parts = <String>[];
     if (scores.strokeQuality != null) {

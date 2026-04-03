@@ -1,6 +1,7 @@
 import '../models/student.dart';
 import '../models/student_artwork_timeline_entry.dart';
 import '../models/student_parent_message_draft.dart';
+import '../utils/fee_calculator.dart';
 import 'ai_analysis_note_codec.dart';
 import 'student_growth_summary_service.dart';
 
@@ -14,12 +15,22 @@ class StudentParentMessageService {
     double balance = 0,
     double pricePerClass = 0,
   }) {
+    final latestInsightEntry = AiAnalysisNoteCodec.latestEntry(
+      student.note,
+      type: 'student_insight',
+    );
     final latestInsight = _InsightSnapshot.fromNote(
-      AiAnalysisNoteCodec.latestContent(student.note, type: 'student_insight'),
+      latestInsightEntry?.content,
     );
     final latestArtwork = artworkTimeline.isEmpty
         ? null
         : artworkTimeline.first;
+    final insightIsFresh = _isInsightFresh(
+      insightCreatedAt: latestInsightEntry?.createdAt,
+      latestArtworkCreatedAt: latestArtwork?.createdAt,
+      latestDataAt: growthSummary.latestDataAt,
+    );
+    final canUseInsight = latestInsight.hasUsefulContent && insightIsFresh;
     final focusLabel = _firstNonEmpty([
       latestArtwork?.focusTags.isNotEmpty == true
           ? latestArtwork!.focusTags.first
@@ -30,20 +41,17 @@ class StudentParentMessageService {
 
     final readyLine = _ensureSentence(
       _firstNonEmpty([
-        latestInsight.parentCommunicationTip,
+        if (canUseInsight) latestInsight.parentCommunicationTip,
         _buildReadyLineFallback(student.name, latestArtwork, growthSummary),
       ]),
     );
     final attendanceLine = _ensureSentence(
-      _firstNonEmpty([
-        latestInsight.attendancePattern,
-        _buildAttendanceFallback(growthSummary),
-      ]),
+      _buildAttendanceFallback(growthSummary),
     );
     final observationLine = _ensureSentence(
       _firstNonEmpty([
-        latestInsight.progressInsight,
-        latestInsight.writingObservation,
+        if (canUseInsight) latestInsight.progressInsight,
+        if (canUseInsight) latestInsight.writingObservation,
         _buildObservationFallback(latestArtwork, growthSummary),
       ]),
     );
@@ -71,7 +79,7 @@ class StudentParentMessageService {
     );
 
     final lines = <String>[
-      '家长您好，和您同步一下 ${student.name} 最近的课堂情况。',
+      '家长您好，和您同步一下${student.name}最近的课堂情况。',
       readyLine,
       attendanceLine,
       observationLine,
@@ -95,7 +103,7 @@ class StudentParentMessageService {
     );
 
     return StudentParentMessageDraft(
-      usesAiInsight: latestInsight.hasUsefulContent,
+      usesAiInsight: canUseInsight,
       readyLine: readyLine,
       attendanceLine: attendanceLine,
       observationLine: observationLine,
@@ -108,6 +116,30 @@ class StudentParentMessageService {
     );
   }
 
+  bool _isInsightFresh({
+    required DateTime? insightCreatedAt,
+    required DateTime? latestArtworkCreatedAt,
+    required DateTime? latestDataAt,
+  }) {
+    if (insightCreatedAt == null) {
+      return false;
+    }
+    final freshnessAnchors = <DateTime>[];
+    if (latestArtworkCreatedAt != null) {
+      freshnessAnchors.add(latestArtworkCreatedAt);
+    }
+    if (latestDataAt != null) {
+      freshnessAnchors.add(latestDataAt);
+    }
+    if (freshnessAnchors.isEmpty) {
+      return true;
+    }
+    final latestSourceAt = freshnessAnchors.reduce(
+      (current, candidate) => candidate.isAfter(current) ? candidate : current,
+    );
+    return !insightCreatedAt.isBefore(latestSourceAt);
+  }
+
   String _buildReadyLineFallback(
     String studentName,
     StudentArtworkTimelineEntry? latestArtwork,
@@ -118,9 +150,9 @@ class StudentParentMessageService {
       growthSummary.progressPoint,
     ]);
     if (summary.isEmpty) {
-      return '$studentName 最近课堂状态稳定，可以继续按当前节奏推进。';
+      return '$studentName最近课堂状态稳定，可以继续按当前节奏推进。';
     }
-    return '最近 $studentName 的课堂表现里，$summary';
+    return '最近$studentName的课堂表现里，$summary';
   }
 
   String _buildAttendanceFallback(StudentGrowthSummary growthSummary) {
@@ -161,15 +193,20 @@ class StudentParentMessageService {
     required StudentGrowthSummary growthSummary,
     required String focusLabel,
   }) {
-    if (balance < 0) {
-      return '另外当前课次已超出 ¥${balance.abs().toStringAsFixed(2)}，可以和家长一并确认后续续费安排。';
+    final ledger = StudentLedgerView(
+      balance: balance,
+      pricePerClass: pricePerClass,
+      hasBalanceHistory: true,
+    );
+    if (ledger.needsPaymentAttention) {
+      return '另外当前课次已超出 ¥${ledger.balance.abs().toStringAsFixed(2)}，可以和家长一并确认后续续费安排。';
     }
 
-    if (pricePerClass > 0) {
-      final remainingLessons = balance / pricePerClass;
-      if (remainingLessons >= 0 && remainingLessons < 2.5) {
-        return '另外当前大约还剩 ${remainingLessons.toStringAsFixed(1)} 节课，也建议顺手和家长确认下阶段排课。';
-      }
+    final remainingLessons = ledger.remainingLessons;
+    if (remainingLessons != null &&
+        remainingLessons >= 0 &&
+        remainingLessons < 2.5) {
+      return '另外当前大约还剩 ${remainingLessons.toStringAsFixed(1)} 节课，也建议顺手和家长确认下阶段排课。';
     }
 
     if (growthSummary.nextLessonLabel.trim() != '待确认') {
@@ -203,7 +240,7 @@ class StudentParentMessageService {
         id: 'practice',
         label: '练习提醒',
         channelLabel: '课后提醒',
-        summary: '适合下课后立即发，让家长知道回家怎么练、盯什么点。',
+        summary: '适合下课后立刻发，让家长知道回家怎么练、盯什么点。',
         isRecommended: recommendedTemplateId == 'practice',
         introLine: '家长您好，今天课后给您留一份简短练习提醒。',
         bodyLines: [readyLine, practiceLine, observationLine, closingLine],
@@ -267,14 +304,18 @@ class StudentParentMessageService {
     required double balance,
     required double pricePerClass,
   }) {
-    if (balance < 0) {
+    final ledger = StudentLedgerView(
+      balance: balance,
+      pricePerClass: pricePerClass,
+      hasBalanceHistory: true,
+    );
+    if (ledger.needsPaymentAttention) {
       return true;
     }
-    if (pricePerClass <= 0) {
-      return false;
-    }
-    final remainingLessons = balance / pricePerClass;
-    return remainingLessons >= 0 && remainingLessons < 2.5;
+    final remainingLessons = ledger.remainingLessons;
+    return remainingLessons != null &&
+        remainingLessons >= 0 &&
+        remainingLessons < 2.5;
   }
 
   String _firstNonEmpty(List<String?> candidates) {
@@ -292,7 +333,7 @@ class StudentParentMessageService {
     if (normalized.isEmpty) {
       return '';
     }
-    if (RegExp(r'[。！？!?]$').hasMatch(normalized)) {
+    if (RegExp(r'[。！？?]$').hasMatch(normalized)) {
       return normalized;
     }
     return '$normalized。';

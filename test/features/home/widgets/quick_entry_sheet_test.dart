@@ -47,6 +47,7 @@ void main() {
     await _settleUi(tester);
 
     expect(find.text('已选 2'), findsOneWidget);
+    expect(find.text('直接保存（2人 / ¥380）'), findsOneWidget);
   });
 }
 

@@ -1,4 +1,5 @@
 import '../../models/payment.dart';
+import '../../utils/ledger_record_validator.dart';
 import '../database_helper.dart';
 
 class PaymentDao {
@@ -6,6 +7,7 @@ class PaymentDao {
   PaymentDao(this._db);
 
   Future<void> insert(Payment p) async {
+    LedgerRecordValidator.validatePayment(p);
     final db = await _db.database;
     await db.insert('payments', p.toMap());
   }
@@ -17,44 +19,62 @@ class PaymentDao {
 
   Future<List<Payment>> getByStudent(String studentId) async {
     final db = await _db.database;
-    final rows = await db.query('payments',
-        where: 'student_id = ?', whereArgs: [studentId], orderBy: 'payment_date DESC');
+    final rows = await db.query(
+      'payments',
+      where: 'student_id = ?',
+      whereArgs: [studentId],
+      orderBy: 'payment_date DESC',
+    );
     return rows.map(Payment.fromMap).toList();
   }
 
   Future<List<Payment>> getByStudentAndDateRange(
-      String studentId, String? from, String? to) async {
+    String studentId,
+    String? from,
+    String? to,
+  ) async {
     final db = await _db.database;
-    final rows = await db.rawQuery('''
+    final rows = await db.rawQuery(
+      '''
       SELECT * FROM payments
       WHERE student_id = ?
         AND (? IS NULL OR payment_date >= ?)
         AND (? IS NULL OR payment_date <= ?)
       ORDER BY payment_date DESC
-    ''', [studentId, from, from, to, to]);
+    ''',
+      [studentId, from, from, to, to],
+    );
     return rows.map(Payment.fromMap).toList();
   }
 
   Future<double> getTotalByDateRange(String? from, String? to) async {
     final db = await _db.database;
-    final rows = await db.rawQuery('''
+    final rows = await db.rawQuery(
+      '''
       SELECT COALESCE(SUM(amount),0) AS total FROM payments
       WHERE (? IS NULL OR payment_date >= ?)
         AND (? IS NULL OR payment_date <= ?)
-    ''', [from, from, to, to]);
+    ''',
+      [from, from, to, to],
+    );
     return (rows.first['total'] as num).toDouble();
   }
 
   Future<Map<String, double>> getTotalByAllStudentsAndDateRange(
-      String? from, String? to) async {
+    String? from,
+    String? to,
+  ) async {
     final db = await _db.database;
-    final rows = await db.rawQuery('''
+    final rows = await db.rawQuery(
+      '''
       SELECT student_id, COALESCE(SUM(amount), 0) AS total
       FROM payments
       WHERE (? IS NULL OR payment_date >= ?)
         AND (? IS NULL OR payment_date <= ?)
       GROUP BY student_id
-    ''', [from, from, to, to]);
+    ''',
+      [from, from, to, to],
+    );
     final result = <String, double>{};
     for (final row in rows) {
       result[row['student_id'] as String] = (row['total'] as num).toDouble();
@@ -65,34 +85,46 @@ class PaymentDao {
   Future<double> getTotalByStudent(String studentId) async {
     final db = await _db.database;
     final rows = await db.rawQuery(
-        'SELECT COALESCE(SUM(amount),0) AS total FROM payments WHERE student_id = ?',
-        [studentId]);
+      'SELECT COALESCE(SUM(amount),0) AS total FROM payments WHERE student_id = ?',
+      [studentId],
+    );
     return (rows.first['total'] as num).toDouble();
   }
 
   Future<double> getTotalByStudentAndDateRange(
-      String studentId, String? from, String? to) async {
+    String studentId,
+    String? from,
+    String? to,
+  ) async {
     final db = await _db.database;
-    final rows = await db.rawQuery('''
+    final rows = await db.rawQuery(
+      '''
       SELECT COALESCE(SUM(amount),0) AS total FROM payments
       WHERE student_id = ?
         AND (? IS NULL OR payment_date >= ?)
         AND (? IS NULL OR payment_date <= ?)
-    ''', [studentId, from, from, to, to]);
+    ''',
+      [studentId, from, from, to, to],
+    );
     return (rows.first['total'] as num).toDouble();
   }
 
   Future<List<Map<String, dynamic>>> getMonthlyReceived(
-      String from, String to) async {
+    String from,
+    String to,
+  ) async {
     final db = await _db.database;
-    return db.rawQuery('''
+    return db.rawQuery(
+      '''
       SELECT strftime('%Y-%m', payment_date) AS month,
              SUM(amount) AS totalReceived
       FROM payments
       WHERE payment_date >= ? AND payment_date <= ?
       GROUP BY month
       ORDER BY month
-    ''', [from, to]);
+    ''',
+      [from, to],
+    );
   }
 
   /// Returns total payment amount per student for all students.

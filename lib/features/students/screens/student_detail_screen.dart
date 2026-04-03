@@ -8,15 +8,17 @@ import '../../../core/models/attendance.dart';
 import '../../../core/models/export_template.dart';
 import '../../../core/models/handwriting_analysis_result.dart';
 import '../../../core/models/payment.dart';
+import '../../../core/models/student.dart';
 import '../../../core/providers/ai_provider.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../core/services/ai_analysis_note_codec.dart';
+import '../../../core/services/attendance_artwork_storage_service.dart';
+import '../../../core/services/handwriting_analysis_service.dart';
 import '../../../core/services/student_artwork_timeline_service.dart';
 import '../../../core/services/student_growth_summary_service.dart';
-import '../../../core/services/handwriting_analysis_service.dart';
 import '../../../core/services/student_parent_message_service.dart';
 import '../../../core/utils/fee_calculator.dart';
 import '../../../shared/constants.dart';
@@ -24,20 +26,28 @@ import '../../../shared/theme.dart';
 import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/attendance_edit_sheet.dart';
+import '../../../shared/widgets/attendance_artwork_preview.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
-import '../../export/screens/export_config_screen.dart';
 import '../widgets/attendance_ai_analysis_sheet.dart';
-import '../widgets/student_ai_insight_card.dart';
 import '../widgets/student_artwork_timeline_card.dart';
-import '../widgets/payment_bottom_sheet.dart';
+import '../widgets/student_action_launcher.dart';
+import '../widgets/student_ai_insight_card.dart';
 import '../widgets/student_ai_progress_card.dart';
+import '../widgets/student_finance_overview_card.dart';
 import '../widgets/student_growth_workbench_card.dart';
 import '../widgets/student_parent_message_card.dart';
 
-enum _StudentDetailAnchor { finance, growth, actions, payments, attendance }
+enum _StudentDetailAnchor {
+  finance,
+  growth,
+  communication,
+  actions,
+  payments,
+  attendance,
+}
 
 class StudentDetailScreen extends ConsumerStatefulWidget {
   final String studentId;
@@ -167,25 +177,22 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   Future<void> _openExportSheet({ExportTemplateId? initialTemplate}) async {
     await InteractionFeedback.selection(context);
     if (!mounted) return;
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => ExportConfigScreen(
-        studentId: widget.studentId,
-        initialTemplate: initialTemplate,
-      ),
+    await showStudentExportSheet(
+      context,
+      studentId: widget.studentId,
+      initialTemplate: initialTemplate,
     );
   }
 
-  Future<void> _openPaymentSheet() async {
+  Future<void> _openPaymentSheet(Student student) async {
     await InteractionFeedback.selection(context);
     if (!mounted) return;
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => PaymentBottomSheet(studentId: widget.studentId),
+    await showStudentPaymentSheet(
+      context,
+      studentId: student.id,
+      studentName: student.name,
+      pricePerClass: student.pricePerClass,
     );
-    invalidateAfterPaymentChange(ref);
     await _loadPayments();
   }
 
@@ -201,10 +208,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   ) async {
     final service = ref.read(handwritingAnalysisServiceProvider);
     if (service == null) {
-      AppToast.showError(
-        context,
-        '\u8bf7\u5148\u5728\u8bbe\u7f6e\u4e2d\u5b8c\u6210 AI \u914d\u7f6e\u3002',
-      );
+      AppToast.showError(context, '请先在设置中完成 AI 配置。');
       return;
     }
 
@@ -220,6 +224,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
           studentName: studentName,
         ),
       );
+      await _saveArtworkImageToAttendance(record, image.path);
       if (!mounted) return;
       await showModalBottomSheet(
         context: context,
@@ -242,15 +247,39 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      AppToast.showError(
-        context,
-        '\u56fe\u7247\u5206\u6790\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002',
-      );
+      AppToast.showError(context, '图片分析失败，请稍后重试。');
     } finally {
       if (mounted) {
         setState(() => _analyzingImageRecordIds.remove(record.id));
       }
     }
+  }
+
+  Future<void> _saveArtworkImageToAttendance(
+    Attendance record,
+    String imagePath,
+  ) async {
+    final attendanceDao = ref.read(attendanceDaoProvider);
+    final latestRecord = await attendanceDao.getById(record.id);
+    if (latestRecord == null) {
+      throw StateError('Attendance not found for artwork save');
+    }
+
+    final storedImagePath = await const AttendanceArtworkStorageService()
+        .replaceArtwork(
+          attendanceId: latestRecord.id,
+          sourceImagePath: imagePath,
+          previousImagePath: latestRecord.artworkImagePath,
+        );
+
+    await attendanceDao.update(
+      latestRecord.copyWith(
+        artworkImagePath: storedImagePath,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+    invalidateAfterAttendanceChange(ref);
+    await _reloadAttendanceRecords();
   }
 
   Future<bool> _applyPracticeSuggestion(
@@ -705,183 +734,12 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     const SizedBox(height: 16),
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.finance],
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: feeAsync.when(
-                          loading: () => const SizedBox(
-                            height: 88,
-                            child: Center(child: CircularProgressIndicator()),
-                          ),
-                          error: (e, _) => Text(
-                            '\u52a0\u8f7d\u8d39\u7528\u6c47\u603b\u5931\u8d25\uff1a$e',
-                          ),
-                          data: (fee) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    Text(
-                                      '\u8d39\u7528\u6982\u89c8',
-                                      style: theme.textTheme.titleMedium,
-                                    ),
-                                    _ProfileBadge(
-                                      icon: Icons.calendar_month_outlined,
-                                      label: '$from - $to',
-                                      color: kPrimaryBlue,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '\u6309\u6708\u67e5\u770b\u5e94\u6536\u3001\u5df2\u6536\u548c\u5f53\u524d\u4f59\u989d\u3002',
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                                const SizedBox(height: 12),
-                                LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    final width = constraints.maxWidth;
-                                    final itemWidth = width < 360
-                                        ? width
-                                        : width < 720
-                                        ? (width - 12) / 2
-                                        : (width - 24) / 3;
-
-                                    return Wrap(
-                                      spacing: 12,
-                                      runSpacing: 12,
-                                      children: [
-                                        SizedBox(
-                                          width: itemWidth,
-                                          child: _FeeMetric(
-                                            '\u672c\u6708\u5e94\u6536',
-                                            fee.totalReceivable,
-                                            kPrimaryBlue,
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: itemWidth,
-                                          child: _FeeMetric(
-                                            '\u672c\u6708\u5df2\u6536',
-                                            fee.totalReceived,
-                                            kGreen,
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: itemWidth,
-                                          child: _FeeMetric(
-                                            '\u5f53\u524d\u4f59\u989d',
-                                            fee.balance,
-                                            fee.balance < 0
-                                                ? kRed
-                                                : fee.balance > 0
-                                                ? kGreen
-                                                : kInkSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                allTimeFeeAsync.whenOrNull(
-                                      data: (allFee) {
-                                        final balanceColor = allFee.balance < 0
-                                            ? kRed
-                                            : allFee.balance > 0
-                                            ? kGreen
-                                            : kInkSecondary;
-                                        return LayoutBuilder(
-                                          builder: (context, constraints) {
-                                            final compact =
-                                                constraints.maxWidth < 420;
-
-                                            final label = Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  '\u603b\u4f59\u989d',
-                                                  style:
-                                                      theme.textTheme.bodySmall,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                const Tooltip(
-                                                  message:
-                                                      '\u603b\u4f59\u989d = \u7d2f\u8ba1\u5df2\u6536 - \u7d2f\u8ba1\u5e94\u6536\u3002\u6b63\u6570\u8868\u793a\u7ed3\u4f59\uff0c\u8d1f\u6570\u8868\u793a\u6b20\u8d39\u3002',
-                                                  child: Icon(
-                                                    Icons.info_outline,
-                                                    size: 14,
-                                                    color: kInkSecondary,
-                                                  ),
-                                                ),
-                                              ],
-                                            );
-
-                                            final value = Text(
-                                              '\u00a5${allFee.balance.toStringAsFixed(2)}',
-                                              style: theme.textTheme.titleMedium
-                                                  ?.copyWith(
-                                                    fontFamily: 'NotoSansSC',
-                                                    color: balanceColor,
-                                                  ),
-                                            );
-
-                                            if (compact) {
-                                              return Container(
-                                                padding: const EdgeInsets.all(
-                                                  14,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: balanceColor
-                                                      .withValues(alpha: 0.08),
-                                                  borderRadius:
-                                                      BorderRadius.circular(16),
-                                                ),
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    label,
-                                                    const SizedBox(height: 8),
-                                                    value,
-                                                  ],
-                                                ),
-                                              );
-                                            }
-
-                                            return Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 14,
-                                                    vertical: 12,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: balanceColor.withValues(
-                                                  alpha: 0.08,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  label,
-                                                  const Spacer(),
-                                                  value,
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        );
-                                      },
-                                    ) ??
-                                    const SizedBox.shrink(),
-                              ],
-                            );
-                          },
-                        ),
+                      child: StudentFinanceOverviewCard(
+                        student: student,
+                        from: from,
+                        to: to,
+                        monthlyFeeAsync: feeAsync,
+                        allTimeFeeAsync: allTimeFeeAsync,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -993,7 +851,8 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                             vertical: 16,
                                           ),
                                         ),
-                                        onPressed: _openPaymentSheet,
+                                        onPressed: () =>
+                                            _openPaymentSheet(student),
                                         icon: const Icon(
                                           Icons.payments_outlined,
                                         ),
@@ -1049,14 +908,22 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     const SizedBox(height: 16),
                     StudentAiInsightCard(student: student),
                     const SizedBox(height: 16),
-                    StudentParentMessageCard(
-                      draft: parentDraft,
-                      onOpenPayment: () {
-                        _openPaymentSheet();
-                      },
+                    _StudentSectionBlock(
+                      anchorKey:
+                          _sectionKeys[_StudentDetailAnchor.communication],
+                      child: StudentParentMessageCard(
+                        draft: parentDraft,
+                        onOpenPayment: () {
+                          _openPaymentSheet(student);
+                        },
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    StudentArtworkTimelineCard(entries: artworkTimeline),
+                    StudentArtworkTimelineCard(
+                      entries: artworkTimeline,
+                      onOpenAttendance: () =>
+                          _scrollToSection(_StudentDetailAnchor.attendance),
+                    ),
                     const SizedBox(height: 16),
                     StudentAiProgressCard(student: student),
                     const SizedBox(height: 22),
@@ -1218,6 +1085,12 @@ class _StudentDetailQuickNavigator extends StatelessWidget {
       icon: Icons.auto_graph_outlined,
       label: '成长',
       color: kGreen,
+    ),
+    _StudentQuickNavItem(
+      anchor: _StudentDetailAnchor.communication,
+      icon: Icons.chat_bubble_outline,
+      label: '沟通',
+      color: kPrimaryBlue,
     ),
     _StudentQuickNavItem(
       anchor: _StudentDetailAnchor.actions,
@@ -1651,41 +1524,6 @@ class _ActionHintChip extends StatelessWidget {
   }
 }
 
-class _FeeMetric extends StatelessWidget {
-  final String label;
-  final double value;
-  final Color color;
-
-  const _FeeMetric(this.label, this.value, this.color);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 6),
-          Text(
-            '\u00a5${value.toStringAsFixed(2)}',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontFamily: 'NotoSansSC',
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PaymentCard extends StatelessWidget {
   final Payment payment;
   final VoidCallback onDelete;
@@ -1991,6 +1829,14 @@ class _AttendanceCard extends StatelessWidget {
                     if (record.note?.isNotEmpty ?? false) ...[
                       const SizedBox(height: 8),
                       Text(record.note!, style: theme.textTheme.bodySmall),
+                    ],
+                    if (record.artworkImagePath?.trim().isNotEmpty ??
+                        false) ...[
+                      const SizedBox(height: 8),
+                      AttendanceArtworkPreview(
+                        imagePath: record.artworkImagePath!,
+                        title: '本次课堂作品',
+                      ),
                     ],
                     if (record.lessonFocusTags.isNotEmpty) ...[
                       const SizedBox(height: 8),
