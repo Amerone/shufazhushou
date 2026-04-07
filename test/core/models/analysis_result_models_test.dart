@@ -39,6 +39,26 @@ void main() {
       expect(result.overallAssessment, 'Overall summary');
       expect(result.teachingSuggestions, isEmpty);
     });
+
+    test('parses saved note content into progress result', () {
+      final result = ProgressAnalysisResult.fromSavedNote(
+        rawText:
+            '总体评价：最近整体稳定\n'
+            '趋势分析：较前几次更顺\n'
+            '优势方面：起收笔更干净\n'
+            '需加强方面：章法还要再稳一些\n'
+            '教学建议：\n'
+            '1. 下节课先做控笔热身\n'
+            '2. 继续巩固中宫位置',
+      );
+
+      expect(result.isStructured, isTrue);
+      expect(result.overallAssessment, '最近整体稳定');
+      expect(result.trendAnalysis, '较前几次更顺');
+      expect(result.strengths, '起收笔更干净');
+      expect(result.areasToImprove, '章法还要再稳一些');
+      expect(result.teachingSuggestions, ['下节课先做控笔热身', '继续巩固中宫位置']);
+    });
   });
 
   group('DataInsightResult', () {

@@ -212,7 +212,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     if (_submitting) return;
     final confirmed = await AppToast.showConfirm(
       context,
-      '备份包含学员、家长、课时和收费等完整数据。继续后会先生成应用内副本，再导出一个需要口令才能恢复的加密备份文件。确认继续吗？',
+      '备份包含学员、家长、课时、收费和课堂作品图片等完整数据。继续后会先生成应用内副本，再导出一个需要口令才能恢复的加密备份文件。确认继续吗？',
     );
     if (!confirmed || !mounted) return;
 

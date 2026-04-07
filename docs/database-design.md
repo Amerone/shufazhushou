@@ -4,7 +4,7 @@
 
 - 引擎：SQLite（通过 sqflite）
 - 数据库文件名：`moyun.db`（兼容迁移旧文件 `calligraphy_assistant.db`）
-- 当前版本：`4`
+- 当前版本：`5`
 
 ---
 
@@ -49,6 +49,7 @@ CREATE TABLE attendance (
   lesson_focus_tags TEXT,                -- 课堂重点标签 JSON 数组
   home_practice_note TEXT,               -- 课后练习建议
   progress_scores_json TEXT,             -- 结构化进步评分 JSON
+  artwork_image_path TEXT,               -- 课堂作品图片本地路径
   created_at     INTEGER NOT NULL,
   updated_at     INTEGER NOT NULL,
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
@@ -74,6 +75,7 @@ CREATE INDEX idx_attendance_date ON attendance(date);
 - `lesson_focus_tags` 保存结构化课堂重点，例如 `["控笔","结构"]`
 - `home_practice_note` 保存课后练习建议，供家长沟通和导出使用
 - `progress_scores_json` 保存结构化评分，当前支持 `stroke_quality`、`structure_accuracy`、`rhythm_consistency`
+- `artwork_image_path` 保存该次出勤关联的课堂作品图片本地路径，用于主页和学生详情回看原图
 
 ---
 
@@ -206,7 +208,7 @@ SELECT DISTINCT student_id FROM attendance WHERE status IN ('present','late');
 
 ```dart
 // database_helper.dart 关键逻辑
-static const int _version = 4;
+static const int _version = 5;
 static const String _dbName = 'moyun.db';
 
 Future<Database> _initDB() async {
@@ -233,6 +235,9 @@ Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
     await _addColumnIfMissing(db, 'attendance', 'home_practice_note TEXT');
     await _addColumnIfMissing(db, 'attendance', 'progress_scores_json TEXT');
   }
+  if (oldVersion < 5) {
+    await _addColumnIfMissing(db, 'attendance', 'artwork_image_path TEXT');
+  }
 }
 ```
 
@@ -243,15 +248,16 @@ Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
 - `attendance.lesson_focus_tags`：课堂重点标签 JSON 数组
 - `attendance.home_practice_note`：课后练习建议
 - `attendance.progress_scores_json`：结构化进步评分 JSON
+- `attendance.artwork_image_path`：课堂作品图片本地路径
 - 升级过程使用 `PRAGMA table_info` 检查列是否存在，避免重复升级时报错
 
 ---
 
 ## 备份策略
 
-- 备份 = 直接复制 SQLite 数据库文件到 `Downloads/墨韵备份/` 目录
+- 备份 = 生成 SQLite 数据库快照，并同时保存课堂作品图片快照
 - 文件名格式：`backup_YYYYMMDD_HHmmss.db`
-- 恢复 = 用户选择备份文件，覆盖当前数据库文件后重启 App
+- 恢复 = 用户选择备份文件，覆盖当前数据库并同步恢复课堂作品图片后重启 App
 - 超过 7 天未备份：读取 `settings.last_backup_at`，在设置页显示橙色警告
 
 ---

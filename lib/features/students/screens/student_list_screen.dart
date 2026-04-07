@@ -82,7 +82,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                     data: (list) => '学生档案 (${list.length})',
                   ) ??
                   '学生档案',
-              subtitle: '先找人，再看档案，也可以直接记录缴费。',
+              subtitle: '新增、查找、进入学生档案',
             ),
             Expanded(
               child: RefreshIndicator(
@@ -107,7 +107,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                         _query.isNotEmpty || _filter != _StudentListFilter.all;
                     final resultSummary = hasActiveFilter
                         ? '当前显示 ${filtered.length} / ${list.length} 位学生'
-                        : '共 ${list.length} 位学生，入口已集中在当前页首屏。';
+                        : '共 ${list.length} 位学生';
 
                     return ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -118,17 +118,6 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                '查找、筛选与入口',
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '先通过入口新增或导入，再按状态和关键词缩小范围。',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              const SizedBox(height: 14),
                               LayoutBuilder(
                                 builder: (context, constraints) {
                                   final compact = constraints.maxWidth < 420;
@@ -175,6 +164,21 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                                     ],
                                   );
                                 },
+                              ),
+                              const SizedBox(height: 14),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _StudentSummaryPill(
+                                    label: '在读 $activeCount',
+                                    color: kPrimaryBlue,
+                                  ),
+                                  _StudentSummaryPill(
+                                    label: '休学 $suspendedCount',
+                                    color: kOrange,
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 14),
                               TextField(
@@ -238,49 +242,6 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                                     setState(() => _filter = selection.first);
                                   },
                                 ),
-                              ),
-                              const SizedBox(height: 14),
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final columns = constraints.maxWidth >= 720
-                                      ? 3
-                                      : 1;
-                                  final itemWidth =
-                                      (constraints.maxWidth -
-                                          12 * (columns - 1)) /
-                                      columns;
-
-                                  return Wrap(
-                                    spacing: 12,
-                                    runSpacing: 12,
-                                    children: [
-                                      SizedBox(
-                                        width: itemWidth,
-                                        child: _StudentStatCard(
-                                          label: '全部学生',
-                                          value: '${list.length}',
-                                          color: kSealRed,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: itemWidth,
-                                        child: _StudentStatCard(
-                                          label: '在读学生',
-                                          value: '$activeCount',
-                                          color: kPrimaryBlue,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: itemWidth,
-                                        child: _StudentStatCard(
-                                          label: '休学学生',
-                                          value: '$suspendedCount',
-                                          color: kOrange,
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
                               ),
                               const SizedBox(height: 14),
                               Container(
@@ -399,41 +360,27 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   }
 }
 
-class _StudentStatCard extends StatelessWidget {
+class _StudentSummaryPill extends StatelessWidget {
   final String label;
-  final String value;
   final Color color;
 
-  const _StudentStatCard({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
+  const _StudentSummaryPill({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withValues(alpha: 0.14)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontFamily: 'NotoSansSC',
-              color: color,
-            ),
-          ),
-        ],
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -604,6 +551,7 @@ class _StudentCard extends StatelessWidget {
                                 studentId: student.id,
                                 studentName:
                                     displayNames[student.id] ?? student.name,
+                                pricePerClass: student.pricePerClass,
                               );
                             },
                             icon: const Icon(Icons.payments_outlined, size: 18),

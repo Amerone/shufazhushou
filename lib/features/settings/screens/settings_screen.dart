@@ -14,6 +14,7 @@ import '../../../core/database/database_helper.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/package_info_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/attendance_artwork_storage_service.dart';
 import '../../../core/utils/seed_test_data.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
@@ -938,6 +939,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         await txn.delete('settings');
         await txn.delete('students');
       });
+      await const AttendanceArtworkStorageService().clearArtworkDirectory();
       await ref.read(sensitiveSettingsStoreProvider).clearAll();
       invalidateAll(ref);
       if (mounted) AppToast.showSuccess(context, '全部数据已清空');

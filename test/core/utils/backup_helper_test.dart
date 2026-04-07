@@ -1,9 +1,34 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moyun/core/services/attendance_artwork_storage_service.dart';
 import 'package:moyun/core/utils/backup_helper.dart';
+import 'package:path/path.dart' as p;
 
 void main() {
+  late Directory tempRoot;
+  const artworkStorage = AttendanceArtworkStorageService();
+
+  setUp(() async {
+    tempRoot = await Directory.systemTemp.createTemp('backup-helper-test');
+    BackupHelper.applicationSupportDirectoryResolver = () async => tempRoot;
+    BackupHelper.temporaryDirectoryResolver = () async => tempRoot;
+    BackupHelper.externalStorageDirectoryResolver = () async => null;
+    AttendanceArtworkStorageService.documentsDirectoryResolver = () async =>
+        tempRoot;
+  });
+
+  tearDown(() async {
+    BackupHelper.applicationSupportDirectoryResolver = null;
+    BackupHelper.temporaryDirectoryResolver = null;
+    BackupHelper.externalStorageDirectoryResolver = null;
+    AttendanceArtworkStorageService.documentsDirectoryResolver = null;
+    if (await tempRoot.exists()) {
+      await tempRoot.delete(recursive: true);
+    }
+  });
+
   test('buildBackupFileName outputs readable timestamped name', () {
     final fileName = BackupHelper.buildBackupFileName(
       DateTime(2026, 4, 1, 9, 5, 7),
@@ -83,4 +108,96 @@ void main() {
       throwsException,
     );
   });
+
+  test('backup bundle payload preserves artwork files', () {
+    final bundleBytes = BackupHelper.buildBackupBundleBytes(
+      databaseBytes: Uint8List.fromList(
+        'SQLite format 3 sample payload'.codeUnits,
+      ),
+      artworkFiles: const {
+        'calligraphy-1.jpg': [1, 2, 3],
+        'calligraphy-2.jpg': [4, 5, 6],
+      },
+    );
+
+    final decoded = BackupHelper.tryDecodeBackupBundleBytes(bundleBytes);
+
+    expect(decoded, isNotNull);
+    expect(
+      decoded!.databaseBytes,
+      Uint8List.fromList('SQLite format 3 sample payload'.codeUnits),
+    );
+    expect(
+      decoded.artworkFiles.keys,
+      containsAll(<String>['calligraphy-1.jpg', 'calligraphy-2.jpg']),
+    );
+    expect(
+      decoded.artworkFiles['calligraphy-1.jpg'],
+      Uint8List.fromList(const [1, 2, 3]),
+    );
+    expect(
+      decoded.artworkFiles['calligraphy-2.jpg'],
+      Uint8List.fromList(const [4, 5, 6]),
+    );
+  });
+
+  test(
+    'payloadIncludesArtworkSnapshot distinguishes bundle from legacy raw db payload',
+    () {
+      final bundleBytes = BackupHelper.buildBackupBundleBytes(
+        databaseBytes: Uint8List.fromList(
+          'SQLite format 3 sample payload'.codeUnits,
+        ),
+      );
+      final legacyBytes = Uint8List.fromList(
+        'SQLite format 3 sample payload'.codeUnits,
+      );
+
+      expect(BackupHelper.payloadIncludesArtworkSnapshot(bundleBytes), isTrue);
+      expect(BackupHelper.payloadIncludesArtworkSnapshot(legacyBytes), isFalse);
+    },
+  );
+
+  test('listBackups counts sidecar artwork snapshots in backup size', () async {
+    final backupDir = Directory(p.join(tempRoot.path, 'moyun_backups'));
+    await backupDir.create(recursive: true);
+
+    final backupFile = File(p.join(backupDir.path, 'moyun_backup_sample.db'));
+    await backupFile.writeAsBytes(const [1, 2, 3, 4], flush: true);
+
+    final artworkDir = Directory('${backupFile.path}.artworks');
+    await artworkDir.create(recursive: true);
+    await File(
+      p.join(artworkDir.path, 'piece-a.jpg'),
+    ).writeAsBytes(const [5, 6, 7], flush: true);
+    await File(
+      p.join(artworkDir.path, 'piece-b.jpg'),
+    ).writeAsBytes(const [8, 9], flush: true);
+
+    final records = await BackupHelper.listBackups();
+
+    expect(records, hasLength(1));
+    expect(records.single.sizeInBytes, 9);
+  });
+
+  test(
+    'applyRestoredArtworkSnapshot clears stale artwork without snapshot',
+    () async {
+      final sourceFile = File(p.join(tempRoot.path, 'stale-artwork.jpg'));
+      await sourceFile.writeAsBytes(const [1, 2, 3], flush: true);
+
+      final staleArtworkPath = await artworkStorage.replaceArtwork(
+        attendanceId: 'attendance-1',
+        sourceImagePath: sourceFile.path,
+      );
+
+      expect(File(staleArtworkPath).existsSync(), isTrue);
+
+      await BackupHelper.applyRestoredArtworkSnapshot(
+        includesArtworkSnapshot: false,
+      );
+
+      expect(File(staleArtworkPath).existsSync(), isFalse);
+    },
+  );
 }

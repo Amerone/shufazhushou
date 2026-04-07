@@ -15,6 +15,7 @@ class Attendance {
   final List<String> lessonFocusTags;
   final String? homePracticeNote;
   final AttendanceProgressScores? progressScores;
+  final String? artworkImagePath;
   final int createdAt;
   final int updatedAt;
 
@@ -31,47 +32,54 @@ class Attendance {
     List<String> lessonFocusTags = const <String>[],
     this.homePracticeNote,
     this.progressScores,
+    this.artworkImagePath,
     required this.createdAt,
     required this.updatedAt,
   }) : lessonFocusTags = List.unmodifiable(lessonFocusTags);
 
   factory Attendance.fromMap(Map<String, dynamic> m) => Attendance(
-        id: m['id'] as String,
-        studentId: m['student_id'] as String,
-        date: m['date'] as String,
-        startTime: m['start_time'] as String,
-        endTime: m['end_time'] as String,
-        status: m['status'] as String,
-        priceSnapshot: (m['price_snapshot'] as num).toDouble(),
-        feeAmount: (m['fee_amount'] as num).toDouble(),
-        note: m['note'] as String?,
-        lessonFocusTags:
-            AttendanceFeedbackCodec.decodeFocusTags(m['lesson_focus_tags'] as String?),
-        homePracticeNote: m['home_practice_note'] as String?,
-        progressScores: AttendanceFeedbackCodec.decodeProgressScores(
-          m['progress_scores_json'] as String?,
-        ),
-        createdAt: m['created_at'] as int,
-        updatedAt: m['updated_at'] as int,
-      );
+    id: m['id'] as String,
+    studentId: m['student_id'] as String,
+    date: m['date'] as String,
+    startTime: m['start_time'] as String,
+    endTime: m['end_time'] as String,
+    status: m['status'] as String,
+    priceSnapshot: (m['price_snapshot'] as num).toDouble(),
+    feeAmount: (m['fee_amount'] as num).toDouble(),
+    note: m['note'] as String?,
+    lessonFocusTags: AttendanceFeedbackCodec.decodeFocusTags(
+      m['lesson_focus_tags'] as String?,
+    ),
+    homePracticeNote: m['home_practice_note'] as String?,
+    progressScores: AttendanceFeedbackCodec.decodeProgressScores(
+      m['progress_scores_json'] as String?,
+    ),
+    artworkImagePath: m['artwork_image_path'] as String?,
+    createdAt: m['created_at'] as int,
+    updatedAt: m['updated_at'] as int,
+  );
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'student_id': studentId,
-        'date': date,
-        'start_time': startTime,
-        'end_time': endTime,
-        'status': status,
-        'price_snapshot': priceSnapshot,
-        'fee_amount': feeAmount,
-        'note': note,
-        'lesson_focus_tags': AttendanceFeedbackCodec.encodeFocusTags(lessonFocusTags),
-        'home_practice_note': homePracticeNote,
-        'progress_scores_json':
-            AttendanceFeedbackCodec.encodeProgressScores(progressScores),
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-      };
+    'id': id,
+    'student_id': studentId,
+    'date': date,
+    'start_time': startTime,
+    'end_time': endTime,
+    'status': status,
+    'price_snapshot': priceSnapshot,
+    'fee_amount': feeAmount,
+    'note': note,
+    'lesson_focus_tags': AttendanceFeedbackCodec.encodeFocusTags(
+      lessonFocusTags,
+    ),
+    'home_practice_note': homePracticeNote,
+    'progress_scores_json': AttendanceFeedbackCodec.encodeProgressScores(
+      progressScores,
+    ),
+    'artwork_image_path': artworkImagePath,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
 
   Attendance copyWith({
     String? id,
@@ -86,29 +94,32 @@ class Attendance {
     Object? lessonFocusTags = _unset,
     Object? homePracticeNote = _unset,
     Object? progressScores = _unset,
+    Object? artworkImagePath = _unset,
     int? createdAt,
     int? updatedAt,
-  }) =>
-      Attendance(
-        id: id ?? this.id,
-        studentId: studentId ?? this.studentId,
-        date: date ?? this.date,
-        startTime: startTime ?? this.startTime,
-        endTime: endTime ?? this.endTime,
-        status: status ?? this.status,
-        priceSnapshot: priceSnapshot ?? this.priceSnapshot,
-        feeAmount: feeAmount ?? this.feeAmount,
-        note: identical(note, _unset) ? this.note : note as String?,
-        lessonFocusTags: identical(lessonFocusTags, _unset)
-            ? this.lessonFocusTags
-            : (lessonFocusTags as List<String>?) ?? const <String>[],
-        homePracticeNote: identical(homePracticeNote, _unset)
-            ? this.homePracticeNote
-            : homePracticeNote as String?,
-        progressScores: identical(progressScores, _unset)
-            ? this.progressScores
-            : progressScores as AttendanceProgressScores?,
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
+  }) => Attendance(
+    id: id ?? this.id,
+    studentId: studentId ?? this.studentId,
+    date: date ?? this.date,
+    startTime: startTime ?? this.startTime,
+    endTime: endTime ?? this.endTime,
+    status: status ?? this.status,
+    priceSnapshot: priceSnapshot ?? this.priceSnapshot,
+    feeAmount: feeAmount ?? this.feeAmount,
+    note: identical(note, _unset) ? this.note : note as String?,
+    lessonFocusTags: identical(lessonFocusTags, _unset)
+        ? this.lessonFocusTags
+        : (lessonFocusTags as List<String>?) ?? const <String>[],
+    homePracticeNote: identical(homePracticeNote, _unset)
+        ? this.homePracticeNote
+        : homePracticeNote as String?,
+    progressScores: identical(progressScores, _unset)
+        ? this.progressScores
+        : progressScores as AttendanceProgressScores?,
+    artworkImagePath: identical(artworkImagePath, _unset)
+        ? this.artworkImagePath
+        : artworkImagePath as String?,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
 }

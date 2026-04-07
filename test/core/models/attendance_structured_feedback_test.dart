@@ -19,6 +19,7 @@ void main() {
         'home_practice_note': '每天练习15分钟横竖撇捺',
         'progress_scores_json':
             '{"stroke_quality":4,"structure_accuracy":3,"rhythm_consistency":4}',
+        'artwork_image_path': 'E:/artworks/a1.jpg',
         'created_at': 1711411200000,
         'updated_at': 1711411200000,
       };
@@ -29,6 +30,7 @@ void main() {
       expect(roundTrip['lesson_focus_tags'], input['lesson_focus_tags']);
       expect(roundTrip['home_practice_note'], input['home_practice_note']);
       expect(roundTrip['progress_scores_json'], input['progress_scores_json']);
+      expect(roundTrip['artwork_image_path'], input['artwork_image_path']);
     });
 
     test(
@@ -47,6 +49,7 @@ void main() {
           'lesson_focus_tags': null,
           'home_practice_note': null,
           'progress_scores_json': null,
+          'artwork_image_path': null,
           'created_at': 1711411200000,
           'updated_at': 1711411200000,
         };
@@ -57,9 +60,11 @@ void main() {
         expect(roundTrip.containsKey('lesson_focus_tags'), isTrue);
         expect(roundTrip.containsKey('home_practice_note'), isTrue);
         expect(roundTrip.containsKey('progress_scores_json'), isTrue);
+        expect(roundTrip.containsKey('artwork_image_path'), isTrue);
         expect(roundTrip['lesson_focus_tags'], isNull);
         expect(roundTrip['home_practice_note'], isNull);
         expect(roundTrip['progress_scores_json'], isNull);
+        expect(roundTrip['artwork_image_path'], isNull);
       },
     );
 
@@ -86,12 +91,14 @@ void main() {
         lessonFocusTags: const <String>[],
         homePracticeNote: null,
         progressScores: null,
+        artworkImagePath: null,
       );
 
       expect(updated.note, isNull);
       expect(updated.lessonFocusTags, isEmpty);
       expect(updated.homePracticeNote, isNull);
       expect(updated.progressScores, isNull);
+      expect(updated.artworkImagePath, isNull);
     });
 
     test('constructor protects lesson focus tags from external mutation', () {

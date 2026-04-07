@@ -9,6 +9,7 @@ class StudentGrowthSummary {
   final String nextLessonLabel;
   final String latestProgressSummary;
   final String dataFreshness;
+  final DateTime? latestDataAt;
 
   const StudentGrowthSummary({
     required this.progressPoint,
@@ -19,6 +20,7 @@ class StudentGrowthSummary {
     required this.nextLessonLabel,
     required this.latestProgressSummary,
     required this.dataFreshness,
+    this.latestDataAt,
   });
 }
 
@@ -61,6 +63,7 @@ class StudentGrowthSummaryService {
       nextLessonLabel: _buildNextLessonLabel(sortedRecords, currentTime),
       latestProgressSummary: _buildLatestProgressSummary(latestFormalRecord),
       dataFreshness: _formatTimestamp(latestUpdatedAt),
+      latestDataAt: DateTime.fromMillisecondsSinceEpoch(latestUpdatedAt),
     );
   }
 

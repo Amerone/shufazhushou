@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../database/database_helper.dart';
+import '../services/attendance_artwork_storage_service.dart';
 
 class BackupRecord {
   final String path;
@@ -34,6 +35,9 @@ class BackupHelper {
   static const minimumPassphraseLength = _minimumPassphraseLength;
   static const _encryptedBackupFormat = 'moyun_encrypted_backup';
   static const _encryptedBackupVersion = 1;
+  static const _backupBundleFormat = 'moyun_backup_bundle';
+  static const _backupBundleVersion = 1;
+  static const _artworkSnapshotDirectorySuffix = '.artworks';
   static const _pbkdf2Iterations = 120000;
   static const _kdfSaltLength = 16;
   static const _gcmNonceLength = 12;
@@ -69,6 +73,7 @@ class BackupHelper {
     final backupDir = await _resolveBackupDirectory();
     final destination = p.join(backupDir.path, buildBackupFileName(at));
     await File(dbPath).copy(destination);
+    await _writeArtworkSnapshot(destination);
     return destination;
   }
 
@@ -95,7 +100,7 @@ class BackupHelper {
     }
 
     final encryptedBytes = await encryptBackupBytes(
-      await rawBackupFile.readAsBytes(),
+      await _buildBackupPayload(rawBackupPath),
       passphrase: normalizedPassphrase,
     );
     final tempDir = await _getTemporaryDirectory();
@@ -126,7 +131,7 @@ class BackupHelper {
           path: entity.path,
           fileName: p.basename(entity.path),
           modifiedAt: stat.modified,
-          sizeInBytes: stat.size,
+          sizeInBytes: await _calculateSnapshotBackupSize(entity, stat.size),
         ),
       );
     }
@@ -177,13 +182,16 @@ class BackupHelper {
     }
 
     String? decryptedTempPath;
+    String? decryptedArtworkTempDirPath;
     try {
       final restoreSource = await _prepareRestoreSource(
         sourceFile,
         passphrase: passphrase,
-        onPrepared: (tempPath) => decryptedTempPath = tempPath,
+        onPreparedDatabase: (tempPath) => decryptedTempPath = tempPath,
+        onPreparedArtworkDirectory: (tempPath) =>
+            decryptedArtworkTempDirPath = tempPath,
       );
-      await _validateBackupFile(restoreSource);
+      await _validateBackupFile(restoreSource.databaseFile);
 
       final dbPath = await DatabaseHelper.resolveDatabasePath();
       final dbDir = Directory(p.dirname(dbPath));
@@ -205,13 +213,23 @@ class BackupHelper {
         }
       }
 
-      await restoreSource.copy(dbPath);
+      await restoreSource.databaseFile.copy(dbPath);
+      await applyRestoredArtworkSnapshot(
+        includesArtworkSnapshot: restoreSource.includesArtworkSnapshot,
+        artworkDirectory: restoreSource.artworkDirectory,
+      );
       return true;
     } finally {
       if (decryptedTempPath != null) {
         final tempFile = File(decryptedTempPath!);
         if (await tempFile.exists()) {
           await tempFile.delete();
+        }
+      }
+      if (decryptedArtworkTempDirPath != null) {
+        final tempDirectory = Directory(decryptedArtworkTempDirPath!);
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
         }
       }
     }
@@ -318,13 +336,96 @@ class BackupHelper {
     }
   }
 
-  static Future<File> _prepareRestoreSource(
+  @visibleForTesting
+  static Uint8List buildBackupBundleBytes({
+    required List<int> databaseBytes,
+    Map<String, List<int>> artworkFiles = const <String, List<int>>{},
+  }) {
+    final normalizedArtworkFiles = <String, String>{};
+    for (final entry in artworkFiles.entries) {
+      normalizedArtworkFiles[p.basename(entry.key)] = base64Encode(entry.value);
+    }
+
+    return Uint8List.fromList(
+      utf8.encode(
+        jsonEncode({
+          'format': _backupBundleFormat,
+          'version': _backupBundleVersion,
+          'database': base64Encode(databaseBytes),
+          'artwork_files': normalizedArtworkFiles,
+        }),
+      ),
+    );
+  }
+
+  @visibleForTesting
+  static ({Uint8List databaseBytes, Map<String, Uint8List> artworkFiles})?
+  tryDecodeBackupBundleBytes(List<int> bytes) {
+    try {
+      final decoded = jsonDecode(utf8.decode(bytes));
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      if (decoded['format'] != _backupBundleFormat ||
+          decoded['version'] != _backupBundleVersion) {
+        return null;
+      }
+
+      final rawArtworkFiles =
+          decoded['artwork_files'] as Map<String, dynamic>? ?? const {};
+      final artworkFiles = <String, Uint8List>{};
+      for (final entry in rawArtworkFiles.entries) {
+        artworkFiles[p.basename(entry.key)] = Uint8List.fromList(
+          base64Decode(entry.value as String),
+        );
+      }
+
+      return (
+        databaseBytes: Uint8List.fromList(
+          base64Decode(decoded['database'] as String),
+        ),
+        artworkFiles: artworkFiles,
+      );
+    } on FormatException {
+      return null;
+    } on TypeError {
+      return null;
+    }
+  }
+
+  @visibleForTesting
+  static bool payloadIncludesArtworkSnapshot(List<int> bytes) {
+    return tryDecodeBackupBundleBytes(bytes) != null;
+  }
+
+  @visibleForTesting
+  static Future<void> applyRestoredArtworkSnapshot({
+    required bool includesArtworkSnapshot,
+    Directory? artworkDirectory,
+  }) async {
+    final storage = const AttendanceArtworkStorageService();
+    if (includesArtworkSnapshot) {
+      await storage.restoreArtworkSnapshotFrom(artworkDirectory!);
+      return;
+    }
+    await storage.clearArtworkDirectory();
+  }
+
+  static Future<_PreparedRestoreSource> _prepareRestoreSource(
     File sourceFile, {
-    required void Function(String tempPath) onPrepared,
+    required void Function(String tempPath) onPreparedDatabase,
+    required void Function(String tempPath) onPreparedArtworkDirectory,
     String? passphrase,
   }) async {
     if (!isEncryptedBackupPath(sourceFile.path)) {
-      return sourceFile;
+      final artworkDirectory = await _existingArtworkSnapshotDirectory(
+        sourceFile.path,
+      );
+      return _PreparedRestoreSource(
+        databaseFile: sourceFile,
+        artworkDirectory: artworkDirectory,
+        includesArtworkSnapshot: artworkDirectory != null,
+      );
     }
 
     final normalizedPassphrase = _normalizePassphrase(passphrase ?? '');
@@ -342,9 +443,31 @@ class BackupHelper {
     }
     final tempPath = p.join(tempDir.path, buildBackupFileName(DateTime.now()));
     final tempFile = File(tempPath);
-    await tempFile.writeAsBytes(decryptedBytes, flush: true);
-    onPrepared(tempPath);
-    return tempFile;
+    final decodedBundle = tryDecodeBackupBundleBytes(decryptedBytes);
+    if (decodedBundle == null) {
+      await tempFile.writeAsBytes(decryptedBytes, flush: true);
+      onPreparedDatabase(tempPath);
+      return _PreparedRestoreSource(
+        databaseFile: tempFile,
+        includesArtworkSnapshot: false,
+      );
+    }
+
+    await tempFile.writeAsBytes(decodedBundle.databaseBytes, flush: true);
+    onPreparedDatabase(tempPath);
+
+    final artworkTempDirectory = _buildArtworkSnapshotDirectory(tempPath);
+    await _writeArtworkSnapshotDirectory(
+      artworkTempDirectory,
+      decodedBundle.artworkFiles,
+    );
+    onPreparedArtworkDirectory(artworkTempDirectory.path);
+
+    return _PreparedRestoreSource(
+      databaseFile: tempFile,
+      artworkDirectory: artworkTempDirectory,
+      includesArtworkSnapshot: true,
+    );
   }
 
   static Future<void> _validateBackupFile(File file) async {
@@ -463,10 +586,112 @@ class BackupHelper {
 
       final destinationPath = p.join(targetDir.path, p.basename(entity.path));
       final destinationFile = File(destinationPath);
-      if (await destinationFile.exists()) {
+      if (!await destinationFile.exists()) {
+        await entity.copy(destinationPath);
+      }
+
+      final sourceArtworkDir = _buildArtworkSnapshotDirectory(entity.path);
+      if (!await sourceArtworkDir.exists()) {
         continue;
       }
-      await entity.copy(destinationPath);
+
+      final targetArtworkDir = _buildArtworkSnapshotDirectory(destinationPath);
+      if (await targetArtworkDir.exists()) {
+        continue;
+      }
+      await _writeArtworkSnapshotDirectory(
+        targetArtworkDir,
+        await _readArtworkSnapshotDirectory(sourceArtworkDir),
+      );
+    }
+  }
+
+  static Future<int> _calculateSnapshotBackupSize(
+    File databaseFile,
+    int databaseSize,
+  ) async {
+    final artworkDirectory = _buildArtworkSnapshotDirectory(databaseFile.path);
+    if (!await artworkDirectory.exists()) {
+      return databaseSize;
+    }
+
+    return databaseSize + await _calculateDirectorySize(artworkDirectory);
+  }
+
+  static Future<int> _calculateDirectorySize(Directory directory) async {
+    var total = 0;
+    await for (final entity in directory.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      if (entity is! File) {
+        continue;
+      }
+      total += await entity.length();
+    }
+    return total;
+  }
+
+  static Future<Uint8List> _buildBackupPayload(String backupPath) async {
+    final databaseBytes = await File(backupPath).readAsBytes();
+    final artworkFiles = await _readArtworkSnapshotDirectory(
+      _buildArtworkSnapshotDirectory(backupPath),
+    );
+    return buildBackupBundleBytes(
+      databaseBytes: databaseBytes,
+      artworkFiles: artworkFiles,
+    );
+  }
+
+  static Future<void> _writeArtworkSnapshot(String backupPath) async {
+    await const AttendanceArtworkStorageService().copyArtworkSnapshotTo(
+      _buildArtworkSnapshotDirectory(backupPath),
+    );
+  }
+
+  static Directory _buildArtworkSnapshotDirectory(String backupPath) {
+    return Directory('$backupPath$_artworkSnapshotDirectorySuffix');
+  }
+
+  static Future<Directory?> _existingArtworkSnapshotDirectory(
+    String backupPath,
+  ) async {
+    final snapshotDirectory = _buildArtworkSnapshotDirectory(backupPath);
+    if (!await snapshotDirectory.exists()) {
+      return null;
+    }
+    return snapshotDirectory;
+  }
+
+  static Future<Map<String, Uint8List>> _readArtworkSnapshotDirectory(
+    Directory snapshotDirectory,
+  ) async {
+    if (!await snapshotDirectory.exists()) {
+      return const <String, Uint8List>{};
+    }
+
+    final files = <String, Uint8List>{};
+    await for (final entity in snapshotDirectory.list(followLinks: false)) {
+      if (entity is! File) {
+        continue;
+      }
+      files[p.basename(entity.path)] = await entity.readAsBytes();
+    }
+    return files;
+  }
+
+  static Future<void> _writeArtworkSnapshotDirectory(
+    Directory snapshotDirectory,
+    Map<String, Uint8List> files,
+  ) async {
+    if (await snapshotDirectory.exists()) {
+      await snapshotDirectory.delete(recursive: true);
+    }
+    await snapshotDirectory.create(recursive: true);
+
+    for (final entry in files.entries) {
+      final targetFile = File(p.join(snapshotDirectory.path, entry.key));
+      await targetFile.writeAsBytes(entry.value, flush: true);
     }
   }
 
@@ -503,6 +728,18 @@ class BackupHelper {
       List<int>.generate(length, (_) => random.nextInt(256)),
     );
   }
+}
+
+class _PreparedRestoreSource {
+  final File databaseFile;
+  final Directory? artworkDirectory;
+  final bool includesArtworkSnapshot;
+
+  const _PreparedRestoreSource({
+    required this.databaseFile,
+    this.artworkDirectory,
+    required this.includesArtworkSnapshot,
+  });
 }
 
 class _EncryptedBackupEnvelope {

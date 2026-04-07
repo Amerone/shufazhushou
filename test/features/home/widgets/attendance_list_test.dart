@@ -12,6 +12,7 @@ import 'package:moyun/features/home/widgets/attendance_list.dart';
 import 'package:moyun/shared/constants.dart';
 import 'package:moyun/shared/theme.dart';
 import 'package:moyun/shared/utils/interaction_feedback.dart';
+import 'package:moyun/shared/widgets/attendance_artwork_preview.dart';
 
 void main() {
   testWidgets('empty attendance state exposes direct quick entry action', (
@@ -33,16 +34,28 @@ void main() {
 
     await _pumpAttendanceList(tester);
 
+    expect(find.text('作品分析'), findsOneWidget);
     expect(find.text('记录缴费'), findsOneWidget);
     expect(find.text('学生档案'), findsOneWidget);
+  });
+
+  testWidgets('attendance card shows uploaded artwork preview', (tester) async {
+    _FakeStudentNotifier.seededStudents = [_seededStudent];
+    _FakeAttendanceNotifier.seededRecords = [
+      _seededAttendance.copyWith(artworkImagePath: 'E:/missing/artwork.jpg'),
+    ];
+
+    await _pumpAttendanceList(tester);
+
+    expect(find.byType(AttendanceArtworkPreview), findsOneWidget);
   });
 }
 
 final _seededStudent = StudentWithMeta(
   const Student(
     id: 'student-1',
-    name: 'Alice',
-    parentName: 'Parent A',
+    name: '王小楷',
+    parentName: '王妈妈',
     parentPhone: '13900000001',
     pricePerClass: 180,
     status: 'active',

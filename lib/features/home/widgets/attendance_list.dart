@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/models/attendance.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
@@ -11,14 +12,23 @@ import '../../../shared/theme.dart';
 import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/attendance_edit_sheet.dart';
+import '../../../shared/widgets/attendance_artwork_preview.dart';
 import '../../../shared/widgets/brush_stroke_divider.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../core/models/student.dart';
+import '../../students/widgets/attendance_artwork_analysis_launcher.dart';
 import '../../students/widgets/student_action_launcher.dart';
 import 'quick_entry_sheet.dart';
 
-class AttendanceList extends ConsumerWidget {
+class AttendanceList extends ConsumerStatefulWidget {
   const AttendanceList({super.key});
+
+  @override
+  ConsumerState<AttendanceList> createState() => _AttendanceListState();
+}
+
+class _AttendanceListState extends ConsumerState<AttendanceList> {
+  final Set<String> _analyzingImageRecordIds = <String>{};
 
   String _durationLabel(String start, String end) {
     final startTime = parseTime(start);
@@ -34,12 +44,35 @@ class AttendanceList extends ConsumerWidget {
     return rest == 0 ? '$hours 小时' : '$hours 小时 $rest 分钟';
   }
 
+  Future<void> _analyzeAttendanceImage(
+    Attendance record,
+    String studentName,
+  ) async {
+    await launchAttendanceArtworkAnalysis(
+      context,
+      ref,
+      record: record,
+      studentName: studentName,
+      onStarted: () {
+        if (!mounted) return;
+        setState(() => _analyzingImageRecordIds.add(record.id));
+      },
+      onFinished: () {
+        if (!mounted) return;
+        setState(() => _analyzingImageRecordIds.remove(record.id));
+      },
+    );
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final selectedDate = ref.watch(selectedDateProvider);
     final asyncAll = ref.watch(attendanceProvider);
     final students = ref.watch(studentProvider).valueOrNull ?? [];
+    final studentMap = {
+      for (final item in students) item.student.id: item.student,
+    };
     final nameMap = buildDisplayNameMap(
       students.map((m) => m.student).toList(),
     );
@@ -96,6 +129,7 @@ class AttendanceList extends ConsumerWidget {
             final sColor = statusColor(r.status);
             final durationLabel = _durationLabel(r.startTime, r.endTime);
             final studentName = nameMap[r.studentId] ?? r.studentId;
+            final analyzingImage = _analyzingImageRecordIds.contains(r.id);
 
             return Container(
               decoration: BoxDecoration(
@@ -280,11 +314,48 @@ class AttendanceList extends ConsumerWidget {
                                     ),
                                   ),
                                 ],
+                                if (r.artworkImagePath?.trim().isNotEmpty ==
+                                    true) ...[
+                                  const SizedBox(height: 10),
+                                  AttendanceArtworkPreview(
+                                    imagePath: r.artworkImagePath!,
+                                    title: '本次课堂作品',
+                                  ),
+                                ],
                                 const SizedBox(height: 12),
                                 Wrap(
                                   spacing: 8,
                                   runSpacing: 8,
                                   children: [
+                                    FilledButton.tonalIcon(
+                                      onPressed: analyzingImage
+                                          ? null
+                                          : () async {
+                                              await InteractionFeedback.selection(
+                                                context,
+                                              );
+                                              if (!context.mounted) return;
+                                              await _analyzeAttendanceImage(
+                                                r,
+                                                studentName,
+                                              );
+                                            },
+                                      icon: analyzingImage
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.camera_alt_outlined,
+                                              size: 18,
+                                            ),
+                                      label: Text(
+                                        analyzingImage ? '分析中...' : '作品分析',
+                                      ),
+                                    ),
                                     FilledButton.tonalIcon(
                                       onPressed: () async {
                                         await InteractionFeedback.selection(
@@ -295,6 +366,8 @@ class AttendanceList extends ConsumerWidget {
                                           context,
                                           studentId: r.studentId,
                                           studentName: studentName,
+                                          pricePerClass: studentMap[r.studentId]
+                                              ?.pricePerClass,
                                         );
                                       },
                                       icon: const Icon(

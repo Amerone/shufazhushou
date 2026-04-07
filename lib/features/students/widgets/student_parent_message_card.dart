@@ -58,6 +58,15 @@ class _StudentParentMessageCardState extends State<StudentParentMessageCard> {
     return widget.draft.templates.first;
   }
 
+  StudentParentMessageTemplate get _recommendedTemplate {
+    for (final template in widget.draft.templates) {
+      if (template.id == widget.draft.recommendedTemplateId) {
+        return template;
+      }
+    }
+    return _selectedTemplate;
+  }
+
   Future<void> _copyText(String text, String successMessage) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
@@ -67,13 +76,34 @@ class _StudentParentMessageCardState extends State<StudentParentMessageCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (widget.draft.templates.isEmpty) {
+      return GlassCard(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('家长沟通话术', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(
+              '暂时还没有可用话术，请先补充课堂记录或生成 AI 洞察。',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+
     final selectedTemplate = _selectedTemplate;
+    final recommendedTemplate = _recommendedTemplate;
     final showPaymentShortcut =
         widget.onOpenPayment != null && selectedTemplate.id == 'renewal';
+    final showRecommendedPaymentShortcut =
+        widget.onOpenPayment != null && recommendedTemplate.id == 'renewal';
 
     return GlassCard(
       padding: const EdgeInsets.all(18),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Wrap(
@@ -106,6 +136,78 @@ class _StudentParentMessageCardState extends State<StudentParentMessageCard> {
           Text(
             '把课堂观察拆成多个常用沟通场景，老师按当前目的直接复制，不需要每次重新改口径。',
             style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: kPrimaryBlue.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      '当前建议',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    _MetaBadge(
+                      label: recommendedTemplate.label,
+                      color: kPrimaryBlue,
+                    ),
+                    if (selectedTemplate.id != recommendedTemplate.id)
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(
+                            () => _selectedTemplateId = recommendedTemplate.id,
+                          );
+                        },
+                        icon: const Icon(Icons.arrow_upward, size: 16),
+                        label: const Text('切换到推荐'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  recommendedTemplate.summary,
+                  style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () =>
+                          _copyText(recommendedTemplate.fullText, '推荐微信整段已复制'),
+                      icon: const Icon(Icons.copy_all_outlined, size: 18),
+                      label: const Text('复制推荐微信整段'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          _copyText(recommendedTemplate.shortText, '推荐短信短版已复制'),
+                      icon: const Icon(Icons.textsms_outlined, size: 18),
+                      label: const Text('复制推荐短信'),
+                    ),
+                    if (showRecommendedPaymentShortcut)
+                      OutlinedButton.icon(
+                        onPressed: widget.onOpenPayment,
+                        icon: const Icon(Icons.payments_outlined, size: 18),
+                        label: const Text('去记录缴费'),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           Wrap(
@@ -186,7 +288,7 @@ class _StudentParentMessageCardState extends State<StudentParentMessageCard> {
                 width: 170,
                 child: FilledButton.tonalIcon(
                   onPressed: () =>
-                      _copyText(selectedTemplate.shortText, '短版话术已复制。'),
+                      _copyText(selectedTemplate.shortText, '短信短版已复制'),
                   icon: const Icon(Icons.textsms_outlined, size: 18),
                   label: const Text('复制短信短版'),
                 ),
@@ -195,7 +297,7 @@ class _StudentParentMessageCardState extends State<StudentParentMessageCard> {
                 width: 170,
                 child: FilledButton.icon(
                   onPressed: () =>
-                      _copyText(selectedTemplate.fullText, '整段话术已复制，可直接发给家长。'),
+                      _copyText(selectedTemplate.fullText, '微信整段已复制，可直接发给家长'),
                   icon: const Icon(Icons.copy_all_outlined, size: 18),
                   label: const Text('复制微信整段'),
                 ),

@@ -115,7 +115,9 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
                         interval: months.length > 6 ? 2 : 1,
                         getTitlesWidget: (v, _) {
                           final i = v.toInt();
-                          if (i < 0 || i >= months.length) return const SizedBox();
+                          if (i < 0 || i >= months.length) {
+                            return const SizedBox();
+                          }
                           return Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(

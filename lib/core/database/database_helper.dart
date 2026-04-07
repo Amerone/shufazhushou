@@ -8,7 +8,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._();
   static const databaseFileName = 'moyun.db';
   static const legacyDatabaseFileName = 'calligraphy_assistant.db';
-  static const databaseVersion = 4;
+  static const databaseVersion = 5;
   static const _legacySuffixes = ['-wal', '-shm', '-journal'];
 
   Future<Database>? _dbFuture;
@@ -106,6 +106,7 @@ class DatabaseHelper {
         lesson_focus_tags TEXT,
         home_practice_note TEXT,
         progress_scores_json TEXT,
+        artwork_image_path TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
@@ -174,6 +175,9 @@ class DatabaseHelper {
       await _addColumnIfMissing(db, 'attendance', 'lesson_focus_tags TEXT');
       await _addColumnIfMissing(db, 'attendance', 'home_practice_note TEXT');
       await _addColumnIfMissing(db, 'attendance', 'progress_scores_json TEXT');
+    }
+    if (oldVersion < 5) {
+      await _addColumnIfMissing(db, 'attendance', 'artwork_image_path TEXT');
     }
   }
 

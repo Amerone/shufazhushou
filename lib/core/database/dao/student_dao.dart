@@ -1,4 +1,5 @@
 import '../../models/student.dart';
+import '../../services/attendance_artwork_storage_service.dart';
 import '../database_helper.dart';
 
 class StudentWithMeta {
@@ -23,7 +24,25 @@ class StudentDao {
 
   Future<void> delete(String id) async {
     final db = await _db.database;
+    final artworkRows = await db.query(
+      'attendance',
+      columns: const ['artwork_image_path'],
+      where: 'student_id = ?',
+      whereArgs: [id],
+    );
+    final artworkPaths = artworkRows
+        .map((row) => row['artwork_image_path'] as String?)
+        .whereType<String>()
+        .map((path) => path.trim())
+        .where((path) => path.isNotEmpty)
+        .toSet();
+
     await db.delete('students', where: 'id = ?', whereArgs: [id]);
+
+    final artworkStorage = const AttendanceArtworkStorageService();
+    for (final artworkPath in artworkPaths) {
+      await artworkStorage.deleteArtwork(artworkPath);
+    }
   }
 
   Future<Student?> getById(String id) async {

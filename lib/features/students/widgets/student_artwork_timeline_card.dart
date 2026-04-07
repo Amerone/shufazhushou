@@ -5,19 +5,49 @@ import '../../../shared/theme.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/glass_card.dart';
 
-class StudentArtworkTimelineCard extends StatelessWidget {
+class StudentArtworkTimelineCard extends StatefulWidget {
   static const _maxVisibleEntries = 6;
 
   final List<StudentArtworkTimelineEntry> entries;
+  final VoidCallback? onOpenAttendance;
 
-  const StudentArtworkTimelineCard({super.key, required this.entries});
+  const StudentArtworkTimelineCard({
+    super.key,
+    required this.entries,
+    this.onOpenAttendance,
+  });
+
+  @override
+  State<StudentArtworkTimelineCard> createState() =>
+      _StudentArtworkTimelineCardState();
+}
+
+class _StudentArtworkTimelineCardState
+    extends State<StudentArtworkTimelineCard> {
+  bool _expanded = false;
+
+  @override
+  void didUpdateWidget(covariant StudentArtworkTimelineCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.entries.length <=
+            StudentArtworkTimelineCard._maxVisibleEntries &&
+        _expanded) {
+      _expanded = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final visibleEntries = entries
-        .take(_maxVisibleEntries)
-        .toList(growable: false);
+    final canExpand =
+        widget.entries.length > StudentArtworkTimelineCard._maxVisibleEntries;
+    final visibleEntries =
+        (_expanded
+                ? widget.entries
+                : widget.entries.take(
+                    StudentArtworkTimelineCard._maxVisibleEntries,
+                  ))
+            .toList(growable: false);
 
     return GlassCard(
       padding: const EdgeInsets.all(18),
@@ -40,7 +70,9 @@ class StudentArtworkTimelineCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  entries.isEmpty ? '等待作品记录' : '${entries.length} 次作品记录',
+                  widget.entries.isEmpty
+                      ? '等待作品记录'
+                      : '${widget.entries.length} 次作品记录',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: kPrimaryBlue,
                     fontWeight: FontWeight.w700,
@@ -55,8 +87,22 @@ class StudentArtworkTimelineCard extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
           ),
           const SizedBox(height: 14),
-          if (entries.isEmpty)
-            const EmptyState(message: '在出勤记录里上传课堂作品后，这里会自动生成成长时间线。')
+          if (widget.entries.isEmpty)
+            Column(
+              children: [
+                const EmptyState(
+                  message: '在出勤记录中点击“作品分析”，选择课堂作品图片并完成分析后，这里会自动生成成长时间线。',
+                ),
+                if (widget.onOpenAttendance != null) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: widget.onOpenAttendance,
+                    icon: const Icon(Icons.fact_check_outlined, size: 18),
+                    label: const Text('去看出勤记录'),
+                  ),
+                ],
+              ],
+            )
           else ...[
             for (var i = 0; i < visibleEntries.length; i++)
               Padding(
@@ -69,13 +115,33 @@ class StudentArtworkTimelineCard extends StatelessWidget {
                   emphasize: i == 0,
                 ),
               ),
-            if (entries.length > _maxVisibleEntries) ...[
+            if (canExpand) ...[
               const SizedBox(height: 12),
-              Text(
-                '已展示最近 $_maxVisibleEntries 次作品记录。',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: kInkSecondary,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _expanded
+                          ? '已展开全部 ${widget.entries.length} 次作品记录。'
+                          : '已展示最近 ${StudentArtworkTimelineCard._maxVisibleEntries} 次作品记录。',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: kInkSecondary,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() => _expanded = !_expanded);
+                    },
+                    icon: Icon(
+                      _expanded
+                          ? Icons.unfold_less_outlined
+                          : Icons.unfold_more_outlined,
+                      size: 18,
+                    ),
+                    label: Text(_expanded ? '收起' : '展开更多'),
+                  ),
+                ],
               ),
             ],
           ],
