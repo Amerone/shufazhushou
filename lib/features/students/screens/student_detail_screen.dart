@@ -43,9 +43,6 @@ import '../widgets/student_primary_actions_card.dart';
 
 enum _StudentDetailAnchor {
   finance,
-  growth,
-  communication,
-  actions,
   payments,
   attendance,
 }
@@ -72,7 +69,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   final Map<_StudentDetailAnchor, GlobalKey> _sectionKeys = {
     for (final anchor in _StudentDetailAnchor.values) anchor: GlobalKey(),
   };
-  _StudentDetailAnchor? _lastFocusedAnchor;
 
   @override
   void initState() {
@@ -110,7 +106,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     if (!mounted) return;
     final targetContext = _sectionKeys[anchor]?.currentContext;
     if (targetContext == null || !targetContext.mounted) return;
-    setState(() => _lastFocusedAnchor = anchor);
     await Scrollable.ensureVisible(
       targetContext,
       duration: const Duration(milliseconds: 420),
@@ -497,8 +492,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
         ? '\u5728\u8bfb'
         : '\u4f11\u5b66';
     final statusColor = student.status == 'active' ? kGreen : kOrange;
-    final lastAttendanceLabel =
-        meta?.lastAttendanceDate ?? '\u6682\u65e0\u8bb0\u5f55';
     final attendanceCountLabel = _hasMore
         ? '${_records.length}+ \u6761\u51fa\u52e4\u8bb0\u5f55'
         : '${_records.length} \u6761\u51fa\u52e4\u8bb0\u5f55';
@@ -555,93 +548,70 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                   children: [
+                    // 1. 费用概览（老师最关心）
+                    _StudentSectionBlock(
+                      anchorKey: _sectionKeys[_StudentDetailAnchor.finance],
+                      child: StudentFinanceOverviewCard(
+                        student: student,
+                        from: from,
+                        to: to,
+                        monthlyFeeAsync: feeAsync,
+                        allTimeFeeAsync: allTimeFeeAsync,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // 2. 精简档案（姓名/家长/电话/状态，去掉数字指标卡片）
                     GlassCard(
                       padding: const EdgeInsets.all(18),
-                      child: Column(
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final compact = constraints.maxWidth < 420;
-                              final metricColumns = constraints.maxWidth >= 720
-                                  ? 3
-                                  : 2;
-                              final metricWidth =
-                                  (constraints.maxWidth -
-                                      12 * (metricColumns - 1)) /
-                                  metricColumns;
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Wrap(
-                                    spacing: 14,
-                                    runSpacing: 14,
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 56,
-                                        height: 56,
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withValues(
-                                            alpha: 0.12,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            18,
-                                          ),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          studentInitial,
-                                          style: theme.textTheme.titleLarge
-                                              ?.copyWith(
-                                                color: statusColor,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: compact
-                                            ? constraints.maxWidth
-                                            : constraints.maxWidth - 70,
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Wrap(
-                                              spacing: 8,
-                                              runSpacing: 8,
-                                              crossAxisAlignment:
-                                                  WrapCrossAlignment.center,
-                                              children: [
-                                                Text(
-                                                  '\u6863\u6848\u6458\u8981',
-                                                  style: theme
-                                                      .textTheme
-                                                      .titleMedium
-                                                      ?.copyWith(
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                      ),
-                                                ),
-                                                _ProfileBadge(
-                                                  icon: Icons
-                                                      .verified_user_outlined,
-                                                  label: statusText,
-                                                  color: statusColor,
-                                                ),
-                                              ],
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              studentInitial,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                color: statusColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        student.name,
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
                                             ),
-                                          ],
-                                        ),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
+                                    ),
+                                    _ProfileBadge(
+                                      icon: Icons.verified_user_outlined,
+                                      label: statusText,
+                                      color: statusColor,
+                                    ),
+                                  ],
+                                ),
+                                if ((student.parentName?.isNotEmpty ?? false) ||
+                                    (student.parentPhone?.isNotEmpty ??
+                                        false)) ...[
+                                  const SizedBox(height: 8),
                                   Wrap(
-                                    spacing: 10,
-                                    runSpacing: 10,
+                                    spacing: 8,
+                                    runSpacing: 8,
                                     children: [
                                       if (student.parentName?.isNotEmpty ??
                                           false)
@@ -657,127 +627,19 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                         ),
                                     ],
                                   ),
-                                  const SizedBox(height: 16),
-                                  Wrap(
-                                    spacing: 12,
-                                    runSpacing: 12,
-                                    children: [
-                                      SizedBox(
-                                        width: metricWidth,
-                                        child: _StudentSnapshot(
-                                          label: '\u6700\u8fd1\u8bfe\u7a0b',
-                                          value: lastAttendanceLabel,
-                                          color: kPrimaryBlue,
-                                          icon: Icons.event_available_outlined,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: metricWidth,
-                                        child: _StudentSnapshot(
-                                          label: '\u7f34\u8d39\u8bb0\u5f55',
-                                          value: '${_payments.length} \u6761',
-                                          color: kGreen,
-                                          icon: Icons.receipt_long_outlined,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: metricWidth,
-                                        child: _StudentSnapshot(
-                                          label: '\u51fa\u52e4\u8bb0\u5f55',
-                                          value: attendanceCountLabel,
-                                          color: kSealRed,
-                                          icon: Icons.fact_check_outlined,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
                                 ],
-                              );
-                            },
+                                if (student.note?.isNotEmpty ?? false) ...[
+                                  const SizedBox(height: 10),
+                                  _DetailNoteCard(note: student.note!),
+                                ],
+                              ],
+                            ),
                           ),
-                          if (student.note?.isNotEmpty ?? false) ...[
-                            const SizedBox(height: 16),
-                            _DetailNoteCard(note: student.note!),
-                          ],
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _StudentDetailQuickNavigator(
-                      activeAnchor: _lastFocusedAnchor,
-                      onTap: _scrollToSection,
-                    ),
-                    const SizedBox(height: 16),
-                    _StudentSectionBlock(
-                      anchorKey: _sectionKeys[_StudentDetailAnchor.finance],
-                      child: StudentFinanceOverviewCard(
-                        student: student,
-                        from: from,
-                        to: to,
-                        monthlyFeeAsync: feeAsync,
-                        allTimeFeeAsync: allTimeFeeAsync,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _StudentSectionBlock(
-                      anchorKey: _sectionKeys[_StudentDetailAnchor.growth],
-                      child: allTimeFeeAsync.when(
-                        loading: () => const GlassCard(
-                          padding: EdgeInsets.all(18),
-                          child: SizedBox(
-                            height: 72,
-                            child: Center(child: CircularProgressIndicator()),
-                          ),
-                        ),
-                        error: (error, _) => GlassCard(
-                          padding: const EdgeInsets.all(18),
-                          child: Text('成长摘要加载失败：$error'),
-                        ),
-                        data: (allFee) {
-                          return StudentGrowthWorkbenchCard(
-                            summary: growthSummary,
-                            balance: allFee.balance,
-                            pricePerClass: student.pricePerClass,
-                            onOpenReport: () => _openExportSheet(
-                              initialTemplate: ExportTemplateId.parentMonthly,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _StudentSectionBlock(
-                      anchorKey: _sectionKeys[_StudentDetailAnchor.actions],
-                      child: StudentPrimaryActionsCard(
-                        onOpenPayment: () => _openPaymentSheet(student),
-                        onOpenAttendance: () =>
-                            _scrollToSection(_StudentDetailAnchor.attendance),
-                        onOpenExport: _openExportSheet,
-                        onEditStudent: _openEditStudent,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    StudentAiInsightCard(student: student),
-                    const SizedBox(height: 16),
-                    _StudentSectionBlock(
-                      anchorKey:
-                          _sectionKeys[_StudentDetailAnchor.communication],
-                      child: StudentParentMessageCard(
-                        draft: parentDraft,
-                        onOpenPayment: () {
-                          _openPaymentSheet(student);
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    StudentArtworkTimelineCard(
-                      entries: artworkTimeline,
-                      onOpenAttendance: () =>
-                          _scrollToSection(_StudentDetailAnchor.attendance),
-                    ),
-                    const SizedBox(height: 16),
-                    StudentAiProgressCard(student: student),
                     const SizedBox(height: 22),
+                    // 3. 缴费记录
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.payments],
                       child: Column(
@@ -826,6 +688,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
+                    // 4. 出勤记录
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.attendance],
                       child: Column(
@@ -879,6 +742,84 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 22),
+                    // 5. 操作面板（置后，次要入口）
+                    StudentPrimaryActionsCard(
+                      onOpenPayment: () => _openPaymentSheet(student),
+                      onOpenAttendance: () =>
+                          _scrollToSection(_StudentDetailAnchor.attendance),
+                      onOpenExport: _openExportSheet,
+                      onEditStudent: _openEditStudent,
+                    ),
+                    const SizedBox(height: 22),
+                    GlassCard(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Theme(
+                        data: theme.copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          initiallyExpanded: false,
+                          tilePadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 4,
+                          ),
+                          childrenPadding: const EdgeInsets.fromLTRB(
+                            14,
+                            0,
+                            14,
+                            14,
+                          ),
+                          leading: Icon(
+                            Icons.auto_awesome_outlined,
+                            color: kSealRed.withValues(alpha: 0.7),
+                            size: 20,
+                          ),
+                          title: Text(
+                            'AI 分析与沟通工具',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          children: [
+                            allTimeFeeAsync.when(
+                              loading: () => const SizedBox(
+                                height: 72,
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              error: (error, _) =>
+                                  Text('成长摘要加载失败：$error'),
+                              data: (allFee) {
+                                return StudentGrowthWorkbenchCard(
+                                  summary: growthSummary,
+                                  balance: allFee.balance,
+                                  pricePerClass: student.pricePerClass,
+                                  onOpenReport: () => _openExportSheet(
+                                    initialTemplate:
+                                        ExportTemplateId.parentMonthly,
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            StudentAiInsightCard(student: student),
+                            const SizedBox(height: 16),
+                            StudentParentMessageCard(
+                              draft: parentDraft,
+                              onOpenPayment: () {
+                                _openPaymentSheet(student);
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            StudentArtworkTimelineCard(
+                              entries: artworkTimeline,
+                            ),
+                            const SizedBox(height: 16),
+                            StudentAiProgressCard(student: student),
+                          ],
+                        ),
+                      ),
+                    ),
                     if (_hasMore)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 18),
@@ -912,182 +853,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                 child: const Icon(Icons.vertical_align_top_outlined),
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StudentDetailQuickNavigator extends StatelessWidget {
-  final _StudentDetailAnchor? activeAnchor;
-  final ValueChanged<_StudentDetailAnchor> onTap;
-
-  const _StudentDetailQuickNavigator({
-    required this.activeAnchor,
-    required this.onTap,
-  });
-
-  static const _items = [
-    _StudentQuickNavItem(
-      anchor: _StudentDetailAnchor.finance,
-      icon: Icons.account_balance_wallet_outlined,
-      label: '费用',
-      color: kPrimaryBlue,
-    ),
-    _StudentQuickNavItem(
-      anchor: _StudentDetailAnchor.communication,
-      icon: Icons.chat_bubble_outline,
-      label: '沟通',
-      color: kPrimaryBlue,
-    ),
-    _StudentQuickNavItem(
-      anchor: _StudentDetailAnchor.payments,
-      icon: Icons.receipt_long_outlined,
-      label: '缴费',
-      color: kOrange,
-    ),
-    _StudentQuickNavItem(
-      anchor: _StudentDetailAnchor.attendance,
-      icon: Icons.fact_check_outlined,
-      label: '出勤',
-      color: kPrimaryBlue,
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return GlassCard(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '快速定位',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Text(
-                '常看区块',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: kInkSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '只保留费用、沟通、缴费和出勤，减少长页面里的重复跳转。',
-            style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 640 ? 4 : 2;
-              final itemWidth =
-                  (constraints.maxWidth - 10 * (columns - 1)) / columns;
-
-              return Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final item in _items)
-                    SizedBox(
-                      width: itemWidth,
-                      child: _StudentQuickNavChip(
-                        item: item,
-                        selected: activeAnchor == item.anchor,
-                        onTap: () => onTap(item.anchor),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StudentQuickNavItem {
-  final _StudentDetailAnchor anchor;
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _StudentQuickNavItem({
-    required this.anchor,
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-}
-
-class _StudentQuickNavChip extends StatelessWidget {
-  final _StudentQuickNavItem item;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _StudentQuickNavChip({
-    required this.item,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-          decoration: BoxDecoration(
-            color: selected
-                ? item.color.withValues(alpha: 0.14)
-                : Colors.white.withValues(alpha: 0.52),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: item.color.withValues(alpha: selected ? 0.22 : 0.1),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(item.icon, size: 18, color: item.color),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  item.label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: item.color,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              if (selected)
-                Icon(Icons.check_circle, size: 16, color: item.color),
-            ],
           ),
         ),
       ),
@@ -1195,51 +960,6 @@ class _ProfileBadge extends StatelessWidget {
               color: color,
               fontWeight: FontWeight.w700,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StudentSnapshot extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-
-  const _StudentSnapshot({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 10),
-          Text(label, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

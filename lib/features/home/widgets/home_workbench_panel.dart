@@ -110,24 +110,6 @@ class HomeWorkbenchPanel extends ConsumerWidget {
               ),
             ),
             data: (tasks) {
-              if (tasks.isEmpty) {
-                return Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.54),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: kInkSecondary.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Text(
-                    '当前没有需要优先处理的事项，可以继续记录课程或整理学员月报。',
-                    style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
-                  ),
-                );
-              }
-
               final visibleTasks = tasks
                   .take(maxVisibleTasks)
                   .toList(growable: false);

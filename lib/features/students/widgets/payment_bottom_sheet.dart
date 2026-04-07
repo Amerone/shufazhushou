@@ -72,10 +72,15 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
     FocusScope.of(context).unfocus();
     setState(() => _saving = true);
     try {
+      final amount = double.tryParse(_amountCtrl.text.trim());
+      if (amount == null || amount <= 0) {
+        if (mounted) AppToast.showError(context, '请输入有效的正数金额');
+        return;
+      }
       final payment = Payment(
         id: const Uuid().v4(),
         studentId: widget.studentId,
-        amount: double.parse(_amountCtrl.text.trim()),
+        amount: amount,
         paymentDate: formatDate(_date),
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
         createdAt: DateTime.now().millisecondsSinceEpoch,

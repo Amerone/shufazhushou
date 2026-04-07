@@ -375,7 +375,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 child: Column(
                   children: [
                     Text(
-                      ['选择学员', '设置课程', '确认提交'][_step],
+                      ['选择学员', '确认并保存'][_step],
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -385,8 +385,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     Text(
                       [
                         '搜索并批量勾选本次需要记课的学员。',
-                        '设置日期、时间和出勤状态。',
-                        '提交前再确认一次课程信息和费用。',
+                        '设置日期、时间和出勤状态，确认后直接保存。',
                       ][_step],
                       style: theme.textTheme.bodySmall,
                       textAlign: TextAlign.center,
@@ -399,7 +398,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(
-                    3,
+                    2,
                     (i) => AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -419,7 +418,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 child: [
                   _buildStep0(controller),
                   _buildStep1(),
-                  _buildStep2(),
                 ][_step],
               ),
             ],
@@ -986,63 +984,123 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
               .toList(),
         ),
         const SizedBox(height: 16),
-        Text('课堂重点（可选）', style: theme.textTheme.titleSmall),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: kLessonFocusTagOptions
-              .map(
-                (tag) => FilterChip(
-                  label: Text(tag),
-                  selected: _lessonFocusTags.contains(tag),
-                  onSelected: (selected) {
-                    unawaited(InteractionFeedback.selection(context));
-                    setState(() {
-                      if (selected) {
-                        _lessonFocusTags.add(tag);
-                      } else {
-                        _lessonFocusTags.remove(tag);
-                      }
-                    });
-                  },
+        Theme(
+          data: theme.copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+            childrenPadding: const EdgeInsets.only(top: 4),
+            title: Text(
+              '课堂反馈（可选）',
+              style: theme.textTheme.titleSmall,
+            ),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('课堂重点', style: theme.textTheme.bodySmall),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: kLessonFocusTagOptions
+                    .map(
+                      (tag) => FilterChip(
+                        label: Text(tag),
+                        selected: _lessonFocusTags.contains(tag),
+                        onSelected: (selected) {
+                          unawaited(InteractionFeedback.selection(context));
+                          setState(() {
+                            if (selected) {
+                              _lessonFocusTags.add(tag);
+                            } else {
+                              _lessonFocusTags.remove(tag);
+                            }
+                          });
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _homePracticeCtrl,
+                minLines: 2,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: '课后练习建议',
+                  hintText: '例如：每日临摹 15 分钟，重点观察起收笔节奏。',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.56),
                 ),
-              )
-              .toList(),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _homePracticeCtrl,
-          minLines: 2,
-          maxLines: 3,
-          decoration: InputDecoration(
-            labelText: '课后练习建议（可选）',
-            hintText: '例如：每日临摹 15 分钟，重点观察起收笔节奏。',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.56),
+              ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('进步评分（0-5）', style: theme.textTheme.bodySmall),
+              ),
+              const SizedBox(height: 8),
+              _ScoreEditor(
+                label: '笔画质量',
+                value: _strokeQuality,
+                onChanged: (value) => setState(() => _strokeQuality = value),
+                onClear: () => setState(() => _strokeQuality = null),
+              ),
+              _ScoreEditor(
+                label: '结构准确',
+                value: _structureAccuracy,
+                onChanged: (value) =>
+                    setState(() => _structureAccuracy = value),
+                onClear: () => setState(() => _structureAccuracy = null),
+              ),
+              _ScoreEditor(
+                label: '节奏连贯',
+                value: _rhythmConsistency,
+                onChanged: (value) =>
+                    setState(() => _rhythmConsistency = value),
+                onClear: () => setState(() => _rhythmConsistency = null),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
-        Text('进步评分（0-5，可选）', style: theme.textTheme.titleSmall),
-        const SizedBox(height: 8),
-        _ScoreEditor(
-          label: '笔画质量',
-          value: _strokeQuality,
-          onChanged: (value) => setState(() => _strokeQuality = value),
-          onClear: () => setState(() => _strokeQuality = null),
-        ),
-        _ScoreEditor(
-          label: '结构准确',
-          value: _structureAccuracy,
-          onChanged: (value) => setState(() => _structureAccuracy = value),
-          onClear: () => setState(() => _structureAccuracy = null),
-        ),
-        _ScoreEditor(
-          label: '节奏连贯',
-          value: _rhythmConsistency,
-          onChanged: (value) => setState(() => _rhythmConsistency = value),
-          onClear: () => setState(() => _rhythmConsistency = null),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: kPrimaryBlue.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
+          ),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _QuickInfoPill(
+                icon: Icons.calendar_today_outlined,
+                label: _dateStr(),
+              ),
+              _QuickInfoPill(
+                icon: Icons.access_time_outlined,
+                label: '$_startTime - $_endTime',
+              ),
+              _QuickInfoPill(
+                icon: Icons.flag_outlined,
+                label: quickEntryStatusLabel(_status),
+                color: statusColor(_status),
+              ),
+              _QuickInfoPill(
+                icon: Icons.groups_2_outlined,
+                label: '${_selectedIds.length} 人',
+              ),
+              _QuickInfoPill(
+                icon: Icons.payments_outlined,
+                label: '预计 ¥${_formatAmount(_estimatedTotalFee(_selectedStudentsFrom(ref.read(studentProvider).valueOrNull ?? [])))}',
+                color: kPrimaryBlue,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 24),
         Row(
@@ -1065,21 +1123,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton(
-                onPressed: () {
-                  if (_endTime.compareTo(_startTime) <= 0) {
-                    AppToast.showError(context, '结束时间必须晚于开始时间');
-                    return;
-                  }
-                  unawaited(InteractionFeedback.selection(context));
-                  setState(() => _step = 2);
-                },
+                onPressed: _saving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text('下一步'),
+                child: Text(_saving ? '保存中...' : '确认保存'),
               ),
             ),
           ],
@@ -1088,177 +1139,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     );
   }
 
-  Widget _buildStep2() {
-    final theme = Theme.of(context);
-    final students = ref.watch(studentProvider).valueOrNull ?? [];
-    final selected = students
-        .where((m) => _selectedIds.contains(m.student.id))
-        .toList();
-    final displayNames = buildDisplayNameMap(
-      selected.map((m) => m.student).toList(),
-    );
-    final statusEnum = AttendanceStatus.values.firstWhere(
-      (e) => e.name == _status,
-    );
-
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: kPrimaryBlue.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '课程摘要',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _QuickInfoPill(
-                          icon: Icons.calendar_today_outlined,
-                          label: _dateStr(),
-                        ),
-                        _QuickInfoPill(
-                          icon: Icons.access_time_outlined,
-                          label: '$_startTime - $_endTime',
-                        ),
-                        _QuickInfoPill(
-                          icon: Icons.flag_outlined,
-                          label: quickEntryStatusLabel(_status),
-                          color: statusColor(_status),
-                        ),
-                        _QuickInfoPill(
-                          icon: Icons.groups_2_outlined,
-                          label: '${selected.length} 位学员',
-                        ),
-                        _QuickInfoPill(
-                          icon: Icons.payments_outlined,
-                          label:
-                              '预计扣费 ¥${_formatAmount(_estimatedTotalFee(selected))}',
-                          color: kPrimaryBlue,
-                        ),
-                        if (_lessonFocusTags.isNotEmpty)
-                          _QuickInfoPill(
-                            icon: Icons.auto_awesome_outlined,
-                            label: '重点 ${_lessonFocusTags.length} 项',
-                            color: kSealRed,
-                          ),
-                        if (_buildProgressScores() != null)
-                          _QuickInfoPill(
-                            icon: Icons.tune_outlined,
-                            label: '已填写进步评分',
-                            color: kGreen,
-                          ),
-                      ],
-                    ),
-                    if (_homePracticeCtrl.text.trim().isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        '课后建议：${_homePracticeCtrl.text.trim()}',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text('学员列表', style: theme.textTheme.titleSmall),
-              const SizedBox(height: 8),
-              ...selected.map((m) {
-                final fee = FeeCalculator.calcFee(
-                  statusEnum,
-                  m.student.pricePerClass,
-                );
-                return Container(
-                  margin: EdgeInsets.only(bottom: m == selected.last ? 0 : 10),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.56),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              displayNames[m.student.id] ?? m.student.name,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '课时单价 ¥${m.student.pricePerClass.toStringAsFixed(0)}',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '¥${fee.toStringAsFixed(0)}',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: kPrimaryBlue,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => setState(() => _step = 1),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text('上一步'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(_saving ? '保存中...' : '确认保存'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _QuickActionChip extends StatelessWidget {

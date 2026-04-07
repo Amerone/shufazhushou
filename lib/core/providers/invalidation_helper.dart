@@ -51,6 +51,7 @@ void invalidateAfterStudentDelete(WidgetRef ref) {
 /// Invalidate providers after a student is created or edited.
 void invalidateAfterStudentChange(WidgetRef ref) {
   ref.invalidate(studentProvider);
+  ref.invalidate(feeSummaryProvider);
   ref.invalidate(contributionProvider);
   ref.invalidate(insightProvider);
   ref.invalidate(homeWorkbenchProvider);
