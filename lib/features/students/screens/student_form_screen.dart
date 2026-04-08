@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/dao/student_dao.dart';
 import '../../../core/models/student.dart';
-import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../shared/theme.dart';
@@ -131,9 +130,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
         await dao.insert(student);
       }
 
-      await ref.read(studentProvider.notifier).reload();
       invalidateAfterStudentChange(ref);
-      if (_isEdit) ref.invalidate(feeSummaryProvider);
       if (mounted) context.pop();
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());

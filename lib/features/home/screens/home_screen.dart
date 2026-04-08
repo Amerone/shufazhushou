@@ -170,12 +170,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         selectedDate.year == today.year &&
         selectedDate.month == today.month &&
         selectedDate.day == today.day;
-    final sectionTitle = isToday ? '今日出勤' : '$dateLabel 出勤';
+    final sectionTitle = isToday ? '今日出勤名单' : '$dateLabel 出勤名单';
     final headerSubtitle = !hasStudents
-        ? '先新增学生，再开始记课。'
+        ? '先建立学生档案，再开始记课、查出勤和记录缴费。'
         : isToday
-        ? '先看今天出勤，再继续记课。'
-        : '$dateLabel 已选中';
+        ? '先看今天谁已出勤，再继续记课或记录缴费。'
+        : '$dateLabel 已选中，可继续核对当日出勤和课程记录。';
 
     final homeTheme = theme.copyWith(
       splashColor: kPrimaryBlue.withValues(alpha: 0.08),
@@ -191,7 +191,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Column(
             children: [
               PageHeader(
-                title: hasStudents ? '首页' : '开始使用',
+                title: hasStudents ? '今日工作台' : '开始使用',
                 subtitle: headerSubtitle,
                 trailing: _TodayAction(
                   onPressed: () {
@@ -299,6 +299,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   ],
                                 ),
                               ],
+                              if (hasStudents &&
+                                  (pendingTaskCount ?? 0) > 0) ...[
+                                const SizedBox(height: 16),
+                                const HomeWorkbenchPanel(),
+                              ],
                             ],
                           ),
                         ),
@@ -328,7 +333,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [const AttendanceList()],
+                              children: [
+                                Text(
+                                  hasStudents
+                                      ? '按时间顺序查看和调整当日出勤记录'
+                                      : '建好学生后，这里会直接显示当天谁出勤了。',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    height: 1.45,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                const AttendanceList(),
+                              ],
                             ),
                           ),
                         ),
@@ -348,19 +364,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                       ),
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                        sliver: const SliverToBoxAdapter(
-                          child: AttendanceCalendar(),
-                        ),
+                      const SliverPadding(
+                        padding: EdgeInsets.fromLTRB(20, 12, 20, 120),
+                        sliver: SliverToBoxAdapter(child: AttendanceCalendar()),
                       ),
-                      if (hasStudents)
-                        SliverPadding(
-                          padding: EdgeInsets.fromLTRB(20, 0, 20, 120),
-                          sliver: SliverToBoxAdapter(
-                            child: HomeWorkbenchPanel(),
-                          ),
-                        ),
                     ],
                   ),
                 ),
