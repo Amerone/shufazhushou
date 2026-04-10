@@ -9,6 +9,7 @@ import '../../../core/providers/class_template_provider.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
+import '../../../shared/widgets/async_value_widget.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
@@ -33,10 +34,9 @@ class TemplateScreen extends ConsumerWidget {
               onBack: () => context.pop(),
             ),
             Expanded(
-              child: asyncTemplates.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('$e')),
-                data: (templates) {
+              child: AsyncValueWidget<List<ClassTemplate>>(
+                value: asyncTemplates,
+                builder: (templates) {
                   final orderedTemplates = List<ClassTemplate>.of(templates)
                     ..sort((left, right) {
                       final leftBuiltin = _isBuiltinTemplate(left);
@@ -67,10 +67,10 @@ class TemplateScreen extends ConsumerWidget {
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                             const SizedBox(height: 10),
-                            Wrap(
+                            const Wrap(
                               spacing: 8,
                               runSpacing: 8,
-                              children: const [
+                              children: [
                                 _TemplateTag('周内 18:00-19:00'),
                                 _TemplateTag('周内 19:00-20:00'),
                                 _TemplateTag('周末 08:30-09:30'),

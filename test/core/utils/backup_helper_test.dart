@@ -9,20 +9,28 @@ import 'package:path/path.dart' as p;
 void main() {
   late Directory tempRoot;
   const artworkStorage = AttendanceArtworkStorageService();
+  Map<String, String> restoredSensitiveSettings = const {};
 
   setUp(() async {
     tempRoot = await Directory.systemTemp.createTemp('backup-helper-test');
     BackupHelper.applicationSupportDirectoryResolver = () async => tempRoot;
     BackupHelper.temporaryDirectoryResolver = () async => tempRoot;
     BackupHelper.externalStorageDirectoryResolver = () async => null;
+    BackupHelper.sensitiveSettingsReader = () async => const {};
+    BackupHelper.sensitiveSettingsWriter = (settings) async {
+      restoredSensitiveSettings = Map<String, String>.from(settings);
+    };
     AttendanceArtworkStorageService.documentsDirectoryResolver = () async =>
         tempRoot;
+    restoredSensitiveSettings = const {};
   });
 
   tearDown(() async {
     BackupHelper.applicationSupportDirectoryResolver = null;
     BackupHelper.temporaryDirectoryResolver = null;
     BackupHelper.externalStorageDirectoryResolver = null;
+    BackupHelper.sensitiveSettingsReader = null;
+    BackupHelper.sensitiveSettingsWriter = null;
     AttendanceArtworkStorageService.documentsDirectoryResolver = null;
     if (await tempRoot.exists()) {
       await tempRoot.delete(recursive: true);
@@ -109,37 +117,42 @@ void main() {
     );
   });
 
-  test('backup bundle payload preserves artwork files', () {
-    final bundleBytes = BackupHelper.buildBackupBundleBytes(
-      databaseBytes: Uint8List.fromList(
-        'SQLite format 3 sample payload'.codeUnits,
-      ),
-      artworkFiles: const {
-        'calligraphy-1.jpg': [1, 2, 3],
-        'calligraphy-2.jpg': [4, 5, 6],
-      },
-    );
+  test(
+    'backup bundle payload preserves artwork files and sensitive settings',
+    () {
+      final bundleBytes = BackupHelper.buildBackupBundleBytes(
+        databaseBytes: Uint8List.fromList(
+          'SQLite format 3 sample payload'.codeUnits,
+        ),
+        artworkFiles: const {
+          'calligraphy-1.jpg': [1, 2, 3],
+          'calligraphy-2.jpg': [4, 5, 6],
+        },
+        sensitiveSettings: const {'qwen_api_key': 'secret-key'},
+      );
 
-    final decoded = BackupHelper.tryDecodeBackupBundleBytes(bundleBytes);
+      final decoded = BackupHelper.tryDecodeBackupBundleBytes(bundleBytes);
 
-    expect(decoded, isNotNull);
-    expect(
-      decoded!.databaseBytes,
-      Uint8List.fromList('SQLite format 3 sample payload'.codeUnits),
-    );
-    expect(
-      decoded.artworkFiles.keys,
-      containsAll(<String>['calligraphy-1.jpg', 'calligraphy-2.jpg']),
-    );
-    expect(
-      decoded.artworkFiles['calligraphy-1.jpg'],
-      Uint8List.fromList(const [1, 2, 3]),
-    );
-    expect(
-      decoded.artworkFiles['calligraphy-2.jpg'],
-      Uint8List.fromList(const [4, 5, 6]),
-    );
-  });
+      expect(decoded, isNotNull);
+      expect(
+        decoded!.databaseBytes,
+        Uint8List.fromList('SQLite format 3 sample payload'.codeUnits),
+      );
+      expect(
+        decoded.artworkFiles.keys,
+        containsAll(<String>['calligraphy-1.jpg', 'calligraphy-2.jpg']),
+      );
+      expect(
+        decoded.artworkFiles['calligraphy-1.jpg'],
+        Uint8List.fromList(const [1, 2, 3]),
+      );
+      expect(
+        decoded.artworkFiles['calligraphy-2.jpg'],
+        Uint8List.fromList(const [4, 5, 6]),
+      );
+      expect(decoded.sensitiveSettings, {'qwen_api_key': 'secret-key'});
+    },
+  );
 
   test(
     'payloadIncludesArtworkSnapshot distinguishes bundle from legacy raw db payload',
@@ -198,6 +211,21 @@ void main() {
       );
 
       expect(File(staleArtworkPath).existsSync(), isFalse);
+    },
+  );
+
+  test(
+    'applyRestoredSensitiveSettings replaces sensitive settings snapshot',
+    () async {
+      await BackupHelper.applyRestoredSensitiveSettings(const {
+        'qwen_api_key': 'restored-key',
+      });
+
+      expect(restoredSensitiveSettings, {'qwen_api_key': 'restored-key'});
+
+      await BackupHelper.applyRestoredSensitiveSettings(const {});
+
+      expect(restoredSensitiveSettings, isEmpty);
     },
   );
 }

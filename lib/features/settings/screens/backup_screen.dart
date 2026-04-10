@@ -12,6 +12,7 @@ import '../../../core/utils/backup_helper.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
+import '../../../shared/widgets/async_value_widget.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
@@ -306,6 +307,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       }
       await _createFallbackBackupBeforeRestore();
       await BackupHelper.restoreFromPath(restorePath, passphrase: passphrase);
+      await _finalizeSuccessfulRestore();
       if (!mounted) return;
       AppToast.showSuccess(context, '备份已恢复，应用即将重启。');
       Restart.restartApp();
@@ -336,6 +338,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       }
       await _createFallbackBackupBeforeRestore();
       await BackupHelper.restoreFromPath(record.path, passphrase: passphrase);
+      await _finalizeSuccessfulRestore();
       if (!mounted) return;
       AppToast.showSuccess(context, '备份已恢复，应用即将重启。');
       Restart.restartApp();
@@ -377,6 +380,10 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     }
   }
 
+  Future<void> _finalizeSuccessfulRestore() async {
+    ref.invalidate(settingsProvider);
+  }
+
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
@@ -392,10 +399,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
               onBack: () => context.pop(),
             ),
             Expanded(
-              child: settingsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => Center(child: Text('$error')),
-                data: (settings) {
+              child: AsyncValueWidget<Map<String, String>>(
+                value: settingsAsync,
+                builder: (settings) {
                   final lastBackupMs = int.tryParse(
                     settings['last_backup_at'] ?? '',
                   );
@@ -644,7 +650,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _SectionHeader(
+                                const _SectionHeader(
                                   title: '立即操作',
                                   subtitle: '常用流程只保留两步：生成加密备份并分享，或从已有备份恢复。',
                                 ),
@@ -717,7 +723,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _SectionHeader(
+                                const _SectionHeader(
                                   title: '最近备份',
                                   subtitle:
                                       '即使你上次没有保存到外部文件，也可以直接在这里重新生成加密分享文件，或恢复应用内副本。',

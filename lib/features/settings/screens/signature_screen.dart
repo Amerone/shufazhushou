@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
+import '../../../shared/widgets/async_value_widget.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
@@ -30,10 +31,9 @@ class SignatureScreen extends ConsumerWidget {
               onBack: () => context.pop(),
             ),
             Expanded(
-              child: settingsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('$e')),
-                data: (settings) {
+              child: AsyncValueWidget<Map<String, String>>(
+                value: settingsAsync,
+                builder: (settings) {
                   final path = settings['signature_path'];
                   final hasFile =
                       path != null &&
@@ -295,10 +295,10 @@ class SignatureScreen extends ConsumerWidget {
                               subtitle: '可直接拍照上传，或从相册选择现成的签名图片。',
                             ),
                             const SizedBox(height: 12),
-                            Wrap(
+                            const Wrap(
                               spacing: 8,
                               runSpacing: 8,
-                              children: const [
+                              children: [
                                 _SignatureTag(
                                   icon: Icons.camera_alt_outlined,
                                   label: '支持拍照上传',
@@ -455,11 +455,11 @@ class SignatureScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      GlassCard(
-                        padding: const EdgeInsets.all(18),
+                      const GlassCard(
+                        padding: EdgeInsets.all(18),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             _SignatureSectionHeader(
                               title: '上传建议',
                               subtitle: '提前处理背景和笔迹，可以明显提升 PDF 导出的签名质感。',

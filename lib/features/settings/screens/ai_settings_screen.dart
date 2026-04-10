@@ -11,6 +11,7 @@ import '../../../core/services/handwriting_analysis_service.dart';
 import '../../../core/services/vision_analysis_gateway.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
+import '../../../shared/widgets/async_value_widget.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
@@ -39,10 +40,9 @@ class AiSettingsScreen extends ConsumerWidget {
               onBack: () => context.pop(),
             ),
             Expanded(
-              child: settingsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => Center(child: Text('$error')),
-                data: (settings) => ListView(
+              child: AsyncValueWidget<Map<String, String>>(
+                value: settingsAsync,
+                builder: (settings) => ListView(
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                   children: [
                     GlassCard(

@@ -20,19 +20,11 @@ import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
+import '../../../shared/widgets/async_value_widget.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
-
-enum _SettingsSectionAnchor {
-  profile,
-  assets,
-  export,
-  feedback,
-  ai,
-  importTool,
-  about,
-}
+import '../widgets/settings_overview_panel.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -46,9 +38,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _devMode = false;
   bool _showScrollToTop = false;
   final ScrollController _scrollController = ScrollController();
-  final Map<_SettingsSectionAnchor, GlobalKey> _sectionKeys = {
-    for (final anchor in _SettingsSectionAnchor.values) anchor: GlobalKey(),
-  };
 
   @override
   void initState() {
@@ -96,10 +85,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           children: [
             const PageHeader(title: '设置中心', subtitle: '管理教师信息、导出模板和本地数据备份。'),
             Expanded(
-              child: settingsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('$e')),
-                data: (settings) {
+              child: AsyncValueWidget<Map<String, String>>(
+                value: settingsAsync,
+                builder: (settings) {
                   final lastBackupMs = int.tryParse(
                     settings['last_backup_at'] ?? '',
                   );
@@ -159,309 +147,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: kPrimaryBlue.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: const Icon(
-                                    Icons.tune_outlined,
-                                    color: kPrimaryBlue,
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: versionStr.isEmpty ? 220 : 160,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '当前配置概览',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '先看关键状态，再进入对应分区调整教师资料、模板和备份。',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (versionStr.isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.68,
-                                      ),
-                                      borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(
-                                        color: kInkSecondary.withValues(
-                                          alpha: 0.16,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'v$versionStr',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: kPrimaryBlue,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final columns = constraints.maxWidth >= 720
-                                    ? 4
-                                    : 2;
-                                final itemWidth =
-                                    (constraints.maxWidth -
-                                        12 * (columns - 1)) /
-                                    columns;
-
-                                return Wrap(
-                                  spacing: 12,
-                                  runSpacing: 12,
-                                  children: [
-                                    SizedBox(
-                                      width: itemWidth,
-                                      child: _SettingsSnapshot(
-                                        icon: Icons.person_outline,
-                                        label: '教师抬头',
-                                        value: teacherName,
-                                        color: kPrimaryBlue,
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: itemWidth,
-                                      child: _SettingsSnapshot(
-                                        icon: Icons.backup_outlined,
-                                        label: '最近备份',
-                                        value: _backupSummaryLabel(
-                                          lastBackupMs,
-                                        ),
-                                        color: isOverdue ? kOrange : kGreen,
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: itemWidth,
-                                      child: _SettingsSnapshot(
-                                        icon: Icons.water_drop_outlined,
-                                        label: 'PDF 水印',
-                                        value: watermarkEnabled ? '已开启' : '已关闭',
-                                        color: watermarkEnabled
-                                            ? kPrimaryBlue
-                                            : kInkSecondary,
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: itemWidth,
-                                      child: _SettingsSnapshot(
-                                        icon: Icons.message_outlined,
-                                        label: '默认寄语',
-                                        value: hasDefaultMessage
-                                            ? '已配置'
-                                            : '未设置',
-                                        color: hasDefaultMessage
-                                            ? kSealRed
-                                            : kOrange,
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.52),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: kInkSecondary.withValues(alpha: 0.08),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        '配置完成度',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                      ),
-                                      const Spacer(),
-                                      Text(
-                                        '$setupReadyCount/4 项已就绪',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: kPrimaryBlue,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(999),
-                                    child: LinearProgressIndicator(
-                                      minHeight: 8,
-                                      value: setupCompletion,
-                                      backgroundColor: kInkSecondary.withValues(
-                                        alpha: 0.12,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    priority == null
-                                        ? '当前导出与备份配置已经比较完整，可以继续微调细节。'
-                                        : '下一步建议先处理“${priority.actionLabel}”，这样后续导出和沟通会更顺手。',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            const _SettingsSectionTitle(
-                              title: '常用入口',
-                              subtitle: '把最常打开的设置集中放在顶部，减少来回查找。',
-                            ),
-                            const SizedBox(height: 12),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final columns = constraints.maxWidth >= 720
-                                    ? 4
-                                    : 2;
-                                final itemWidth =
-                                    (constraints.maxWidth -
-                                        12 * (columns - 1)) /
-                                    columns;
-
-                                return Wrap(
-                                  spacing: 12,
-                                  runSpacing: 12,
-                                  children: [
-                                    SizedBox(
-                                      width: itemWidth,
-                                      child: _SettingsShortcutCard(
-                                        icon: Icons.backup_outlined,
-                                        title: '数据备份',
-                                        subtitle: isOverdue ? '建议更新' : '查看记录',
-                                        color: isOverdue
-                                            ? kOrange
-                                            : kPrimaryBlue,
-                                        onTap: () =>
-                                            context.push('/settings/backup'),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: itemWidth,
-                                      child: _SettingsShortcutCard(
-                                        icon: Icons.draw_outlined,
-                                        title: '签名管理',
-                                        subtitle: hasSignature ? '已配置' : '待上传',
-                                        color: hasSignature ? kGreen : kSealRed,
-                                        onTap: () =>
-                                            context.push('/settings/signature'),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: itemWidth,
-                                      child: _SettingsShortcutCard(
-                                        icon: Icons.view_quilt_outlined,
-                                        title: '课堂模板',
-                                        subtitle: '时段与课程',
-                                        color: kPrimaryBlue,
-                                        onTap: () =>
-                                            context.push('/settings/templates'),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: itemWidth,
-                                      child: _SettingsShortcutCard(
-                                        icon: Icons.approval_outlined,
-                                        title: '印章样式',
-                                        subtitle:
-                                            settings['seal_text']?.isNotEmpty ==
-                                                true
-                                            ? '已设置'
-                                            : '待配置',
-                                        color: kSealRed,
-                                        onTap: () =>
-                                            context.push('/settings/seal'),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: itemWidth,
-                                      child: _SettingsShortcutCard(
-                                        icon: Icons.psychology_alt_outlined,
-                                        title: 'AI 视觉',
-                                        subtitle:
-                                            settings['qwen_api_key']
-                                                    ?.trim()
-                                                    .isNotEmpty ==
-                                                true
-                                            ? 'Qwen 已配置'
-                                            : '待接入',
-                                        color:
-                                            settings['qwen_api_key']
-                                                    ?.trim()
-                                                    .isNotEmpty ==
-                                                true
-                                            ? kGreen
-                                            : kPrimaryBlue,
-                                        onTap: () =>
-                                            context.push('/settings/ai'),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
-                        ),
+                      SettingsOverviewPanel(
+                        version: versionStr,
+                        teacherName: teacherName,
+                        backupSummary: _backupSummaryLabel(lastBackupMs),
+                        isBackupOverdue: isOverdue,
+                        watermarkEnabled: watermarkEnabled,
+                        hasDefaultMessage: hasDefaultMessage,
+                        setupReadyCount: setupReadyCount,
+                        setupCompletion: setupCompletion,
+                        priorityHint: priority == null
+                            ? '当前导出与备份配置已经比较完整，可以继续微调细节。'
+                            : '下一步建议先处理“${priority.actionLabel}”，这样后续导出和沟通会更顺手。',
+                        hasSignature: hasSignature,
+                        hasSeal: settings['seal_text']?.isNotEmpty == true,
+                        hasAiConfig:
+                            settings['qwen_api_key']?.trim().isNotEmpty == true,
+                        onOpenBackup: () => context.push('/settings/backup'),
+                        onOpenSignature: () =>
+                            context.push('/settings/signature'),
+                        onOpenTemplates: () =>
+                            context.push('/settings/templates'),
+                        onOpenSeal: () => context.push('/settings/seal'),
+                        onOpenAi: () => context.push('/settings/ai'),
                       ),
                       const SizedBox(height: 16),
-                      _SettingsSectionTitle(
-                        key: _sectionKeys[_SettingsSectionAnchor.profile],
+                      const SettingsSectionTitle(
                         title: '教师资料',
                         subtitle: '影响首页抬头、导出报告与对外展示的基础信息。',
                       ),
@@ -488,8 +199,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      _SettingsSectionTitle(
-                        key: _sectionKeys[_SettingsSectionAnchor.assets],
+                      const SettingsSectionTitle(
                         title: '资料与模板',
                         subtitle: '维护备份、课堂模板、签名和印章等常用资产。',
                       ),
@@ -533,8 +243,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      _SettingsSectionTitle(
-                        key: _sectionKeys[_SettingsSectionAnchor.export],
+                      const SettingsSectionTitle(
                         title: '导出与沟通',
                         subtitle: '决定 PDF 报告的默认效果，以及家长沟通文案的起点。',
                       ),
@@ -582,8 +291,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      _SettingsSectionTitle(
-                        key: _sectionKeys[_SettingsSectionAnchor.feedback],
+                      const SettingsSectionTitle(
                         title: '沉浸反馈',
                         subtitle: '让翻页、保存与导出在视觉之外，也保留一点纸墨手感。',
                       ),
@@ -633,8 +341,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      _SettingsSectionTitle(
-                        key: _sectionKeys[_SettingsSectionAnchor.ai],
+                      const SettingsSectionTitle(
                         title: 'AI 扩展',
                         subtitle: '预留视觉模型与远端能力配置，保持 UI 与远端网关解耦。',
                       ),
@@ -657,8 +364,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      _SettingsSectionTitle(
-                        key: _sectionKeys[_SettingsSectionAnchor.importTool],
+                      const SettingsSectionTitle(
                         title: '导入工具',
                         subtitle: '批量录入前可先下载标准模板，减少字段缺失或顺序错误。',
                       ),
@@ -678,7 +384,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       if (_devMode) ...[
                         const SizedBox(height: 20),
-                        const _SettingsSectionTitle(
+                        const SettingsSectionTitle(
                           title: '开发者工具',
                           subtitle: '用于本地演示、压测和初始化环境，操作前请确认风险。',
                         ),
@@ -711,8 +417,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ],
                       const SizedBox(height: 20),
-                      _SettingsSectionTitle(
-                        key: _sectionKeys[_SettingsSectionAnchor.about],
+                      const SettingsSectionTitle(
                         title: '关于应用',
                         subtitle: '查看版本信息，并保留隐藏的开发者模式入口。',
                       ),
@@ -1153,347 +858,6 @@ class _PriorityBanner extends StatelessWidget {
 }
 
 // ignore: unused_element
-class _SettingsQuickNavigator extends StatelessWidget {
-  final _SettingsSectionAnchor? activeAnchor;
-  final ValueChanged<_SettingsSectionAnchor> onTap;
-
-  const _SettingsQuickNavigator({
-    required this.activeAnchor,
-    required this.onTap,
-  });
-
-  static const _items = [
-    _SettingsQuickNavItem(
-      anchor: _SettingsSectionAnchor.profile,
-      icon: Icons.person_outline,
-      label: '教师资料',
-      color: kPrimaryBlue,
-    ),
-    _SettingsQuickNavItem(
-      anchor: _SettingsSectionAnchor.assets,
-      icon: Icons.folder_copy_outlined,
-      label: '资料模板',
-      color: kSealRed,
-    ),
-    _SettingsQuickNavItem(
-      anchor: _SettingsSectionAnchor.export,
-      icon: Icons.send_outlined,
-      label: '导出沟通',
-      color: kOrange,
-    ),
-    _SettingsQuickNavItem(
-      anchor: _SettingsSectionAnchor.feedback,
-      icon: Icons.touch_app_outlined,
-      label: '交互反馈',
-      color: kGreen,
-    ),
-    _SettingsQuickNavItem(
-      anchor: _SettingsSectionAnchor.ai,
-      icon: Icons.psychology_alt_outlined,
-      label: 'AI',
-      color: kPrimaryBlue,
-    ),
-    _SettingsQuickNavItem(
-      anchor: _SettingsSectionAnchor.importTool,
-      icon: Icons.download_outlined,
-      label: '导入工具',
-      color: kSealRed,
-    ),
-    _SettingsQuickNavItem(
-      anchor: _SettingsSectionAnchor.about,
-      icon: Icons.info_outline,
-      label: '关于',
-      color: kInkSecondary,
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return GlassCard(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '区块导航',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Text(
-                '长页速达',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: kInkSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '快速跳到教师资料、模板、导出沟通和反馈设置，减少长页面来回查找。',
-            style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 720
-                  ? 4
-                  : constraints.maxWidth >= 460
-                  ? 3
-                  : 2;
-              final itemWidth =
-                  (constraints.maxWidth - 10 * (columns - 1)) / columns;
-
-              return Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final item in _items)
-                    SizedBox(
-                      width: itemWidth,
-                      child: _SettingsQuickNavChip(
-                        item: item,
-                        selected: activeAnchor == item.anchor,
-                        onTap: () => onTap(item.anchor),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ignore: unused_element
-class _SettingsQuickNavItem {
-  final _SettingsSectionAnchor anchor;
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _SettingsQuickNavItem({
-    required this.anchor,
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-}
-
-// ignore: unused_element
-class _SettingsQuickNavChip extends StatelessWidget {
-  final _SettingsQuickNavItem item;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _SettingsQuickNavChip({
-    required this.item,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-          decoration: BoxDecoration(
-            color: selected
-                ? item.color.withValues(alpha: 0.14)
-                : Colors.white.withValues(alpha: 0.52),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: item.color.withValues(alpha: selected ? 0.22 : 0.1),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(item.icon, size: 18, color: item.color),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  item.label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: item.color,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              if (selected)
-                Icon(Icons.check_circle, size: 16, color: item.color),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsSectionTitle extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-
-  const _SettingsSectionTitle({super.key, required this.title, this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(subtitle!, style: theme.textTheme.bodySmall),
-        ],
-      ],
-    );
-  }
-}
-
-class _SettingsSnapshot extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _SettingsSnapshot({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 10),
-          Text(label, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingsShortcutCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _SettingsShortcutCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () {
-          unawaited(InteractionFeedback.selection(context));
-          onTap();
-        },
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.74),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, size: 20, color: color),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String title;

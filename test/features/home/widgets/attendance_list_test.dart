@@ -19,7 +19,7 @@ void main() {
     tester,
   ) async {
     _FakeStudentNotifier.seededStudents = [_seededStudent];
-    _FakeAttendanceNotifier.seededRecords = const [];
+    _selectedDateAttendanceRecords = const [];
 
     await _pumpAttendanceList(tester);
 
@@ -30,7 +30,7 @@ void main() {
     tester,
   ) async {
     _FakeStudentNotifier.seededStudents = [_seededStudent];
-    _FakeAttendanceNotifier.seededRecords = [_seededAttendance];
+    _selectedDateAttendanceRecords = [_seededAttendance];
 
     await _pumpAttendanceList(tester);
 
@@ -41,7 +41,7 @@ void main() {
 
   testWidgets('attendance card shows uploaded artwork preview', (tester) async {
     _FakeStudentNotifier.seededStudents = [_seededStudent];
-    _FakeAttendanceNotifier.seededRecords = [
+    _selectedDateAttendanceRecords = [
       _seededAttendance.copyWith(artworkImagePath: 'E:/missing/artwork.jpg'),
     ];
 
@@ -78,13 +78,17 @@ final _seededAttendance = Attendance(
   updatedAt: 1,
 );
 
+List<Attendance> _selectedDateAttendanceRecords = const [];
+
 Future<void> _pumpAttendanceList(WidgetTester tester) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         settingsProvider.overrideWith(_FakeSettingsNotifier.new),
         studentProvider.overrideWith(_FakeStudentNotifier.new),
-        attendanceProvider.overrideWith(_FakeAttendanceNotifier.new),
+        selectedDateAttendanceProvider.overrideWith(
+          (ref) async => _selectedDateAttendanceRecords,
+        ),
       ],
       child: MaterialApp.router(
         theme: buildAppTheme(),
@@ -133,13 +137,6 @@ class _FakeStudentNotifier extends StudentNotifier {
 
   @override
   Future<List<StudentWithMeta>> build() async => seededStudents;
-}
-
-class _FakeAttendanceNotifier extends MonthAttendanceNotifier {
-  static List<Attendance> seededRecords = const [];
-
-  @override
-  Future<List<Attendance>> build() async => seededRecords;
 }
 
 Future<void> _settleUi(WidgetTester tester) async {

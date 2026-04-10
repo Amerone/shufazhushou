@@ -51,7 +51,6 @@ android {
 
     buildTypes {
         release {
-            // Only use an explicit release keystore when the project provides one.
             val releaseSigning = signingConfigs.findByName("release")
             if (releaseSigning != null) {
                 signingConfig = releaseSigning

@@ -16,7 +16,13 @@ import 'time_wheel_picker.dart';
 
 class AttendanceEditSheet extends ConsumerStatefulWidget {
   final Attendance record;
-  const AttendanceEditSheet({super.key, required this.record});
+  final Future<void> Function()? onAnalyzeArtwork;
+
+  const AttendanceEditSheet({
+    super.key,
+    required this.record,
+    this.onAnalyzeArtwork,
+  });
 
   @override
   ConsumerState<AttendanceEditSheet> createState() =>
@@ -24,6 +30,7 @@ class AttendanceEditSheet extends ConsumerStatefulWidget {
 }
 
 class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
+  late Attendance _record;
   late String _status;
   late DateTime _date;
   late String _startTime;
@@ -35,6 +42,7 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
   double? _structureAccuracy;
   double? _rhythmConsistency;
   bool _saving = false;
+  bool _analyzingArtwork = false;
 
   static const _statuses = [
     ('present', '出勤'),
@@ -47,18 +55,19 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
   @override
   void initState() {
     super.initState();
-    _status = widget.record.status;
-    _date = DateTime.parse(widget.record.date);
-    _startTime = widget.record.startTime;
-    _endTime = widget.record.endTime;
-    _noteCtrl = TextEditingController(text: widget.record.note ?? '');
+    _record = widget.record;
+    _status = _record.status;
+    _date = DateTime.parse(_record.date);
+    _startTime = _record.startTime;
+    _endTime = _record.endTime;
+    _noteCtrl = TextEditingController(text: _record.note ?? '');
     _homePracticeCtrl = TextEditingController(
-      text: widget.record.homePracticeNote ?? '',
+      text: _record.homePracticeNote ?? '',
     );
-    _lessonFocusTags.addAll(widget.record.lessonFocusTags);
-    _strokeQuality = widget.record.progressScores?.strokeQuality;
-    _structureAccuracy = widget.record.progressScores?.structureAccuracy;
-    _rhythmConsistency = widget.record.progressScores?.rhythmConsistency;
+    _lessonFocusTags.addAll(_record.lessonFocusTags);
+    _strokeQuality = _record.progressScores?.strokeQuality;
+    _structureAccuracy = _record.progressScores?.structureAccuracy;
+    _rhythmConsistency = _record.progressScores?.rhythmConsistency;
   }
 
   @override
@@ -87,7 +96,29 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
     final statusEnum = AttendanceStatus.values.firstWhere(
       (item) => item.name == _status,
     );
-    return FeeCalculator.calcFee(statusEnum, widget.record.priceSnapshot);
+    return FeeCalculator.calcFee(statusEnum, _record.priceSnapshot);
+  }
+
+  Future<Attendance?> _loadLatestRecord() {
+    return ref.read(attendanceDaoProvider).getById(_record.id);
+  }
+
+  void _replaceHomePracticeDraft(String? value) {
+    final nextText = value ?? '';
+    _homePracticeCtrl.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: nextText.length),
+    );
+  }
+
+  Future<void> _refreshAfterExternalUpdate() async {
+    final latestRecord = await _loadLatestRecord();
+    if (!mounted || latestRecord == null) return;
+
+    setState(() {
+      _record = latestRecord;
+      _replaceHomePracticeDraft(latestRecord.homePracticeNote);
+    });
   }
 
   Future<void> _save() async {
@@ -100,14 +131,18 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
     setState(() => _saving = true);
     try {
       final dao = ref.read(attendanceDaoProvider);
+      final latestRecord = await dao.getById(_record.id);
+      if (latestRecord == null) {
+        throw StateError('未找到对应的出勤记录。');
+      }
 
       // 冲突检测（排除自身）
       final conflict = await dao.findConflict(
-        widget.record.studentId,
+        latestRecord.studentId,
         _dateStr(),
         _startTime,
         _endTime,
-        excludeId: widget.record.id,
+        excludeId: latestRecord.id,
       );
       if (conflict != null && mounted) {
         final ok = await AppToast.showConfirm(context, '该时段已有其他出勤记录，是否继续保存？');
@@ -119,10 +154,10 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
       );
       final newFee = FeeCalculator.calcFee(
         statusEnum,
-        widget.record.priceSnapshot,
+        latestRecord.priceSnapshot,
       );
 
-      final updated = widget.record.copyWith(
+      final updated = latestRecord.copyWith(
         status: _status,
         date: _dateStr(),
         startTime: _startTime,
@@ -138,11 +173,16 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
       );
 
       await dao.update(updated);
+      _record = updated;
       _invalidate();
       if (!mounted) return;
       await InteractionFeedback.seal(context);
       if (!mounted) return;
       Navigator.of(context).pop();
+    } catch (error) {
+      if (mounted) {
+        AppToast.showError(context, error.toString());
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -154,16 +194,40 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
     if (!confirm) return;
 
     setState(() => _saving = true);
-    await ref.read(attendanceDaoProvider).delete(widget.record.id);
-    _invalidate();
-    if (!mounted) return;
-    await InteractionFeedback.seal(context);
-    if (!mounted) return;
-    Navigator.of(context).pop();
+    try {
+      await ref.read(attendanceDaoProvider).delete(_record.id);
+      _invalidate();
+      if (!mounted) return;
+      await InteractionFeedback.seal(context);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (mounted) {
+        AppToast.showError(context, error.toString());
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   void _invalidate() {
     invalidateAfterAttendanceChange(ref);
+  }
+
+  Future<void> _analyzeArtwork() async {
+    final analyzeArtwork = widget.onAnalyzeArtwork;
+    if (analyzeArtwork == null || _saving || _analyzingArtwork) return;
+
+    FocusScope.of(context).unfocus();
+    setState(() => _analyzingArtwork = true);
+    try {
+      await analyzeArtwork();
+      await _refreshAfterExternalUpdate();
+    } finally {
+      if (mounted) {
+        setState(() => _analyzingArtwork = false);
+      }
+    }
   }
 
   @override
@@ -259,7 +323,7 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                   children: [
                     Expanded(
                       child: Text(
-                        '课时单价 ¥${widget.record.priceSnapshot.toStringAsFixed(0)}',
+                        '课时单价 ¥${_record.priceSnapshot.toStringAsFixed(0)}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: kPrimaryBlue,
                           fontWeight: FontWeight.w600,
@@ -388,6 +452,13 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                   fillColor: Colors.white.withValues(alpha: 0.5),
                 ),
               ),
+              if (widget.onAnalyzeArtwork != null) ...[
+                const SizedBox(height: 16),
+                _ArtworkAnalysisPanel(
+                  analyzing: _analyzingArtwork,
+                  onAnalyze: _analyzeArtwork,
+                ),
+              ],
               const SizedBox(height: 16),
               Align(
                 alignment: Alignment.centerLeft,
@@ -530,6 +601,87 @@ class _ScoreEditor extends StatelessWidget {
               unawaited(InteractionFeedback.selection(context));
               onChanged(nextValue);
             },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ArtworkAnalysisPanel extends StatelessWidget {
+  final bool analyzing;
+  final VoidCallback onAnalyze;
+
+  const _ArtworkAnalysisPanel({
+    required this.analyzing,
+    required this.onAnalyze,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kSealRed.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kSealRed.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: kSealRed.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_outlined,
+                  color: kSealRed,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI 作品分析',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '拍照或从相册选择课堂作品，AI 会生成观察结果和课后练习建议。',
+                      style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: analyzing ? null : onAnalyze,
+              icon: analyzing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.camera_alt_outlined),
+              label: Text(analyzing ? '分析中...' : '拍照 / 选照片分析'),
+            ),
           ),
         ],
       ),

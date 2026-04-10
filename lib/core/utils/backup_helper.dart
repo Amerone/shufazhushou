@@ -11,6 +11,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../database/database_helper.dart';
 import '../services/attendance_artwork_storage_service.dart';
+import '../services/sensitive_settings_store.dart';
 
 class BackupRecord {
   final String path;
@@ -38,6 +39,7 @@ class BackupHelper {
   static const _backupBundleFormat = 'moyun_backup_bundle';
   static const _backupBundleVersion = 1;
   static const _artworkSnapshotDirectorySuffix = '.artworks';
+  static const _sensitiveSettingsSnapshotSuffix = '.sensitive.json';
   static const _pbkdf2Iterations = 120000;
   static const _kdfSaltLength = 16;
   static const _gcmNonceLength = 12;
@@ -63,6 +65,12 @@ class BackupHelper {
   @visibleForTesting
   static Future<Directory> Function()? temporaryDirectoryResolver;
 
+  @visibleForTesting
+  static Future<Map<String, String>> Function()? sensitiveSettingsReader;
+
+  @visibleForTesting
+  static Future<void> Function(Map<String, String>)? sensitiveSettingsWriter;
+
   static Future<String> backup({DateTime? at}) async {
     try {
       final db = await DatabaseHelper.instance.database;
@@ -74,6 +82,7 @@ class BackupHelper {
     final destination = p.join(backupDir.path, buildBackupFileName(at));
     await File(dbPath).copy(destination);
     await _writeArtworkSnapshot(destination);
+    await _writeSensitiveSettingsSnapshot(destination);
     return destination;
   }
 
@@ -218,6 +227,7 @@ class BackupHelper {
         includesArtworkSnapshot: restoreSource.includesArtworkSnapshot,
         artworkDirectory: restoreSource.artworkDirectory,
       );
+      await applyRestoredSensitiveSettings(restoreSource.sensitiveSettings);
       return true;
     } finally {
       if (decryptedTempPath != null) {
@@ -340,6 +350,7 @@ class BackupHelper {
   static Uint8List buildBackupBundleBytes({
     required List<int> databaseBytes,
     Map<String, List<int>> artworkFiles = const <String, List<int>>{},
+    Map<String, String> sensitiveSettings = const <String, String>{},
   }) {
     final normalizedArtworkFiles = <String, String>{};
     for (final entry in artworkFiles.entries) {
@@ -353,13 +364,18 @@ class BackupHelper {
           'version': _backupBundleVersion,
           'database': base64Encode(databaseBytes),
           'artwork_files': normalizedArtworkFiles,
+          'sensitive_settings': sensitiveSettings,
         }),
       ),
     );
   }
 
   @visibleForTesting
-  static ({Uint8List databaseBytes, Map<String, Uint8List> artworkFiles})?
+  static ({
+    Uint8List databaseBytes,
+    Map<String, Uint8List> artworkFiles,
+    Map<String, String> sensitiveSettings,
+  })?
   tryDecodeBackupBundleBytes(List<int> bytes) {
     try {
       final decoded = jsonDecode(utf8.decode(bytes));
@@ -373,11 +389,20 @@ class BackupHelper {
 
       final rawArtworkFiles =
           decoded['artwork_files'] as Map<String, dynamic>? ?? const {};
+      final rawSensitiveSettings =
+          decoded['sensitive_settings'] as Map<String, dynamic>? ?? const {};
       final artworkFiles = <String, Uint8List>{};
       for (final entry in rawArtworkFiles.entries) {
         artworkFiles[p.basename(entry.key)] = Uint8List.fromList(
           base64Decode(entry.value as String),
         );
+      }
+      final sensitiveSettings = <String, String>{};
+      for (final entry in rawSensitiveSettings.entries) {
+        final key = entry.key.trim();
+        final value = (entry.value as String).trim();
+        if (key.isEmpty || value.isEmpty) continue;
+        sensitiveSettings[key] = value;
       }
 
       return (
@@ -385,6 +410,7 @@ class BackupHelper {
           base64Decode(decoded['database'] as String),
         ),
         artworkFiles: artworkFiles,
+        sensitiveSettings: sensitiveSettings,
       );
     } on FormatException {
       return null;
@@ -403,12 +429,28 @@ class BackupHelper {
     required bool includesArtworkSnapshot,
     Directory? artworkDirectory,
   }) async {
-    final storage = const AttendanceArtworkStorageService();
+    const storage = AttendanceArtworkStorageService();
     if (includesArtworkSnapshot) {
       await storage.restoreArtworkSnapshotFrom(artworkDirectory!);
       return;
     }
     await storage.clearArtworkDirectory();
+  }
+
+  @visibleForTesting
+  static Future<void> applyRestoredSensitiveSettings(
+    Map<String, String> settings,
+  ) async {
+    if (sensitiveSettingsWriter != null) {
+      await sensitiveSettingsWriter!(settings);
+      return;
+    }
+
+    final store = SensitiveSettingsStore();
+    await store.clearAll();
+    for (final entry in settings.entries) {
+      await store.set(entry.key, entry.value);
+    }
   }
 
   static Future<_PreparedRestoreSource> _prepareRestoreSource(
@@ -421,10 +463,14 @@ class BackupHelper {
       final artworkDirectory = await _existingArtworkSnapshotDirectory(
         sourceFile.path,
       );
+      final sensitiveSettings = await _readSensitiveSettingsSnapshot(
+        sourceFile.path,
+      );
       return _PreparedRestoreSource(
         databaseFile: sourceFile,
         artworkDirectory: artworkDirectory,
         includesArtworkSnapshot: artworkDirectory != null,
+        sensitiveSettings: sensitiveSettings,
       );
     }
 
@@ -450,6 +496,7 @@ class BackupHelper {
       return _PreparedRestoreSource(
         databaseFile: tempFile,
         includesArtworkSnapshot: false,
+        sensitiveSettings: const <String, String>{},
       );
     }
 
@@ -467,6 +514,7 @@ class BackupHelper {
       databaseFile: tempFile,
       artworkDirectory: artworkTempDirectory,
       includesArtworkSnapshot: true,
+      sensitiveSettings: decodedBundle.sensitiveSettings,
     );
   }
 
@@ -590,6 +638,19 @@ class BackupHelper {
         await entity.copy(destinationPath);
       }
 
+      final sourceSensitiveSettingsFile = _buildSensitiveSettingsSnapshotFile(
+        entity.path,
+      );
+      if (await sourceSensitiveSettingsFile.exists()) {
+        final destinationSensitiveSettingsFile =
+            _buildSensitiveSettingsSnapshotFile(destinationPath);
+        if (!await destinationSensitiveSettingsFile.exists()) {
+          await sourceSensitiveSettingsFile.copy(
+            destinationSensitiveSettingsFile.path,
+          );
+        }
+      }
+
       final sourceArtworkDir = _buildArtworkSnapshotDirectory(entity.path);
       if (!await sourceArtworkDir.exists()) {
         continue;
@@ -610,12 +671,20 @@ class BackupHelper {
     File databaseFile,
     int databaseSize,
   ) async {
+    var total = databaseSize;
     final artworkDirectory = _buildArtworkSnapshotDirectory(databaseFile.path);
-    if (!await artworkDirectory.exists()) {
-      return databaseSize;
+    if (await artworkDirectory.exists()) {
+      total += await _calculateDirectorySize(artworkDirectory);
     }
 
-    return databaseSize + await _calculateDirectorySize(artworkDirectory);
+    final sensitiveSettingsFile = _buildSensitiveSettingsSnapshotFile(
+      databaseFile.path,
+    );
+    if (await sensitiveSettingsFile.exists()) {
+      total += await sensitiveSettingsFile.length();
+    }
+
+    return total;
   }
 
   static Future<int> _calculateDirectorySize(Directory directory) async {
@@ -637,9 +706,11 @@ class BackupHelper {
     final artworkFiles = await _readArtworkSnapshotDirectory(
       _buildArtworkSnapshotDirectory(backupPath),
     );
+    final sensitiveSettings = await _readSensitiveSettingsSnapshot(backupPath);
     return buildBackupBundleBytes(
       databaseBytes: databaseBytes,
       artworkFiles: artworkFiles,
+      sensitiveSettings: sensitiveSettings,
     );
   }
 
@@ -649,8 +720,28 @@ class BackupHelper {
     );
   }
 
+  static Future<void> _writeSensitiveSettingsSnapshot(String backupPath) async {
+    final sensitiveSettings = await _readSensitiveSettings();
+    final snapshotFile = _buildSensitiveSettingsSnapshotFile(backupPath);
+    if (sensitiveSettings.isEmpty) {
+      if (await snapshotFile.exists()) {
+        await snapshotFile.delete();
+      }
+      return;
+    }
+
+    await snapshotFile.writeAsString(
+      jsonEncode(sensitiveSettings),
+      flush: true,
+    );
+  }
+
   static Directory _buildArtworkSnapshotDirectory(String backupPath) {
     return Directory('$backupPath$_artworkSnapshotDirectorySuffix');
+  }
+
+  static File _buildSensitiveSettingsSnapshotFile(String backupPath) {
+    return File('$backupPath$_sensitiveSettingsSnapshotSuffix');
   }
 
   static Future<Directory?> _existingArtworkSnapshotDirectory(
@@ -680,6 +771,38 @@ class BackupHelper {
     return files;
   }
 
+  static Future<Map<String, String>> _readSensitiveSettingsSnapshot(
+    String backupPath,
+  ) async {
+    final snapshotFile = _buildSensitiveSettingsSnapshotFile(backupPath);
+    if (!await snapshotFile.exists()) {
+      return const <String, String>{};
+    }
+
+    try {
+      final decoded = jsonDecode(await snapshotFile.readAsString());
+      if (decoded is! Map) {
+        return const <String, String>{};
+      }
+
+      final settings = <String, String>{};
+      for (final entry in decoded.entries) {
+        final key = entry.key;
+        final value = entry.value;
+        if (key is! String || value is! String) continue;
+        final trimmedKey = key.trim();
+        final trimmedValue = value.trim();
+        if (trimmedKey.isEmpty || trimmedValue.isEmpty) continue;
+        settings[trimmedKey] = trimmedValue;
+      }
+      return settings;
+    } on FormatException {
+      return const <String, String>{};
+    } on FileSystemException {
+      return const <String, String>{};
+    }
+  }
+
   static Future<void> _writeArtworkSnapshotDirectory(
     Directory snapshotDirectory,
     Map<String, Uint8List> files,
@@ -702,6 +825,13 @@ class BackupHelper {
 
   static Future<Directory> _getTemporaryDirectory() {
     return temporaryDirectoryResolver?.call() ?? getTemporaryDirectory();
+  }
+
+  static Future<Map<String, String>> _readSensitiveSettings() async {
+    if (sensitiveSettingsReader != null) {
+      return sensitiveSettingsReader!();
+    }
+    return SensitiveSettingsStore().readAll();
   }
 
   static String _formatTimestamp(DateTime timestamp) {
@@ -734,11 +864,13 @@ class _PreparedRestoreSource {
   final File databaseFile;
   final Directory? artworkDirectory;
   final bool includesArtworkSnapshot;
+  final Map<String, String> sensitiveSettings;
 
   const _PreparedRestoreSource({
     required this.databaseFile,
     this.artworkDirectory,
     required this.includesArtworkSnapshot,
+    this.sensitiveSettings = const <String, String>{},
   });
 }
 

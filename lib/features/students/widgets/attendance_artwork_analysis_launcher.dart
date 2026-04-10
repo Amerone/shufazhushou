@@ -30,7 +30,10 @@ Future<void> launchAttendanceArtworkAnalysis(
     return;
   }
 
-  final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+  final imageSource = await _pickArtworkImageSource(context);
+  if (imageSource == null || !context.mounted) return;
+
+  final image = await ImagePicker().pickImage(source: imageSource);
   if (image == null || !context.mounted) return;
 
   onStarted?.call();
@@ -78,6 +81,56 @@ Future<void> launchAttendanceArtworkAnalysis(
   } finally {
     onFinished?.call();
   }
+}
+
+Future<ImageSource?> _pickArtworkImageSource(BuildContext context) async {
+  return showModalBottomSheet<ImageSource>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Material(
+          color: Theme.of(sheetContext).colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '上传课堂作品',
+                  style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '可直接拍照，或从相册选择已有作品图片进行 AI 分析。',
+                  style: Theme.of(sheetContext).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () =>
+                      Navigator.of(sheetContext).pop(ImageSource.camera),
+                  icon: const Icon(Icons.camera_alt_outlined),
+                  label: const Text('拍照分析'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () =>
+                      Navigator.of(sheetContext).pop(ImageSource.gallery),
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('从相册选择'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 Future<void> _saveArtworkImage(

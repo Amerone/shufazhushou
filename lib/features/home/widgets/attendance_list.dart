@@ -67,8 +67,7 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final selectedDate = ref.watch(selectedDateProvider);
-    final asyncAll = ref.watch(attendanceProvider);
+    final asyncRecords = ref.watch(selectedDateAttendanceProvider);
     final students = ref.watch(studentProvider).valueOrNull ?? [];
     final studentMap = {
       for (final item in students) item.student.id: item.student,
@@ -77,19 +76,17 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
       students.map((m) => m.student).toList(),
     );
 
-    final dateStr = formatDate(selectedDate);
-
-    return asyncAll.when(
+    return asyncRecords.when(
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 32),
         child: Center(child: CircularProgressIndicator()),
       ),
       error: (e, _) => Center(child: Text('加载失败: $e')),
-      data: (allRecords) {
-        final records = allRecords.where((r) => r.date == dateStr).toList()
+      data: (records) {
+        final sortedRecords = [...records]
           ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
-        if (records.isEmpty) {
+        if (sortedRecords.isEmpty) {
           if (students.isEmpty) {
             return const EmptyState(message: '当日暂无出勤记录');
           }
@@ -121,10 +118,10 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
         return ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: records.length,
+          itemCount: sortedRecords.length,
           separatorBuilder: (_, _) => const SizedBox(height: 14),
           itemBuilder: (_, i) {
-            final r = records[i];
+            final r = sortedRecords[i];
             final status = statusLabel(r.status);
             final sColor = statusColor(r.status);
             final durationLabel = _durationLabel(r.startTime, r.endTime);
@@ -160,7 +157,11 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
                   showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
-                    builder: (_) => AttendanceEditSheet(record: r),
+                    builder: (_) => AttendanceEditSheet(
+                      record: r,
+                      onAnalyzeArtwork: () =>
+                          _analyzeAttendanceImage(r, studentName),
+                    ),
                   );
                 },
                 child: Padding(

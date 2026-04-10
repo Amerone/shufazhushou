@@ -3,20 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../core/models/attendance.dart';
 import '../../../core/models/export_template.dart';
-import '../../../core/models/handwriting_analysis_result.dart';
 import '../../../core/models/payment.dart';
 import '../../../core/models/student.dart';
-import '../../../core/providers/ai_provider.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
-import '../../../core/services/ai_analysis_note_codec.dart';
-import '../../../core/services/attendance_artwork_storage_service.dart';
-import '../../../core/services/handwriting_analysis_service.dart';
 import '../../../core/services/student_artwork_timeline_service.dart';
 import '../../../core/services/student_growth_summary_service.dart';
 import '../../../core/services/student_parent_message_service.dart';
@@ -26,12 +20,12 @@ import '../../../shared/theme.dart';
 import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/attendance_edit_sheet.dart';
-import '../../../shared/widgets/attendance_artwork_preview.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
-import '../widgets/attendance_ai_analysis_sheet.dart';
+import '../widgets/attendance_artwork_analysis_launcher.dart';
+import '../widgets/student_attendance_record_card.dart';
 import '../widgets/student_artwork_timeline_card.dart';
 import '../widgets/student_action_launcher.dart';
 import '../widgets/student_ai_insight_card.dart';
@@ -41,11 +35,7 @@ import '../widgets/student_growth_workbench_card.dart';
 import '../widgets/student_parent_message_card.dart';
 import '../widgets/student_primary_actions_card.dart';
 
-enum _StudentDetailAnchor {
-  finance,
-  payments,
-  attendance,
-}
+enum _StudentDetailAnchor { finance, payments, attendance }
 
 class StudentDetailScreen extends ConsumerStatefulWidget {
   final String studentId;
@@ -64,6 +54,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   bool _hasMore = true;
   bool _loadingMore = false;
   bool _showScrollToTop = false;
+  int _attendanceLoadGeneration = 0;
   final Set<String> _analyzingImageRecordIds = <String>{};
   final ScrollController _scrollController = ScrollController();
   final Map<_StudentDetailAnchor, GlobalKey> _sectionKeys = {
@@ -132,24 +123,28 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     setState(() => _payments = list);
   }
 
-  Future<void> _loadMore() async {
+  Future<void> _loadMore({int? generation}) async {
     if (_loadingMore) return;
+    final requestGeneration = generation ?? _attendanceLoadGeneration;
+    final offset = _page * _pageSize;
     _loadingMore = true;
     try {
       final dao = ref.read(attendanceDaoProvider);
       final batch = await dao.getByStudentPaged(
         widget.studentId,
         _pageSize,
-        _page * _pageSize,
+        offset,
       );
-      if (!mounted) return;
+      if (!mounted || requestGeneration != _attendanceLoadGeneration) return;
       setState(() {
         _records = [..._records, ...batch];
         _hasMore = batch.length == _pageSize;
         _page++;
       });
     } finally {
-      _loadingMore = false;
+      if (requestGeneration == _attendanceLoadGeneration) {
+        _loadingMore = false;
+      }
     }
   }
 
@@ -161,13 +156,15 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
 
   Future<void> _reloadAttendanceRecords() async {
     if (!mounted) return;
+    final nextGeneration = _attendanceLoadGeneration + 1;
+    _attendanceLoadGeneration = nextGeneration;
     setState(() {
       _page = 0;
       _records = [];
       _hasMore = true;
       _loadingMore = false;
     });
-    await _loadMore();
+    await _loadMore(generation: nextGeneration);
   }
 
   Future<void> _openExportSheet({ExportTemplateId? initialTemplate}) async {
@@ -202,287 +199,79 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     Attendance record,
     String studentName,
   ) async {
-    final service = ref.read(handwritingAnalysisServiceProvider);
-    if (service == null) {
-      AppToast.showError(context, '请先在设置中完成 AI 配置。');
-      return;
-    }
-
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image == null || !mounted) return;
-
-    setState(() => _analyzingImageRecordIds.add(record.id));
-
-    try {
-      final result = await service.analyze(
-        HandwritingAnalysisInput(
-          imageSource: image.path,
-          studentName: studentName,
-        ),
-      );
-      await _saveArtworkImageToAttendance(record, image.path);
-      if (!mounted) return;
-      await showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (sheetContext) => AttendanceAiAnalysisSheet(
-          result: result,
-          onApplySuggestion: () async {
-            final nextPracticeNote = _buildPracticeSuggestionText(result);
-            final applied = await _applyPracticeSuggestion(
-              record,
-              nextPracticeNote,
-              analysisResult: result,
-            );
-            if (applied && sheetContext.mounted) {
-              Navigator.of(sheetContext).pop();
-            }
-          },
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      AppToast.showError(context, '图片分析失败，请稍后重试。');
-    } finally {
-      if (mounted) {
+    await launchAttendanceArtworkAnalysis(
+      context,
+      ref,
+      record: record,
+      studentName: studentName,
+      onStarted: () {
+        if (!mounted) return;
+        setState(() => _analyzingImageRecordIds.add(record.id));
+      },
+      onFinished: () {
+        if (!mounted) return;
         setState(() => _analyzingImageRecordIds.remove(record.id));
-      }
-    }
+      },
+      onAttendanceSaved: _reloadAttendanceRecords,
+    );
   }
 
-  Future<void> _saveArtworkImageToAttendance(
-    Attendance record,
-    String imagePath,
-  ) async {
-    final attendanceDao = ref.read(attendanceDaoProvider);
-    final latestRecord = await attendanceDao.getById(record.id);
-    if (latestRecord == null) {
-      throw StateError('Attendance not found for artwork save');
-    }
+  Widget _buildDetailState({required Widget child}) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: InkWashBackground(child: Center(child: child)),
+    );
+  }
 
-    final storedImagePath = await const AttendanceArtworkStorageService()
-        .replaceArtwork(
-          attendanceId: latestRecord.id,
-          sourceImagePath: imagePath,
-          previousImagePath: latestRecord.artworkImagePath,
-        );
-
-    await attendanceDao.update(
-      latestRecord.copyWith(
-        artworkImagePath: storedImagePath,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
+  Widget _buildMessageState({
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return _buildDetailState(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: GlassCard(
+          padding: const EdgeInsets.all(18),
+          child: EmptyState(
+            message: message,
+            actionLabel: actionLabel,
+            onAction: onAction,
+          ),
+        ),
       ),
     );
-    invalidateAfterAttendanceChange(ref);
-    await _reloadAttendanceRecords();
-  }
-
-  Future<bool> _applyPracticeSuggestion(
-    Attendance record,
-    String suggestion, {
-    HandwritingAnalysisResult? analysisResult,
-  }) async {
-    final normalizedSuggestion = suggestion.trim();
-    if (normalizedSuggestion.isEmpty) {
-      AppToast.showError(
-        context,
-        'AI \u672a\u8fd4\u56de\u53ef\u5199\u5165\u7684\u7ec3\u4e60\u5efa\u8bae\u3002',
-      );
-      return false;
-    }
-
-    try {
-      final attendanceDao = ref.read(attendanceDaoProvider);
-      final latestRecord = await attendanceDao.getById(record.id);
-      if (latestRecord == null) {
-        if (mounted) {
-          AppToast.showError(
-            context,
-            '\u672a\u627e\u5230\u5bf9\u5e94\u7684\u51fa\u52e4\u8bb0\u5f55\uff0c\u65e0\u6cd5\u66f4\u65b0\u7ec3\u4e60\u5efa\u8bae\u3002',
-          );
-        }
-        return false;
-      }
-
-      final oldNote = latestRecord.homePracticeNote?.trim() ?? '';
-      final stamp = formatDate(DateTime.now());
-      final mergedNote = oldNote.isEmpty
-          ? normalizedSuggestion
-          : '$oldNote\n\nAI \u5efa\u8bae\u8bb0\u5f55\u4e8e $stamp\uff1a\n$normalizedSuggestion';
-
-      final updated = latestRecord.copyWith(
-        homePracticeNote: mergedNote,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-      );
-
-      await attendanceDao.update(updated);
-      if (analysisResult != null) {
-        await _saveHandwritingAnalysisToStudentNote(
-          latestRecord,
-          analysisResult,
-        );
-      }
-      invalidateAfterAttendanceChange(ref);
-      await _reloadAttendanceRecords();
-      if (!mounted) return true;
-      AppToast.showSuccess(
-        context,
-        analysisResult == null
-            ? '\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae\u5df2\u66f4\u65b0\u3002'
-            : '\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae\u5df2\u66f4\u65b0\uff0c\u5e76\u5df2\u7eb3\u5165\u5b66\u751f AI \u6d1e\u5bdf\u3002',
-      );
-      return true;
-    } catch (_) {
-      if (mounted) {
-        AppToast.showError(
-          context,
-          analysisResult == null
-              ? '\u66f4\u65b0\u8bfe\u540e\u7ec3\u4e60\u5efa\u8bae\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002'
-              : '\u4fdd\u5b58\u8bfe\u540e\u5efa\u8bae\u6216\u4f5c\u54c1\u5206\u6790\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002',
-        );
-      }
-      return false;
-    }
-  }
-
-  Future<void> _saveHandwritingAnalysisToStudentNote(
-    Attendance record,
-    HandwritingAnalysisResult result,
-  ) async {
-    final studentDao = ref.read(studentDaoProvider);
-    final currentStudent = await studentDao.getById(widget.studentId);
-    if (currentStudent == null) {
-      throw StateError('Student not found for handwriting analysis save');
-    }
-
-    final noteContent = _buildHandwritingAnalysisNoteContent(record, result);
-    final latestContent = AiAnalysisNoteCodec.latestContent(
-      currentStudent.note,
-      type: 'handwriting',
-    );
-    if (latestContent?.trim() == noteContent) {
-      return;
-    }
-
-    final mergedNote = AiAnalysisNoteCodec.appendHandwritingAnalysis(
-      existingNote: currentStudent.note,
-      analysisText: noteContent,
-      analyzedAt: DateTime.now(),
-    );
-
-    await studentDao.update(
-      currentStudent.copyWith(
-        note: mergedNote,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
-    await ref.read(studentProvider.notifier).reload();
-  }
-
-  /*
-  String _buildHandwritingAnalysisNoteContent(
-    Attendance record,
-    HandwritingAnalysisResult result,
-  ) {
-    final lines = <String>[
-      '课堂日期：${record.date} ${record.startTime}-${record.endTime}',
-    ];
-
-    if (result.summary.trim().isNotEmpty) {
-      lines.add('总体概览：${result.summary.trim()}');
-    }
-    if (result.strokeObservation.trim().isNotEmpty) {
-      lines.add('笔画观察：${result.strokeObservation.trim()}');
-    }
-    if (result.structureObservation.trim().isNotEmpty) {
-      lines.add('结构观察：${result.structureObservation.trim()}');
-    }
-    if (result.layoutObservation.trim().isNotEmpty) {
-      lines.add('章法观察：${result.layoutObservation.trim()}');
-    }
-    if (result.practiceSuggestions.isNotEmpty) {
-      lines.add('练习建议：');
-      for (var i = 0; i < result.practiceSuggestions.length; i++) {
-        lines.add('${i + 1}. ${result.practiceSuggestions[i]}');
-      }
-    }
-
-    return lines.join('\n');
-  }
-
-*/
-  String _buildHandwritingAnalysisNoteContent(
-    Attendance record,
-    HandwritingAnalysisResult result,
-  ) {
-    final lines = <String>[
-      '\u8bfe\u5802\u65e5\u671f\uff1a${record.date} ${record.startTime}-${record.endTime}',
-    ];
-
-    if (result.summary.trim().isNotEmpty) {
-      lines.add('\u603b\u4f53\u6982\u89c8\uff1a${result.summary.trim()}');
-    }
-    if (result.strokeObservation.trim().isNotEmpty) {
-      lines.add(
-        '\u7b14\u753b\u89c2\u5bdf\uff1a${result.strokeObservation.trim()}',
-      );
-    }
-    if (result.structureObservation.trim().isNotEmpty) {
-      lines.add(
-        '\u7ed3\u6784\u89c2\u5bdf\uff1a${result.structureObservation.trim()}',
-      );
-    }
-    if (result.layoutObservation.trim().isNotEmpty) {
-      lines.add(
-        '\u7ae0\u6cd5\u89c2\u5bdf\uff1a${result.layoutObservation.trim()}',
-      );
-    }
-    if (result.practiceSuggestions.isNotEmpty) {
-      lines.add('\u7ec3\u4e60\u5efa\u8bae\uff1a');
-      for (var i = 0; i < result.practiceSuggestions.length; i++) {
-        lines.add('${i + 1}. ${result.practiceSuggestions[i]}');
-      }
-    }
-
-    return lines.join('\n');
-  }
-
-  String _buildPracticeSuggestionText(HandwritingAnalysisResult result) {
-    final suggestions = result.practiceSuggestions
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList(growable: false);
-    if (suggestions.isNotEmpty) {
-      return suggestions
-          .asMap()
-          .entries
-          .map((entry) => '${entry.key + 1}. ${entry.value}')
-          .join('\n');
-    }
-
-    final fallbackParts = <String>[
-      result.summary.trim(),
-      result.strokeObservation.trim(),
-      result.structureObservation.trim(),
-      result.layoutObservation.trim(),
-    ].where((item) => item.isNotEmpty);
-
-    return fallbackParts.join('\n');
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final viewPaddingBottom = MediaQuery.of(context).viewPadding.bottom;
-    final students = ref.watch(studentProvider).valueOrNull ?? [];
+    final studentsAsync = ref.watch(studentProvider);
+    if (studentsAsync.hasError && !studentsAsync.hasValue) {
+      return _buildMessageState(
+        message:
+            '\u5b66\u751f\u6863\u6848\u52a0\u8f7d\u5931\u8d25\uff1a${studentsAsync.error}',
+        actionLabel: '\u8fd4\u56de\u5b66\u751f\u5217\u8868',
+        onAction: () => context.go('/students'),
+      );
+    }
+    final students = studentsAsync.valueOrNull;
+    if (students == null) {
+      return _buildDetailState(child: const CircularProgressIndicator());
+    }
     final meta = students
         .where((m) => m.student.id == widget.studentId)
         .firstOrNull;
     final student = meta?.student;
 
     if (student == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return _buildMessageState(
+        message:
+            '\u8be5\u5b66\u751f\u6863\u6848\u4e0d\u5b58\u5728\u6216\u5df2\u88ab\u5220\u9664\u3002',
+        actionLabel: '\u8fd4\u56de\u5b66\u751f\u5217\u8868',
+        onAction: () => context.go('/students'),
+      );
     }
 
     final now = DateTime.now();
@@ -548,7 +337,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                   children: [
-                    // 1. 费用概览（老师最关心）
+                    // 1. 闂備浇宕垫慨鐢稿礉閺囩儑鑰块梺顒€绉撮弸渚€鏌曢崼婵囧婵炵》绻濋弻娑氫沪閸撗咁吋濠电偛鍚嬪Λ鍐蓟閵娿儮妲堟俊顖滃帶閳煡姊洪柅鐐茶嫰閸樺摜绱掗埀顒佹媴閾忓湱鐣堕梺閫炲苯澧撮柡宀嬬節瀹曠厧顫濋鍨棜闂傚倷鑳堕…鍫㈡崲閹版澘鐤悹鎭掑妿缁憋箑螖閿濆懎鏆為柡?
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.finance],
                       child: StudentFinanceOverviewCard(
@@ -560,7 +349,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // 2. 精简档案（姓名/家长/电话/状态，去掉数字指标卡片）
+                    // 2. 缂傚倸鍊风欢锟犲窗閺嶃劍娅犲ù鐘差儐閸嬧晜绻濋棃娑欙紞婵炲瓨鐗犻弻銊モ攽閸℃﹫绱為梺琛″亾闁规儼濮ら悡銉︾箾閹寸儐鐒藉褎娲橀妵鍕敃閿濆繗鈧法鈧?闂備浇顕уù鐑藉箠閹剧粯鍋夊┑鍌滎焾濮?闂傚倷鐒﹀鍨熆閳ь剛绱掗幓鎺濈吋闁?闂傚倷鑳剁划顖炩€﹂崼銉ユ槬闁哄稁鍘奸悞鍨亜閹达絾纭剁紒娑樼箳缁辨帗娼忛妸褏鐤勯悗瑙勬磸閸ㄨ崵妲愰幒鎳崇喖鎼圭拠鈥茬礃闂傚倷娴囧銊╂倿閿曗偓椤灝顫滈埀顒勫箖妤︽妯勫Δ鐘靛仦閸旀瑥鐣烽崼鏇炍╃憸宥夋倶闁秵鈷戦柛娑橆煬濞堬絿绱掓潏銊︾闁哄懎鐖煎浠嬵敇閻斿憡鐝?
                     GlassCard(
                       padding: const EdgeInsets.all(18),
                       child: Row(
@@ -639,7 +428,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    // 3. 缴费记录
+                    // 3. 缂傚倸鍊搁崐鎼佸磹婵犳澶愬箛閺夊灝鐎梺绋挎湰缁秵鍒婃總鍛婄厸濠㈣泛瀛╃涵鍓佺磼?
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.payments],
                       child: Column(
@@ -688,19 +477,16 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    // 4. 出勤记录
+                    // 4. 闂傚倷绀侀幉锟犲垂閻㈢绠规い鎰╁€愰崑鎾愁潩閸楃偞鐏侀梺鐟板槻椤戝顕ｉ崜浣瑰磯闁靛鐏?
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.attendance],
                       child: Column(
                         children: [
-                          KeyedSubtree(
-                            key: _sectionKeys[_StudentDetailAnchor.attendance],
-                            child: _SectionHeader(
-                              title: '\u51fa\u52e4\u8bb0\u5f55',
-                              subtitle:
-                                  '\u70b9\u51fb\u8bb0\u5f55\u53ef\u7f16\u8f91\u51fa\u52e4\u72b6\u6001\u3001\u5907\u6ce8\u548c\u8bfe\u5802\u53cd\u9988\u3002',
-                              trailing: attendanceCountLabel,
-                            ),
+                          _SectionHeader(
+                            title: '\u51fa\u52e4\u8bb0\u5f55',
+                            subtitle:
+                                '\u70b9\u51fb\u8bb0\u5f55\u53ef\u7f16\u8f91\u51fa\u52e4\u72b6\u6001\u3001\u5907\u6ce8\u548c\u8bfe\u5802\u53cd\u9988\u3002',
+                            trailing: attendanceCountLabel,
                           ),
                           const SizedBox(height: 10),
                           if (_records.isEmpty && !_hasMore)
@@ -719,7 +505,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                 padding: EdgeInsets.only(
                                   bottom: record == _records.last ? 0 : 10,
                                 ),
-                                child: _AttendanceCard(
+                                child: StudentAttendanceRecordCard(
                                   record: record,
                                   analyzingImage: _analyzingImageRecordIds
                                       .contains(record.id),
@@ -731,8 +517,14 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                     await showModalBottomSheet(
                                       context: context,
                                       isScrollControlled: true,
-                                      builder: (_) =>
-                                          AttendanceEditSheet(record: record),
+                                      builder: (_) => AttendanceEditSheet(
+                                        record: record,
+                                        onAnalyzeArtwork: () =>
+                                            _analyzeAttendanceImage(
+                                              record,
+                                              student.name,
+                                            ),
+                                      ),
                                     );
                                     await _reloadAttendanceRecords();
                                   },
@@ -743,7 +535,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    // 5. 操作面板（置后，次要入口）
+                    // 5. 闂傚倷鑳堕幊鎾绘倶濠靛牏鐭撶€规洖娲ㄧ粈濠囨煛閸愩劎澧涙い銉ョ墦閺屾洝绠涙繝鍌氣拤缂備浇鍩栭悡锟犲蓟閵娿儮妲堟俊顖滃帶閳亶姊哄Ч鍥р偓鏇炍涘┑鍡欐殾闁靛闄勯崕鐔搞亜閺嶃劎鐭屾い锔诲枛閳规垿鎮欓崣澶屼槐闂侀潧鐗嗙€涒晠鎯屽Δ鍛拺缂佸娉曠粻鐐烘煕鎼淬倗绨块柕鍥ㄥ姇閳藉濮€閳╁啯鐝?
                     StudentPrimaryActionsCard(
                       onOpenPayment: () => _openPaymentSheet(student),
                       onOpenAttendance: () =>
@@ -774,7 +566,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             size: 20,
                           ),
                           title: Text(
-                            'AI 分析与沟通工具',
+                            'AI \u5206\u6790\u4e0e\u6c9f\u901a\u5de5\u5177',
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
@@ -787,8 +579,9 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                   child: CircularProgressIndicator(),
                                 ),
                               ),
-                              error: (error, _) =>
-                                  Text('成长摘要加载失败：$error'),
+                              error: (error, _) => Text(
+                                '\u52a0\u8f7d AI \u6d1e\u5bdf\u5931\u8d25\uff1a$error',
+                              ),
                               data: (allFee) {
                                 return StudentGrowthWorkbenchCard(
                                   summary: growthSummary,
@@ -846,7 +639,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
               child: FloatingActionButton.small(
                 heroTag: 'student-detail-scroll-top',
                 onPressed: _scrollToTop,
-                tooltip: '回到顶部',
+                tooltip: '\u56de\u5230\u9876\u90e8',
                 backgroundColor: Colors.white.withValues(alpha: 0.92),
                 foregroundColor: kPrimaryBlue,
                 elevation: 0,
@@ -1095,7 +888,7 @@ class _PaymentCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    _DetailMetaChip(
+                    StudentDetailMetaChip(
                       icon: Icons.calendar_today_outlined,
                       label: payment.paymentDate,
                     ),
@@ -1113,313 +906,6 @@ class _PaymentCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _AttendanceCard extends StatelessWidget {
-  final Attendance record;
-  final VoidCallback onTap;
-  final VoidCallback onAnalyzeImage;
-  final bool analyzingImage;
-
-  const _AttendanceCard({
-    required this.record,
-    required this.onTap,
-    required this.onAnalyzeImage,
-    required this.analyzingImage,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final statusColorValue = statusColor(record.status);
-    final progressItems = _buildProgressItems(record);
-    final startTime = parseTime(record.startTime);
-    final endTime = parseTime(record.endTime);
-    final minutes =
-        (endTime.hour * 60 + endTime.minute) -
-        (startTime.hour * 60 + startTime.minute);
-    final durationLabel = minutes <= 0
-        ? '\u65f6\u957f\u5f85\u5b9a'
-        : minutes < 60
-        ? '$minutes \u5206\u949f'
-        : minutes % 60 == 0
-        ? '${minutes ~/ 60} \u5c0f\u65f6'
-        : '${minutes ~/ 60} \u5c0f\u65f6 ${minutes % 60} \u5206\u949f';
-
-    return GlassCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(16),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 420;
-          final analysisAction = Container(
-            decoration: BoxDecoration(
-              color: kPrimaryBlue.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              tooltip: '\u5206\u6790\u5b57\u5e16\u56fe\u7247',
-              onPressed: analyzingImage ? null : onAnalyzeImage,
-              icon: analyzingImage
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.camera_alt_outlined),
-              color: kPrimaryBlue,
-              visualDensity: VisualDensity.compact,
-            ),
-          );
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 46,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: statusColorValue.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.schedule_outlined,
-                      color: statusColorValue,
-                      size: 18,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      statusLabel(record.status),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: statusColorValue,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            record.date,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (compact) analysisAction,
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _DetailMetaChip(
-                          icon: Icons.access_time_outlined,
-                          label: '${record.startTime} - ${record.endTime}',
-                        ),
-                        _DetailMetaChip(
-                          icon: Icons.timelapse_outlined,
-                          label: durationLabel,
-                        ),
-                        _DetailMetaChip(
-                          icon: Icons.payments_outlined,
-                          label: '\u00a5${record.feeAmount.toStringAsFixed(2)}',
-                        ),
-                      ],
-                    ),
-                    if (record.note?.isNotEmpty ?? false) ...[
-                      const SizedBox(height: 8),
-                      Text(record.note!, style: theme.textTheme.bodySmall),
-                    ],
-                    if (record.artworkImagePath?.trim().isNotEmpty ??
-                        false) ...[
-                      const SizedBox(height: 8),
-                      AttendanceArtworkPreview(
-                        imagePath: record.artworkImagePath!,
-                        title: '本次课堂作品',
-                      ),
-                    ],
-                    if (record.lessonFocusTags.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: record.lessonFocusTags
-                            .map(
-                              (tag) => _DetailMetaChip(
-                                icon: Icons.auto_awesome_outlined,
-                                label: tag,
-                                color: kSealRed,
-                              ),
-                            )
-                            .toList(growable: false),
-                      ),
-                    ],
-                    if (record.homePracticeNote?.isNotEmpty ?? false) ...[
-                      const SizedBox(height: 8),
-                      _FeedbackBlock(
-                        icon: Icons.edit_note_outlined,
-                        title: '\u8bfe\u540e\u7ec3\u4e60',
-                        content: record.homePracticeNote!,
-                        color: kPrimaryBlue,
-                      ),
-                    ],
-                    if (progressItems.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: progressItems
-                            .map(
-                              (item) => _DetailMetaChip(
-                                icon: Icons.trending_up_outlined,
-                                label: item,
-                                color: kGreen,
-                              ),
-                            )
-                            .toList(growable: false),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (!compact) ...[const SizedBox(width: 10), analysisAction],
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _DetailMetaChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color? color;
-
-  const _DetailMetaChip({required this.icon, required this.label, this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final resolvedColor = color ?? kInkSecondary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color == null
-            ? Colors.white.withValues(alpha: 0.72)
-            : resolvedColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color == null
-              ? kInkSecondary.withValues(alpha: 0.1)
-              : resolvedColor.withValues(alpha: 0.14),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: resolvedColor),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color == null ? null : resolvedColor,
-              fontWeight: color == null ? null : FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeedbackBlock extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String content;
-  final Color color;
-
-  const _FeedbackBlock({
-    required this.icon,
-    required this.title,
-    required this.content,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  content,
-                  style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-List<String> _buildProgressItems(Attendance record) {
-  final scores = record.progressScores;
-  if (scores == null || scores.isEmpty) return const <String>[];
-
-  final result = <String>[];
-  if (scores.strokeQuality != null) {
-    result.add(
-      '\u7b14\u753b\u8d28\u91cf\uff1a${scores.strokeQuality!.toStringAsFixed(1)}',
-    );
-  }
-  if (scores.structureAccuracy != null) {
-    result.add(
-      '\u7ed3\u6784\u51c6\u786e\u5ea6\uff1a${scores.structureAccuracy!.toStringAsFixed(1)}',
-    );
-  }
-  if (scores.rhythmConsistency != null) {
-    result.add(
-      '\u8282\u594f\u7a33\u5b9a\u6027\uff1a${scores.rhythmConsistency!.toStringAsFixed(1)}',
-    );
-  }
-  return result;
 }
 
 class _DangerActionButton extends StatelessWidget {
