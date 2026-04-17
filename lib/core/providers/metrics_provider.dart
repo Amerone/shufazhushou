@@ -27,11 +27,17 @@ class MetricsNotifier extends AsyncNotifier<MetricsData> {
     final range = ref.watch(statisticsPeriodProvider);
     final attendanceDao = ref.read(attendanceDaoProvider);
     final paymentDao = ref.read(paymentDaoProvider);
-    final m = await attendanceDao.getMetrics(range.from, range.to);
-    final totalReceived = await paymentDao.getTotalByDateRange(
+    final metricsFuture = attendanceDao.getMetrics(range.from, range.to);
+    final totalReceivedFuture = paymentDao.getTotalByDateRange(
       range.from,
       range.to,
     );
+    final results = await Future.wait<Object?>([
+      metricsFuture,
+      totalReceivedFuture,
+    ]);
+    final m = results[0] as Map<String, dynamic>;
+    final totalReceived = results[1] as double;
     return MetricsData(
       totalReceivable: (m['totalFee'] as num?)?.toDouble() ?? 0,
       totalReceived: totalReceived,

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import 'interaction_feedback.dart';
@@ -9,7 +9,11 @@ class AppToast {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+            const Icon(
+              Icons.check_circle_outline,
+              color: Colors.white,
+              size: 18,
+            ),
             const SizedBox(width: 8),
             Expanded(child: Text(msg)),
           ],
@@ -66,7 +70,9 @@ class AppToast {
               foregroundColor: kRed,
               backgroundColor: kRed.withValues(alpha: 0.08),
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
             onPressed: () async {
               await InteractionFeedback.selection(dialogCtx);
@@ -126,17 +132,14 @@ class AppToast {
               const SizedBox(height: 16),
               Text(
                 title,
-                style: Theme.of(dialogCtx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(
+                  dialogCtx,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 10),
-              Text(
-                message,
-                style: Theme.of(dialogCtx).textTheme.bodyMedium,
-              ),
+              Text(message, style: Theme.of(dialogCtx).textTheme.bodyMedium),
               const SizedBox(height: 20),
-              Row(
-                children: actions(dialogCtx),
-              ),
+              Row(children: actions(dialogCtx)),
             ],
           ),
         ),

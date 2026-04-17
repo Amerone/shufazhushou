@@ -19,11 +19,17 @@ class RevenueNotifier extends AsyncNotifier<RevenueData> {
     final range = ref.watch(statisticsPeriodProvider);
     final attendanceDao = ref.read(attendanceDaoProvider);
     final paymentDao = ref.read(paymentDaoProvider);
-    final receivable = await attendanceDao.getMonthlyRevenue(
+    final receivableFuture = attendanceDao.getMonthlyRevenue(
       range.from,
       range.to,
     );
-    final received = await paymentDao.getMonthlyReceived(range.from, range.to);
+    final receivedFuture = paymentDao.getMonthlyReceived(range.from, range.to);
+    final results = await Future.wait<Object?>([
+      receivableFuture,
+      receivedFuture,
+    ]);
+    final receivable = results[0] as List<Map<String, dynamic>>;
+    final received = results[1] as List<Map<String, dynamic>>;
     return RevenueData(
       monthlyReceivable: receivable,
       monthlyReceived: received,

@@ -27,7 +27,7 @@ class SignatureScreen extends ConsumerWidget {
           children: [
             PageHeader(
               title: '签名管理',
-              subtitle: '上传教师签名，用于 PDF 报告和导出资料的落款区域。',
+              subtitle: '用于 PDF 报告落款。',
               onBack: () => context.pop(),
             ),
             Expanded(
@@ -82,15 +82,6 @@ class SignatureScreen extends ConsumerWidget {
                                             ?.copyWith(
                                               fontWeight: FontWeight.w700,
                                             ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        hasFile
-                                            ? '当前签名会用于报告落款，重新上传后会立即替换。'
-                                            : '上传后会自动用于 PDF 报告和导出资料的落款区域。',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall,
                                       ),
                                     ],
                                   ),
@@ -164,9 +155,6 @@ class SignatureScreen extends ConsumerWidget {
                             const SizedBox(height: 16),
                             _SignatureSectionHeader(
                               title: '预览区域',
-                              subtitle: hasFile
-                                  ? '确认签名清晰度和横向比例，导出时会直接复用。'
-                                  : '上传后会在这里展示当前签名效果。',
                               trailing: hasFile ? '本地文件' : '暂无文件',
                             ),
                             const SizedBox(height: 12),
@@ -215,7 +203,7 @@ class SignatureScreen extends ConsumerWidget {
                                             ),
                                           ),
                                           Text(
-                                            '建议横向',
+                                            '横向更清晰',
                                             style: Theme.of(
                                               context,
                                             ).textTheme.bodySmall,
@@ -419,7 +407,7 @@ class SignatureScreen extends ConsumerWidget {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            '如果需要更换签名，可直接重新上传；删除后导出报告将不再显示签名。',
+                                            '删除后导出报告将不再显示签名。',
                                             style: Theme.of(
                                               context,
                                             ).textTheme.bodySmall,
@@ -437,7 +425,7 @@ class SignatureScreen extends ConsumerWidget {
                                       children: [
                                         Expanded(
                                           child: Text(
-                                            '如果需要更换签名，可直接重新上传；删除后导出报告将不再显示签名。',
+                                            '删除后导出报告将不再显示签名。',
                                             style: Theme.of(
                                               context,
                                             ).textTheme.bodySmall,
@@ -513,12 +501,12 @@ class SignatureScreen extends ConsumerWidget {
 
 class _SignatureSectionHeader extends StatelessWidget {
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final String? trailing;
 
   const _SignatureSectionHeader({
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     this.trailing,
   });
 
@@ -543,8 +531,13 @@ class _SignatureSectionHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: theme.textTheme.bodySmall),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle!,
+                      style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -566,6 +559,70 @@ class _SignatureSectionHeader extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _SignatureTag extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SignatureTag({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SignatureHintLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _SignatureHintLine({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: kInkSecondary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(height: 1.45),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -611,64 +668,6 @@ class _SignatureMetric extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SignatureTag extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _SignatureTag({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SignatureHintLine extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _SignatureHintLine({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: kInkSecondary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(text, style: Theme.of(context).textTheme.bodySmall),
-        ),
-      ],
     );
   }
 }

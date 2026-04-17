@@ -34,9 +34,7 @@ class BrushStrokeDivider extends StatelessWidget {
 class _BrushStrokePainter extends CustomPainter {
   final Color color;
 
-  const _BrushStrokePainter({
-    required this.color,
-  });
+  const _BrushStrokePainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {

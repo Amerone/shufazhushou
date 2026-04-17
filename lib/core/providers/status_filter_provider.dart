@@ -9,7 +9,9 @@ final statusFilterProvider = StateProvider<String?>((ref) => null);
 /// Watches [statusFilterProvider] and [statisticsPeriodProvider] to query
 /// attendance records for a specific status in the current time range.
 /// Returns empty list when no status is selected.
-final filteredAttendanceProvider = FutureProvider<List<Attendance>>((ref) async {
+final filteredAttendanceProvider = FutureProvider<List<Attendance>>((
+  ref,
+) async {
   final status = ref.watch(statusFilterProvider);
   if (status == null) return [];
 

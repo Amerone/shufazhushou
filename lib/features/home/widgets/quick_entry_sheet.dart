@@ -7,7 +7,6 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/dao/student_dao.dart';
 import '../../../core/models/attendance.dart';
 import '../../../core/models/structured_attendance_feedback.dart';
-import '../../../core/models/student.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/class_template_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
@@ -258,24 +257,21 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           .where((m) => _selectedIds.contains(m.student.id))
           .toList();
 
-      final allStudents = students.map((m) => m.student).toList();
-      final displayNames = buildDisplayNameMap(allStudents);
-      final conflicts = <String>[];
-      final conflictIds =
-          <String, String>{}; // studentId -> conflicting attendance id
-
-      for (final m in selectedStudents) {
-        final conflict = await dao.findConflict(
-          m.student.id,
-          _dateStr(),
-          _startTime,
-          _endTime,
-        );
-        if (conflict != null) {
-          conflicts.add(displayNames[m.student.id] ?? m.student.name);
-          conflictIds[m.student.id] = conflict.id;
-        }
-      }
+      final displayNames = ref.read(studentDisplayNameMapProvider);
+      final conflictRecords = await dao.findConflictsForStudents(
+        selectedStudents.map((m) => m.student.id),
+        _dateStr(),
+        _startTime,
+        _endTime,
+      );
+      final conflictIds = {
+        for (final entry in conflictRecords.entries) entry.key: entry.value.id,
+      };
+      final conflicts = [
+        for (final m in selectedStudents)
+          if (conflictRecords.containsKey(m.student.id))
+            (displayNames[m.student.id] ?? m.student.name),
+      ];
 
       if (conflicts.isNotEmpty && mounted) {
         final ok = await AppToast.showConfirm(
@@ -383,10 +379,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      [
-                        '搜索并批量勾选本次需要记课的学员。',
-                        '设置日期、时间和出勤状态，确认后直接保存。',
-                      ][_step],
+                      ['搜索并批量勾选本次需要记课的学员。', '设置日期、时间和出勤状态，确认后直接保存。'][_step],
                       style: theme.textTheme.bodySmall,
                       textAlign: TextAlign.center,
                     ),
@@ -414,12 +407,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   ),
                 ),
               ),
-              Expanded(
-                child: [
-                  _buildStep0(controller),
-                  _buildStep1(),
-                ][_step],
-              ),
+              Expanded(child: [_buildStep0(controller), _buildStep1()][_step]),
             ],
           ),
         ),
@@ -440,9 +428,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 (m.student.parentPhone?.contains(_searchQuery) ?? false);
           }).toList();
 
-    final displayNames = buildDisplayNameMap(
-      filtered.map((m) => m.student).toList(),
-    );
+    final displayNames = ref.watch(studentDisplayNameMapProvider);
     final filteredIds = filtered.map((m) => m.student.id).toSet();
     final allFilteredSelected =
         filteredIds.isNotEmpty &&
@@ -989,10 +975,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           child: ExpansionTile(
             tilePadding: const EdgeInsets.symmetric(horizontal: 4),
             childrenPadding: const EdgeInsets.only(top: 4),
-            title: Text(
-              '课堂反馈（可选）',
-              style: theme.textTheme.titleSmall,
-            ),
+            title: Text('课堂反馈（可选）', style: theme.textTheme.titleSmall),
             children: [
               Align(
                 alignment: Alignment.centerLeft,
@@ -1096,7 +1079,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
               ),
               _QuickInfoPill(
                 icon: Icons.payments_outlined,
-                label: '预计 ¥${_formatAmount(_estimatedTotalFee(_selectedStudentsFrom(ref.read(studentProvider).valueOrNull ?? [])))}',
+                label:
+                    '预计 ¥${_formatAmount(_estimatedTotalFee(_selectedStudentsFrom(ref.read(studentProvider).valueOrNull ?? [])))}',
                 color: kPrimaryBlue,
               ),
             ],
@@ -1138,7 +1122,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       ],
     );
   }
-
 }
 
 class _QuickActionChip extends StatelessWidget {

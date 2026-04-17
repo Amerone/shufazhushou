@@ -5,15 +5,15 @@ import '../models/qwen_vision_config.dart';
 import '../services/sensitive_settings_store.dart';
 import 'database_provider.dart';
 
-final settingsDaoProvider = Provider((ref) =>
-    SettingsDao(ref.watch(databaseProvider)));
+final settingsDaoProvider = Provider(
+  (ref) => SettingsDao(ref.watch(databaseProvider)),
+);
 
-final sensitiveSettingsStoreProvider =
-    Provider((ref) => SensitiveSettingsStore());
+final sensitiveSettingsStoreProvider = Provider(
+  (ref) => SensitiveSettingsStore(),
+);
 
-const _sensitiveSettingKeys = <String>{
-  QwenVisionConfig.settingApiKey,
-};
+const _sensitiveSettingKeys = <String>{QwenVisionConfig.settingApiKey};
 
 class SettingsNotifier extends AsyncNotifier<Map<String, String>> {
   @override
@@ -21,9 +21,7 @@ class SettingsNotifier extends AsyncNotifier<Map<String, String>> {
     final dao = ref.watch(settingsDaoProvider);
     final sensitiveStore = ref.watch(sensitiveSettingsStoreProvider);
     final settings = await dao.getAll();
-    final sensitive = {
-      ...await sensitiveStore.readAll(),
-    };
+    final sensitive = {...await sensitiveStore.readAll()};
 
     for (final key in _sensitiveSettingKeys) {
       final dbValue = settings[key]?.trim();
@@ -77,4 +75,5 @@ class SettingsNotifier extends AsyncNotifier<Map<String, String>> {
 
 final settingsProvider =
     AsyncNotifierProvider<SettingsNotifier, Map<String, String>>(
-        SettingsNotifier.new);
+      SettingsNotifier.new,
+    );

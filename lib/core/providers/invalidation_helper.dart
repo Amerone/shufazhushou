@@ -16,7 +16,9 @@ import 'student_provider.dart';
 void invalidateAfterAttendanceChange(WidgetRef ref) {
   ref.invalidate(studentProvider);
   ref.invalidate(attendanceProvider);
+  ref.invalidate(allAttendanceByStudentProvider);
   ref.invalidate(feeSummaryProvider);
+  ref.invalidate(allPaymentsByStudentProvider);
   ref.invalidate(metricsProvider);
   ref.invalidate(revenueProvider);
   ref.invalidate(contributionProvider);
@@ -29,6 +31,7 @@ void invalidateAfterAttendanceChange(WidgetRef ref) {
 /// Invalidate providers after a payment is created or deleted.
 void invalidateAfterPaymentChange(WidgetRef ref) {
   ref.invalidate(feeSummaryProvider);
+  ref.invalidate(allPaymentsByStudentProvider);
   ref.invalidate(revenueProvider);
   ref.invalidate(insightProvider);
   ref.invalidate(homeWorkbenchProvider);
@@ -38,7 +41,9 @@ void invalidateAfterPaymentChange(WidgetRef ref) {
 void invalidateAfterStudentDelete(WidgetRef ref) {
   ref.invalidate(studentProvider);
   ref.invalidate(attendanceProvider);
+  ref.invalidate(allAttendanceByStudentProvider);
   ref.invalidate(feeSummaryProvider);
+  ref.invalidate(allPaymentsByStudentProvider);
   ref.invalidate(metricsProvider);
   ref.invalidate(revenueProvider);
   ref.invalidate(contributionProvider);
@@ -52,6 +57,8 @@ void invalidateAfterStudentDelete(WidgetRef ref) {
 void invalidateAfterStudentChange(WidgetRef ref) {
   ref.invalidate(studentProvider);
   ref.invalidate(feeSummaryProvider);
+  ref.invalidate(allAttendanceByStudentProvider);
+  ref.invalidate(allPaymentsByStudentProvider);
   ref.invalidate(contributionProvider);
   ref.invalidate(insightProvider);
   ref.invalidate(homeWorkbenchProvider);
@@ -60,6 +67,8 @@ void invalidateAfterStudentChange(WidgetRef ref) {
 /// Invalidate all statistics-related providers (for refresh on statistics page).
 void invalidateStatistics(WidgetRef ref) {
   ref.invalidate(attendanceProvider);
+  ref.invalidate(allAttendanceByStudentProvider);
+  ref.invalidate(allPaymentsByStudentProvider);
   ref.invalidate(metricsProvider);
   ref.invalidate(revenueProvider);
   ref.invalidate(contributionProvider);
@@ -73,7 +82,9 @@ void invalidateStatistics(WidgetRef ref) {
 void invalidateAll(WidgetRef ref) {
   ref.invalidate(studentProvider);
   ref.invalidate(attendanceProvider);
+  ref.invalidate(allAttendanceByStudentProvider);
   ref.invalidate(feeSummaryProvider);
+  ref.invalidate(allPaymentsByStudentProvider);
   ref.invalidate(metricsProvider);
   ref.invalidate(revenueProvider);
   ref.invalidate(contributionProvider);

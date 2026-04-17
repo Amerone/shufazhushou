@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -77,9 +77,7 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
   }
 
   Widget _buildOptionSection(
-    BuildContext context,
     String title,
-    String subtitle,
     Map<String, String> options,
     String currentValue,
     Function(String) onChanged,
@@ -97,10 +95,7 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SealSectionHeader(
-                title: title,
-                subtitle: subtitle,
-              ),
+              _SealSectionHeader(title: title),
               const SizedBox(height: 14),
               Wrap(
                 spacing: 12,
@@ -110,13 +105,22 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
                   return ChoiceChip(
                     label: Text(entry.value),
                     selected: selected,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     backgroundColor: Colors.white.withValues(alpha: 0.5),
                     selectedColor: kPrimaryBlue.withValues(alpha: 0.1),
-                    side: BorderSide(color: selected ? kPrimaryBlue : kInkSecondary.withValues(alpha: 0.2)),
+                    side: BorderSide(
+                      color: selected
+                          ? kPrimaryBlue
+                          : kInkSecondary.withValues(alpha: 0.2),
+                    ),
                     labelStyle: TextStyle(
                       color: selected ? kPrimaryBlue : kInkSecondary,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+                      fontWeight: selected
+                          ? FontWeight.w700
+                          : FontWeight.normal,
                     ),
                     onSelected: (_) => onChanged(entry.key),
                   );
@@ -140,7 +144,7 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
           children: [
             PageHeader(
               title: '印章样式',
-              subtitle: '印章会显示在启动页和导出报告封面。',
+              subtitle: '用于启动页和报告封面。',
               onBack: () => context.pop(),
             ),
             Expanded(
@@ -150,7 +154,8 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
                 data: (settings) {
                   _initFromSettings(settings);
                   return ListView(
-                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                     children: [
                       GlassCard(
@@ -164,7 +169,9 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.78),
                                 borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
+                                border: Border.all(
+                                  color: kInkSecondary.withValues(alpha: 0.1),
+                                ),
                               ),
                               child: Center(
                                 child: SealStampWidget(
@@ -176,10 +183,7 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
                             final summary = Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const _SealSectionHeader(
-                                  title: '实时预览',
-                                  subtitle: '保存前先确认印章的文字、结构与边框气质，启动页和报告封面会直接使用这套效果。',
-                                ),
+                                const _SealSectionHeader(title: '实时预览'),
                                 const SizedBox(height: 16),
                                 Wrap(
                                   spacing: 8,
@@ -187,17 +191,26 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
                                   children: [
                                     _SealInfoBadge(
                                       icon: Icons.font_download_outlined,
-                                      label: _optionLabel(_fontOptions, _config.fontStyle),
+                                      label: _optionLabel(
+                                        _fontOptions,
+                                        _config.fontStyle,
+                                      ),
                                       color: kSealRed,
                                     ),
                                     _SealInfoBadge(
                                       icon: Icons.grid_view_rounded,
-                                      label: _optionLabel(_layoutOptions, _config.layout),
+                                      label: _optionLabel(
+                                        _layoutOptions,
+                                        _config.layout,
+                                      ),
                                       color: kPrimaryBlue,
                                     ),
                                     _SealInfoBadge(
                                       icon: Icons.crop_square_outlined,
-                                      label: _optionLabel(_borderOptions, _config.border),
+                                      label: _optionLabel(
+                                        _borderOptions,
+                                        _config.border,
+                                      ),
                                       color: kGreen,
                                     ),
                                   ],
@@ -210,15 +223,11 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
                                 const SizedBox(height: 4),
                                 Text(
                                   _config.text,
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
                                         fontWeight: FontWeight.w800,
                                         color: kSealRed,
                                       ),
-                                ),
-                                const SizedBox(height: 14),
-                                const _SealHintRow(
-                                  icon: Icons.layers_outlined,
-                                  text: '印章与签名相互独立，可分别优化品牌识别与报告落款效果。',
                                 ),
                               ],
                             );
@@ -251,10 +260,7 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const _SealSectionHeader(
-                              title: '文字与样式',
-                              subtitle: '建议使用 2-4 个字，过长会削弱印章识别度；下面的选项会实时反映到上方预览。',
-                            ),
+                            const _SealSectionHeader(title: '文字与样式'),
                             const SizedBox(height: 16),
                             Wrap(
                               spacing: 8,
@@ -264,11 +270,6 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
                                   icon: Icons.spellcheck_outlined,
                                   label: '${_config.text.length}/4 字',
                                   color: kPrimaryBlue,
-                                ),
-                                const _SealInfoBadge(
-                                  icon: Icons.refresh_outlined,
-                                  label: '留空时回退默认印章',
-                                  color: kInkSecondary,
                                 ),
                               ],
                             ),
@@ -283,52 +284,48 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
                                 prefixIcon: Icon(Icons.edit_note_outlined),
                               ),
                               onChanged: (value) {
-                                setState(() => _config = _config.copyWith(text: value.isNotEmpty ? value : kDefaultSealText));
+                                setState(
+                                  () => _config = _config.copyWith(
+                                    text: value.isNotEmpty
+                                        ? value
+                                        : kDefaultSealText,
+                                  ),
+                                );
                               },
                             ),
                             const SizedBox(height: 24),
                             _buildOptionSection(
-                              context,
                               '字体',
-                              '字体会直接影响印章线条气质与整体古意。',
                               _fontOptions,
                               _config.fontStyle,
-                              (v) => setState(() => _config = _config.copyWith(fontStyle: v)),
+                              (v) => setState(
+                                () => _config = _config.copyWith(fontStyle: v),
+                              ),
                             ),
                             const SizedBox(height: 24),
                             _buildOptionSection(
-                              context,
                               '布局',
-                              '布局决定字位分布，适合搭配不同字数和视觉重心。',
                               _layoutOptions,
                               _config.layout,
-                              (v) => setState(() => _config = _config.copyWith(layout: v)),
+                              (v) => setState(
+                                () => _config = _config.copyWith(layout: v),
+                              ),
                             ),
                             const SizedBox(height: 24),
                             _buildOptionSection(
-                              context,
                               '边框',
-                              '边框会改变印章轮廓气质，适合根据报告风格做取舍。',
                               _borderOptions,
                               _config.border,
-                              (v) => setState(() => _config = _config.copyWith(border: v)),
-                            ),
-                            const SizedBox(height: 20),
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: kSealRed.withValues(alpha: 0.06),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const _SealHintRow(
-                                icon: Icons.info_outline,
-                                text: '保存后会立即影响启动页和后续导出文件，已生成的历史文件不会自动重绘。',
+                              (v) => setState(
+                                () => _config = _config.copyWith(border: v),
                               ),
                             ),
                             const SizedBox(height: 18),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                               ),
                               onPressed: _save,
                               icon: const Icon(Icons.save_outlined),
@@ -351,12 +348,8 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
 
 class _SealSectionHeader extends StatelessWidget {
   final String title;
-  final String subtitle;
 
-  const _SealSectionHeader({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SealSectionHeader({required this.title});
 
   @override
   Widget build(BuildContext context) {
@@ -367,12 +360,9 @@ class _SealSectionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: theme.textTheme.bodySmall,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ],
     );
@@ -408,39 +398,12 @@ class _SealInfoBadge extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: textColor,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: textColor,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SealHintRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _SealHintRow({
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: kInkSecondary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-      ],
     );
   }
 }

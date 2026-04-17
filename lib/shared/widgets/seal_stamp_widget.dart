@@ -6,11 +6,7 @@ class SealStampWidget extends StatelessWidget {
   final SealConfig config;
   final double size;
 
-  const SealStampWidget({
-    super.key,
-    required this.config,
-    this.size = 64,
-  });
+  const SealStampWidget({super.key, required this.config, this.size = 64});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +15,9 @@ class SealStampWidget extends StatelessWidget {
     final isInverted = config.isInverted;
     final bgColor = isInverted ? kSealRed : Colors.transparent;
     final textColor = isInverted ? Colors.white : kSealRed;
-    final fontWeight = config.layout == 'fine_red' ? FontWeight.w300 : FontWeight.w400;
+    final fontWeight = config.layout == 'fine_red'
+        ? FontWeight.w300
+        : FontWeight.w400;
 
     return Transform.rotate(
       angle: -0.08,

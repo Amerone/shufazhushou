@@ -30,7 +30,7 @@ class TemplateScreen extends ConsumerWidget {
           children: [
             PageHeader(
               title: '课堂模板',
-              subtitle: '预设常用上课时段，记课时可直接快速选择。',
+              subtitle: '记课时可快速套用。',
               onBack: () => context.pop(),
             ),
             Expanded(
@@ -287,18 +287,12 @@ class TemplateScreen extends ConsumerWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '为常用上课时段创建快捷入口，记课时可以直接套用。',
-                    style: Theme.of(stCtx).textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
                   const SizedBox(height: 24),
                   TextField(
                     controller: nameCtrl,
                     decoration: InputDecoration(
                       labelText: '模板名称',
-                      hintText: '例如：早班、晚班、周末提高班',
+                      hintText: '例如：晚班',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -459,10 +453,11 @@ class _TemplateTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: kPrimaryBlue.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.14)),
       ),
       child: Text(
         label,

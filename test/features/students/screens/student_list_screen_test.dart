@@ -84,6 +84,39 @@ void main() {
     expect(find.textContaining('1 / 3'), findsNothing);
     expect(find.byIcon(Icons.close), findsNothing);
   });
+
+  testWidgets('search empty state names the query', (tester) async {
+    _FakeStudentNotifier.seededStudents = _seededStudents;
+
+    await _pumpScreen(tester);
+
+    await tester.enterText(find.byType(TextField), 'Missing');
+    await _settleUi(tester);
+
+    expect(find.text('没有找到“Missing”'), findsOneWidget);
+    expect(find.text('重置筛选'), findsWidgets);
+  });
+
+  testWidgets('student cards expose clear accessibility labels', (
+    tester,
+  ) async {
+    _FakeStudentNotifier.seededStudents = _seededStudents;
+    final semantics = tester.ensureSemantics();
+    try {
+      await _pumpScreen(tester);
+      final verticalScrollable = find.byType(Scrollable).first;
+      await tester.drag(verticalScrollable, const Offset(0, -420));
+      await _settleUi(tester);
+
+      expect(
+        find.bySemanticsLabel(RegExp('Alice.*轻触查看学生档案'), skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('编辑Alice'), findsOneWidget);
+    } finally {
+      semantics.dispose();
+    }
+  });
 }
 
 final _seededStudents = [

@@ -6,6 +6,7 @@ import '../../../core/models/export_template.dart';
 import '../../../core/providers/home_workbench_provider.dart';
 import '../../../core/services/home_workbench_service.dart';
 import '../../../shared/theme.dart';
+import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../students/widgets/student_action_launcher.dart';
 
@@ -16,6 +17,9 @@ class HomeWorkbenchPanel extends ConsumerWidget {
     BuildContext context,
     HomeWorkbenchTask task,
   ) async {
+    await InteractionFeedback.selection(context);
+    if (!context.mounted) return;
+
     final studentId = task.studentId;
     switch (task.type) {
       case HomeWorkbenchTaskType.debt:
@@ -67,21 +71,11 @@ class HomeWorkbenchPanel extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '优先待办',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '只保留最需要立刻处理的事项，避免首页信息堆叠。',
-                      style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
-                    ),
-                  ],
+                child: Text(
+                  '优先待办',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -129,7 +123,11 @@ class HomeWorkbenchPanel extends ConsumerWidget {
                   if (hiddenCount > 0) ...[
                     const SizedBox(height: 8),
                     TextButton.icon(
-                      onPressed: () => context.push('/statistics'),
+                      onPressed: () async {
+                        await InteractionFeedback.pageTurn(context);
+                        if (!context.mounted) return;
+                        context.push('/statistics');
+                      },
                       icon: const Icon(Icons.arrow_forward_outlined, size: 18),
                       label: Text('还有 $hiddenCount 项待办，去统计页查看'),
                     ),
@@ -180,54 +178,95 @@ class _WorkbenchTaskCard extends StatelessWidget {
     final theme = Theme.of(context);
     final config = _TaskVisualConfig.fromType(task.type);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.58),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: config.color.withValues(alpha: 0.14)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
+    return Material(
+      color: Colors.transparent,
+      child: Semantics(
+        button: true,
+        label: '${task.title}，${task.summary}，${task.actionLabel}',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Ink(
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: config.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
+              color: Colors.white.withValues(alpha: 0.58),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: config.color.withValues(alpha: 0.14)),
             ),
-            child: Icon(config.icon, color: config.color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  task.title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: config.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
+                  child: Icon(config.icon, color: config.color, size: 20),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  task.summary,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
-                ),
-                const SizedBox(height: 10),
-                TextButton.icon(
-                  onPressed: onTap,
-                  icon: Icon(config.actionIcon, size: 18),
-                  label: Text(task.actionLabel),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        task.title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        task.summary,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
+                      ),
+                      const SizedBox(height: 12),
+                      _TaskActionCue(
+                        icon: config.actionIcon,
+                        label: task.actionLabel,
+                        color: config.color,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _TaskActionCue extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _TaskActionCue({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }

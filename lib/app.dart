@@ -21,6 +21,7 @@ import 'shared/utils/interaction_feedback.dart';
 
 final _router = GoRouter(
   initialLocation: '/launch',
+  errorBuilder: (context, state) => _NotFoundScreen(error: state.error),
   routes: [
     GoRoute(path: '/launch', builder: (ctx, s) => const LaunchScreen()),
     GoRoute(path: '/setup', builder: (ctx, s) => const InitialSetupScreen()),
@@ -102,6 +103,41 @@ final _router = GoRouter(
     ),
   ],
 );
+
+class _NotFoundScreen extends StatelessWidget {
+  final Exception? error;
+  const _NotFoundScreen({this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.explore_off_rounded, size: 64, color: theme.colorScheme.outline),
+            const SizedBox(height: 16),
+            Text('页面未找到', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              '请求的页面不存在',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () => context.go('/'),
+              icon: const Icon(Icons.home_rounded),
+              label: const Text('返回首页'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _ScaffoldWithNav extends StatelessWidget {
   final StatefulNavigationShell shell;

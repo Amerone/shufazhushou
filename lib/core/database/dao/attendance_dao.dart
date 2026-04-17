@@ -77,7 +77,7 @@ class AttendanceDao {
       }
     });
 
-    final artworkStorage = const AttendanceArtworkStorageService();
+    const artworkStorage = AttendanceArtworkStorageService();
     for (final artworkPath in obsoleteArtworkPaths) {
       await artworkStorage.deleteArtwork(artworkPath);
     }
@@ -187,6 +187,53 @@ class AttendanceDao {
     }
     final rows = await db.query('attendance', where: where, whereArgs: args);
     return rows.isEmpty ? null : Attendance.fromMap(rows.first);
+  }
+
+  /// Batch checks time-range conflicts for multiple students on a date.
+  /// Returns at most one conflicting record per student_id.
+  Future<Map<String, Attendance>> findConflictsForStudents(
+    Iterable<String> studentIds,
+    String date,
+    String startTime,
+    String endTime, {
+    String? excludeId,
+  }) async {
+    final ids = studentIds.toSet().toList(growable: false);
+    if (ids.isEmpty) return const <String, Attendance>{};
+
+    final db = await _db.database;
+    final result = <String, Attendance>{};
+    const batchSize = 800;
+
+    for (var start = 0; start < ids.length; start += batchSize) {
+      var end = start + batchSize;
+      if (end > ids.length) {
+        end = ids.length;
+      }
+      final batchIds = ids.sublist(start, end);
+      final placeholders = List.filled(batchIds.length, '?').join(', ');
+      var where =
+          'student_id IN ($placeholders) AND date = ? AND start_time < ? AND end_time > ?';
+      final args = <Object>[...batchIds, date, endTime, startTime];
+      if (excludeId != null) {
+        where += ' AND id != ?';
+        args.add(excludeId);
+      }
+
+      final rows = await db.query(
+        'attendance',
+        where: where,
+        whereArgs: args,
+        orderBy: 'student_id ASC, start_time ASC, created_at ASC',
+      );
+
+      for (final row in rows) {
+        final record = Attendance.fromMap(row);
+        result.putIfAbsent(record.studentId, () => record);
+      }
+    }
+
+    return result;
   }
 
   Future<List<Map<String, dynamic>>> getMonthlyRevenue(

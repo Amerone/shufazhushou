@@ -16,6 +16,7 @@ import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../core/services/ai_analysis_note_codec.dart';
+import '../../../core/services/student_growth_summary_service.dart';
 import '../../../core/utils/excel_exporter.dart';
 import '../../../core/utils/fee_calculator.dart';
 import '../../../core/utils/pdf_generator.dart';
@@ -57,6 +58,8 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
   bool _loading = false;
   Student? _latestStudentSnapshot;
   late ExportTemplateId _template;
+  Future<_ParentSnapshot>? _parentSnapshotFuture;
+  String? _parentSnapshotKey;
 
   String _fmt(DateTime date) => formatDate(date);
 
@@ -137,6 +140,42 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       feeSummaryProvider(
         FeeSummaryParams(widget.studentId, from: from, to: to),
       ).future,
+    );
+  }
+
+  Future<_ParentSnapshot> _parentSnapshotFor(Student? student) {
+    final key =
+        '${widget.studentId}|${_fmt(_from)}|${_fmt(_to)}|'
+        '${student?.updatedAt ?? 0}';
+    if (_parentSnapshotKey != key || _parentSnapshotFuture == null) {
+      _parentSnapshotKey = key;
+      _parentSnapshotFuture = _loadParentSnapshot(student);
+    }
+    return _parentSnapshotFuture!;
+  }
+
+  Future<_ParentSnapshot> _loadParentSnapshot(Student? student) async {
+    final dataFuture = _loadData();
+    final feeSummaryFuture = _loadFeeSummary();
+    final resolvedStudent = student ?? await _loadStudent();
+    final data = await dataFuture;
+    final feeSummary = await feeSummaryFuture;
+    final summary = const StudentGrowthSummaryService().build(
+      records: data.records,
+    );
+    final ledger = StudentLedgerView.fromSummary(
+      feeSummary,
+      pricePerClass: resolvedStudent?.pricePerClass ?? 0,
+    );
+
+    return _ParentSnapshot(
+      balanceLabel:
+          '${ledger.currentBalanceLabel} ¥${feeSummary.balance.toStringAsFixed(2)}',
+      balanceColor: _snapshotBalanceColor(ledger),
+      nextLessonLabel: summary.nextLessonLabel,
+      progressPoint: summary.progressPoint,
+      attentionPoint: summary.attentionPoint,
+      dataFreshness: summary.dataFreshness,
     );
   }
 
@@ -686,6 +725,15 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
               ),
               const SizedBox(height: 24),
               _ExportSectionHeader(
+                title: '\u5bb6\u957f\u9996\u5c4f\u6458\u8981',
+                subtitle:
+                    '\u9884\u89c8\u5bb6\u957f\u6253\u5f00\u62a5\u544a\u65f6\u6700\u5148\u770b\u5230\u7684\u4fe1\u606f\uff0c\u4fbf\u4e8e\u5206\u4eab\u524d\u68c0\u67e5\u91cd\u70b9\u3002',
+                trailing: '5 \u9879',
+              ),
+              const SizedBox(height: 12),
+              _ParentSnapshotCard(future: _parentSnapshotFor(student)),
+              const SizedBox(height: 24),
+              _ExportSectionHeader(
                 title: '\u5bfc\u51fa\u6a21\u677f',
                 subtitle: templateDescription,
                 trailing: templateLabel,
@@ -987,11 +1035,217 @@ class _ExportData {
   const _ExportData({required this.records, required this.payments});
 }
 
+class _ParentSnapshot {
+  final String balanceLabel;
+  final Color balanceColor;
+  final String nextLessonLabel;
+  final String progressPoint;
+  final String attentionPoint;
+  final String dataFreshness;
+
+  const _ParentSnapshot({
+    required this.balanceLabel,
+    required this.balanceColor,
+    required this.nextLessonLabel,
+    required this.progressPoint,
+    required this.attentionPoint,
+    required this.dataFreshness,
+  });
+}
+
 class _PreparedPdf {
   final String path;
   final Student student;
 
   const _PreparedPdf({required this.path, required this.student});
+}
+
+Color _snapshotBalanceColor(StudentLedgerView ledger) {
+  switch (ledger.balanceState) {
+    case LedgerBalanceState.debt:
+      return kRed;
+    case LedgerBalanceState.settled:
+      return kInkSecondary;
+    case LedgerBalanceState.surplus:
+      return kGreen;
+  }
+}
+
+class _ParentSnapshotCard extends StatelessWidget {
+  final Future<_ParentSnapshot> future;
+
+  const _ParentSnapshotCard({required this.future});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return FutureBuilder<_ParentSnapshot>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.44),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 12),
+                Text('正在整理家长首屏摘要...', style: theme.textTheme.bodySmall),
+              ],
+            ),
+          );
+        }
+
+        if (snapshot.hasError || snapshot.data == null) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: kRed.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: kRed.withValues(alpha: 0.12)),
+            ),
+            child: Text(
+              '摘要加载失败：${snapshot.error}',
+              style: theme.textTheme.bodySmall?.copyWith(color: kRed),
+            ),
+          );
+        }
+
+        final data = snapshot.data!;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.44),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 440;
+              final itemWidth = compact
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 12) / 2;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: itemWidth,
+                    child: _SnapshotMetric(
+                      icon: Icons.account_balance_wallet_outlined,
+                      label: '余额',
+                      value: data.balanceLabel,
+                      color: data.balanceColor,
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _SnapshotMetric(
+                      icon: Icons.schedule_outlined,
+                      label: '下次课',
+                      value: data.nextLessonLabel,
+                      color: kSealRed,
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _SnapshotMetric(
+                      icon: Icons.trending_up_outlined,
+                      label: '进步点',
+                      value: data.progressPoint,
+                      color: kGreen,
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _SnapshotMetric(
+                      icon: Icons.track_changes_outlined,
+                      label: '待巩固点',
+                      value: data.attentionPoint,
+                      color: kPrimaryBlue,
+                    ),
+                  ),
+                  SizedBox(
+                    width: constraints.maxWidth,
+                    child: _SnapshotMetric(
+                      icon: Icons.update_outlined,
+                      label: '数据截止',
+                      value: data.dataFreshness,
+                      color: kInkSecondary,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SnapshotMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _SnapshotMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ExportSectionHeader extends StatelessWidget {

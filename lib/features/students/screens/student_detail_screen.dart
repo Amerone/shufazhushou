@@ -428,6 +428,45 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
+                    StudentPrimaryActionsCard(
+                      onOpenPayment: () => _openPaymentSheet(student),
+                      onOpenAttendance: () =>
+                          _scrollToSection(_StudentDetailAnchor.attendance),
+                      onOpenExport: _openExportSheet,
+                      onEditStudent: _openEditStudent,
+                    ),
+                    const SizedBox(height: 22),
+                    allTimeFeeAsync.when(
+                      loading: () => const GlassCard(
+                        padding: EdgeInsets.all(18),
+                        child: SizedBox(
+                          height: 72,
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      ),
+                      error: (error, _) => GlassCard(
+                        padding: const EdgeInsets.all(18),
+                        child: Text('加载成长与沟通摘要失败：$error'),
+                      ),
+                      data: (allFee) => StudentGrowthWorkbenchCard(
+                        summary: growthSummary,
+                        balance: allFee.balance,
+                        pricePerClass: student.pricePerClass,
+                        onOpenReport: () => _openExportSheet(
+                          initialTemplate: ExportTemplateId.parentMonthly,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    StudentParentMessageCard(
+                      draft: parentDraft,
+                      onOpenPayment: () {
+                        _openPaymentSheet(student);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    StudentArtworkTimelineCard(entries: artworkTimeline),
+                    const SizedBox(height: 22),
                     // 3. 缂傚倸鍊搁崐鎼佸磹婵犳澶愬箛閺夊灝鐎梺绋挎湰缁秵鍒婃總鍛婄厸濠㈣泛瀛╃涵鍓佺磼?
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.payments],
@@ -435,8 +474,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                         children: [
                           _SectionHeader(
                             title: '\u7f34\u8d39\u8bb0\u5f55',
-                            subtitle:
-                                '\u67e5\u770b\u4f59\u989d\u53d8\u5316\u548c\u6bcf\u7b14\u7f34\u8d39\u5907\u6ce8\u3002',
                             trailing: '${_payments.length} \u6761',
                           ),
                           const SizedBox(height: 10),
@@ -536,14 +573,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     ),
                     const SizedBox(height: 22),
                     // 5. 闂傚倷鑳堕幊鎾绘倶濠靛牏鐭撶€规洖娲ㄧ粈濠囨煛閸愩劎澧涙い銉ョ墦閺屾洝绠涙繝鍌氣拤缂備浇鍩栭悡锟犲蓟閵娿儮妲堟俊顖滃帶閳亶姊哄Ч鍥р偓鏇炍涘┑鍡欐殾闁靛闄勯崕鐔搞亜閺嶃劎鐭屾い锔诲枛閳规垿鎮欓崣澶屼槐闂侀潧鐗嗙€涒晠鎯屽Δ鍛拺缂佸娉曠粻鐐烘煕鎼淬倗绨块柕鍥ㄥ姇閳藉濮€閳╁啯鐝?
-                    StudentPrimaryActionsCard(
-                      onOpenPayment: () => _openPaymentSheet(student),
-                      onOpenAttendance: () =>
-                          _scrollToSection(_StudentDetailAnchor.attendance),
-                      onOpenExport: _openExportSheet,
-                      onEditStudent: _openEditStudent,
-                    ),
-                    const SizedBox(height: 22),
                     GlassCard(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Theme(
@@ -566,47 +595,13 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             size: 20,
                           ),
                           title: Text(
-                            'AI \u5206\u6790\u4e0e\u6c9f\u901a\u5de5\u5177',
+                            'AI \u5206\u6790\u5de5\u5177',
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           children: [
-                            allTimeFeeAsync.when(
-                              loading: () => const SizedBox(
-                                height: 72,
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              ),
-                              error: (error, _) => Text(
-                                '\u52a0\u8f7d AI \u6d1e\u5bdf\u5931\u8d25\uff1a$error',
-                              ),
-                              data: (allFee) {
-                                return StudentGrowthWorkbenchCard(
-                                  summary: growthSummary,
-                                  balance: allFee.balance,
-                                  pricePerClass: student.pricePerClass,
-                                  onOpenReport: () => _openExportSheet(
-                                    initialTemplate:
-                                        ExportTemplateId.parentMonthly,
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 16),
                             StudentAiInsightCard(student: student),
-                            const SizedBox(height: 16),
-                            StudentParentMessageCard(
-                              draft: parentDraft,
-                              onOpenPayment: () {
-                                _openPaymentSheet(student);
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            StudentArtworkTimelineCard(
-                              entries: artworkTimeline,
-                            ),
                             const SizedBox(height: 16),
                             StudentAiProgressCard(student: student),
                           ],
@@ -700,7 +695,10 @@ class _SectionHeader extends StatelessWidget {
                   Text(title, style: theme.textTheme.titleMedium),
                   if (subtitle != null) ...[
                     const SizedBox(height: 4),
-                    Text(subtitle!, style: theme.textTheme.bodySmall),
+                    Text(
+                      subtitle!,
+                      style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                    ),
                   ],
                 ],
               ),

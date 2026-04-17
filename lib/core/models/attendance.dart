@@ -122,4 +122,30 @@ class Attendance {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Attendance &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          studentId == other.studentId &&
+          date == other.date &&
+          startTime == other.startTime &&
+          endTime == other.endTime &&
+          status == other.status &&
+          priceSnapshot == other.priceSnapshot &&
+          feeAmount == other.feeAmount &&
+          note == other.note &&
+          homePracticeNote == other.homePracticeNote &&
+          artworkImagePath == other.artworkImagePath &&
+          createdAt == other.createdAt &&
+          updatedAt == other.updatedAt;
+
+  @override
+  int get hashCode => Object.hash(
+    id, studentId, date, startTime, endTime,
+    status, priceSnapshot, feeAmount, note,
+    homePracticeNote, artworkImagePath, createdAt, updatedAt,
+  );
 }

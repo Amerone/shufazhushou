@@ -137,17 +137,30 @@ void main() {
       expect(attendanceDao.metricsFrom, '2026-03-01');
       expect(attendanceDao.metricsTo, '2026-03-31');
       expect(paymentDao.totalByAllStudentsCalled, isTrue);
+      expect(studentDao.getAllCalled, isFalse);
+      expect(studentDao.getStudentsWithLastAttendanceCalled, isTrue);
     },
   );
 }
 
 class _FakeStudentDao extends StudentDao {
   final List<Student> students;
+  bool getAllCalled = false;
+  bool getStudentsWithLastAttendanceCalled = false;
 
   _FakeStudentDao(this.students) : super(DatabaseHelper.instance);
 
   @override
-  Future<List<Student>> getAll() async => students;
+  Future<List<Student>> getAll() async {
+    getAllCalled = true;
+    return students;
+  }
+
+  @override
+  Future<List<StudentWithMeta>> getStudentsWithLastAttendance() async {
+    getStudentsWithLastAttendanceCalled = true;
+    return [for (final student in students) StudentWithMeta(student, null)];
+  }
 }
 
 class _FakeAttendanceDao extends AttendanceDao {

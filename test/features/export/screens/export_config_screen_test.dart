@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moyun/core/database/dao/attendance_dao.dart';
+import 'package:moyun/core/database/dao/payment_dao.dart';
 import 'package:moyun/core/database/dao/student_dao.dart';
 import 'package:moyun/core/database/database_helper.dart';
+import 'package:moyun/core/models/attendance.dart';
+import 'package:moyun/core/models/payment.dart';
 import 'package:moyun/core/models/student.dart';
+import 'package:moyun/core/providers/attendance_provider.dart';
+import 'package:moyun/core/providers/fee_summary_provider.dart';
 import 'package:moyun/core/providers/settings_provider.dart';
 import 'package:moyun/core/providers/student_provider.dart';
 import 'package:moyun/core/services/ai_analysis_note_codec.dart';
@@ -87,13 +93,13 @@ Future<void> _pumpScreen(WidgetTester tester, Student student) async {
     ProviderScope(
       overrides: [
         settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+        attendanceDaoProvider.overrideWithValue(_FakeAttendanceDao()),
+        paymentDaoProvider.overrideWithValue(_FakePaymentDao()),
         studentDaoProvider.overrideWithValue(_FakeStudentDao(student)),
         studentProvider.overrideWith(_FakeStudentNotifier.new),
       ],
       child: MaterialApp(
-        home: Scaffold(
-          body: ExportConfigScreen(studentId: student.id),
-        ),
+        home: Scaffold(body: ExportConfigScreen(studentId: student.id)),
       ),
     ),
   );
@@ -116,6 +122,50 @@ class _FakeStudentDao extends StudentDao {
   Future<Student?> getById(String id) async {
     if (id != student.id) return null;
     return student;
+  }
+}
+
+class _FakeAttendanceDao extends AttendanceDao {
+  _FakeAttendanceDao() : super(DatabaseHelper.instance);
+
+  @override
+  Future<List<Attendance>> getByStudentAndDateRange(
+    String studentId,
+    String? from,
+    String? to,
+  ) async {
+    return const [];
+  }
+
+  @override
+  Future<double> getTotalFeeByStudentAndDateRange(
+    String studentId,
+    String? from,
+    String? to,
+  ) async {
+    return 0;
+  }
+}
+
+class _FakePaymentDao extends PaymentDao {
+  _FakePaymentDao() : super(DatabaseHelper.instance);
+
+  @override
+  Future<List<Payment>> getByStudentAndDateRange(
+    String studentId,
+    String? from,
+    String? to,
+  ) async {
+    return const [];
+  }
+
+  @override
+  Future<double> getTotalByStudentAndDateRange(
+    String studentId,
+    String? from,
+    String? to,
+  ) async {
+    return 0;
   }
 }
 

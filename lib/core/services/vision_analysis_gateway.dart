@@ -14,10 +14,7 @@ class TextAnalysisRequest {
   final String prompt;
   final double temperature;
 
-  const TextAnalysisRequest({
-    required this.prompt,
-    this.temperature = 0.2,
-  });
+  const TextAnalysisRequest({required this.prompt, this.temperature = 0.2});
 }
 
 class VisionAnalysisResult {

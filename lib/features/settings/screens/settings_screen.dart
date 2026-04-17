@@ -83,7 +83,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: InkWashBackground(
         child: Column(
           children: [
-            const PageHeader(title: '设置中心', subtitle: '管理教师信息、导出模板和本地数据备份。'),
+            const PageHeader(title: '设置中心'),
             Expanded(
               child: AsyncValueWidget<Map<String, String>>(
                 value: settingsAsync,
@@ -286,6 +286,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               onTap: () => _editMessage(
                                 settings['default_message_template'] ?? '',
                               ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const SettingsSectionTitle(title: '提醒策略'),
+                      const SizedBox(height: 12),
+                      GlassCard(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          children: [
+                            _SettingsTile(
+                              icon: Icons.notifications_active_outlined,
+                              title: '恢复已忽略提醒',
+                              subtitle: '清空已忽略的经营提醒，欠费、续费、流失和进步提醒会重新计算。',
+                              onTap: _restoreDismissedInsights,
+                            ),
+                            const Divider(height: 1, indent: 16, endIndent: 16),
+                            const _SettingsInfoTile(
+                              icon: Icons.info_outline,
+                              title: '提醒恢复规则',
+                              subtitle:
+                                  '欠费/续费默认 3 天后恢复，流失/试听/高峰 7 天后恢复，进步提醒 14 天后恢复。',
                             ),
                           ],
                         ),
@@ -558,12 +581,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '修改后会立即应用到后续导出和页面展示中。',
-                  style: Theme.of(sheetCtx).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
                 const SizedBox(height: 24),
                 TextField(
                   controller: ctrl,
@@ -608,6 +625,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _restoreDismissedInsights() async {
+    final confirmed = await AppToast.showConfirm(
+      context,
+      '将恢复所有已忽略的经营提醒，确定继续吗？',
+    );
+    if (!confirmed) return;
+
+    try {
+      final db = await DatabaseHelper.instance.database;
+      await db.delete('dismissed_insights');
+      invalidateStatistics(ref);
+      if (!mounted) return;
+      await InteractionFeedback.seal(context);
+      if (!mounted) return;
+      AppToast.showSuccess(context, '已恢复所有经营提醒');
+    } catch (e) {
+      if (mounted) AppToast.showError(context, e.toString());
+    }
   }
 
   Future<void> _seedTestData() async {
@@ -693,7 +730,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (isOverdue) {
       return const _PrioritySuggestion(
         title: '建议优先更新本地备份',
-        description: '距离上次备份时间较久，先保留最新数据副本，再继续调整模板和导出配置更稳妥。',
+        description: '请先生成最新备份。',
         actionLabel: '前往备份',
         action: _PriorityAction.backup,
         color: kOrange,
@@ -702,7 +739,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!hasSignature) {
       return const _PrioritySuggestion(
         title: '建议补充教师签名',
-        description: '签名会直接影响 PDF 报告落款效果，上传后导出资料会更完整。',
+        description: '上传后即可用于导出。',
         actionLabel: '上传签名',
         action: _PriorityAction.signature,
         color: kSealRed,
@@ -711,7 +748,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!hasDefaultMessage) {
       return const _PrioritySuggestion(
         title: '可以补充默认寄语',
-        description: '先设置一份默认寄语，之后导出报告时可以直接复用，减少重复输入。',
+        description: '设置后可直接复用。',
         actionLabel: '编辑寄语',
         action: _PriorityAction.message,
         color: kPrimaryBlue,
@@ -720,7 +757,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!hasCustomTeacherName) {
       return const _PrioritySuggestion(
         title: '建议更新教师抬头',
-        description: '使用真实教师姓名后，首页、报告和印章相关资料会保持一致。',
+        description: '使用真实姓名更统一。',
         actionLabel: '修改姓名',
         action: _PriorityAction.teacher,
         color: kGreen,
@@ -852,6 +889,60 @@ class _PriorityBanner extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _SettingsInfoTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _SettingsInfoTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: kInkSecondary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: kInkSecondary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

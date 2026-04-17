@@ -72,6 +72,27 @@ class Student {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Student &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          parentName == other.parentName &&
+          parentPhone == other.parentPhone &&
+          pricePerClass == other.pricePerClass &&
+          status == other.status &&
+          note == other.note &&
+          createdAt == other.createdAt &&
+          updatedAt == other.updatedAt;
+
+  @override
+  int get hashCode => Object.hash(
+    id, name, parentName, parentPhone,
+    pricePerClass, status, note, createdAt, updatedAt,
+  );
 }
 
 /// 构建 id 到显示名称的映射，仅为重名学员追加后缀消歧。

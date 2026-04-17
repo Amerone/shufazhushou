@@ -37,6 +37,10 @@ void main() {
     expect(find.text('作品分析'), findsOneWidget);
     expect(find.text('记录缴费'), findsOneWidget);
     expect(find.text('学生档案'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('王小楷.*09:00到10:00.*轻触编辑')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('attendance card shows uploaded artwork preview', (tester) async {
@@ -48,6 +52,7 @@ void main() {
     await _pumpAttendanceList(tester);
 
     expect(find.byType(AttendanceArtworkPreview), findsOneWidget);
+    expect(find.text('本次课堂作品'), findsOneWidget);
   });
 }
 

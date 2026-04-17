@@ -14,8 +14,9 @@ class DismissedInsightDao {
         where: r.studentId != null
             ? 'insight_type = ? AND student_id = ?'
             : 'insight_type = ? AND student_id IS NULL',
-        whereArgs:
-            r.studentId != null ? [r.insightType, r.studentId] : [r.insightType],
+        whereArgs: r.studentId != null
+            ? [r.insightType, r.studentId]
+            : [r.insightType],
       );
       await txn.insert('dismissed_insights', r.toMap());
     });
@@ -42,7 +43,9 @@ class DismissedInsightDao {
   }
 
   Future<void> deleteByStudentAndType(
-      String insightType, String? studentId) async {
+    String insightType,
+    String? studentId,
+  ) async {
     final db = await _db.database;
     await db.delete(
       'dismissed_insights',

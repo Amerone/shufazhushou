@@ -39,7 +39,7 @@ class StudentDao {
 
     await db.delete('students', where: 'id = ?', whereArgs: [id]);
 
-    final artworkStorage = const AttendanceArtworkStorageService();
+    const artworkStorage = AttendanceArtworkStorageService();
     for (final artworkPath in artworkPaths) {
       await artworkStorage.deleteArtwork(artworkPath);
     }
@@ -79,10 +79,15 @@ class StudentDao {
   Future<List<StudentWithMeta>> getStudentsWithLastAttendance() async {
     final db = await _db.database;
     final rows = await db.rawQuery('''
-      SELECT s.*,
-        (SELECT MAX(date) FROM attendance
-         WHERE student_id = s.id AND status IN ('present','late')) AS last_attendance_date
+      SELECT s.*, recent.last_attendance_date
       FROM students s
+      LEFT JOIN (
+        SELECT student_id, MAX(date) AS last_attendance_date
+        FROM attendance
+        WHERE status IN ('present', 'late')
+        GROUP BY student_id
+      ) recent
+      ON recent.student_id = s.id
       ORDER BY s.created_at DESC
     ''');
     return rows.map((r) {

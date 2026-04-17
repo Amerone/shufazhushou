@@ -6,14 +6,38 @@ const _uuid = Uuid();
 final _random = Random(42);
 
 const _names = [
-  '张小明', '李思琪', '王子涵', '赵雨萱', '刘浩然',
-  '陈美琪', '杨子轩', '黄诗涵', '周天佑', '吴欣怡',
-  '郑博文', '孙雅琪', '马思远', '朱梓萱', '胡明轩',
-  '林雨桐', '何子墨', '高艺涵', '罗天翔', '谢语嫣',
+  '张小明',
+  '李思琪',
+  '王子涵',
+  '赵雨萱',
+  '刘浩然',
+  '陈美琪',
+  '杨子轩',
+  '黄诗涵',
+  '周天佑',
+  '吴欣怡',
+  '郑博文',
+  '孙雅琪',
+  '马思远',
+  '朱梓萱',
+  '胡明轩',
+  '林雨桐',
+  '何子墨',
+  '高艺涵',
+  '罗天翔',
+  '谢语嫣',
 ];
 
 const _statuses = ['active', 'active', 'active', 'active', 'suspended'];
-const _attendanceStatuses = ['present', 'present', 'present', 'late', 'absent', 'leave', 'trial'];
+const _attendanceStatuses = [
+  'present',
+  'present',
+  'present',
+  'late',
+  'absent',
+  'leave',
+  'trial',
+];
 
 class SeedTestData {
   static Future<void> run(Database db) async {
@@ -28,7 +52,9 @@ class SeedTestData {
         final price = (80 + _random.nextInt(12) * 10).toDouble();
         studentPrices[id] = price;
         final status = _statuses[i % _statuses.length];
-        final ts = now.subtract(Duration(days: 180 + _random.nextInt(90))).millisecondsSinceEpoch;
+        final ts = now
+            .subtract(Duration(days: 180 + _random.nextInt(90)))
+            .millisecondsSinceEpoch;
 
         await txn.insert('students', {
           'id': id,
@@ -52,11 +78,14 @@ class SeedTestData {
           final hour = 8 + _random.nextInt(12);
           final startTime = '${hour.toString().padLeft(2, '0')}:00';
           final endTime = '${(hour + 1).toString().padLeft(2, '0')}:00';
-          final status = _attendanceStatuses[_random.nextInt(_attendanceStatuses.length)];
+          final status =
+              _attendanceStatuses[_random.nextInt(_attendanceStatuses.length)];
           final ts = date.millisecondsSinceEpoch;
 
           // 与 FeeCalculator 逻辑一致: present/late 收费, 其余为 0
-          final feeAmount = (status == 'present' || status == 'late') ? price : 0.0;
+          final feeAmount = (status == 'present' || status == 'late')
+              ? price
+              : 0.0;
 
           await txn.insert('attendance', {
             'id': _uuid.v4(),

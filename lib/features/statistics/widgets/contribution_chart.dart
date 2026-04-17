@@ -1,8 +1,9 @@
-﻿import 'package:fl_chart/fl_chart.dart';
+import 'dart:math' as math;
+
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/models/student.dart';
 import '../../../core/providers/contribution_provider.dart';
 import '../../../core/providers/status_distribution_provider.dart';
 import '../../../core/providers/status_filter_provider.dart';
@@ -25,25 +26,16 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final asyncContribution = ref.watch(contributionProvider);
-    final students = ref.watch(studentProvider).valueOrNull ?? [];
-    final displayNames = buildDisplayNameMap(students.map((m) => m.student).toList());
+    final displayNames = ref.watch(studentDisplayNameMapProvider);
 
     return asyncContribution.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Text('加载失败: $e'),
       data: (list) {
-        final sorted = [...list]
-          ..sort((a, b) => _byFee
-              ? ((b['totalFee'] as num?) ?? 0).compareTo((a['totalFee'] as num?) ?? 0)
-              : ((b['attendanceCount'] as num?) ?? 0).compareTo((a['attendanceCount'] as num?) ?? 0));
-
-        final top = sorted.take(10).toList();
-        if (top.isEmpty) return const EmptyState(message: '暂无数据');
-
-        final maxVal = (_byFee
-                ? (top.first['totalFee'] as num?) ?? 0
-                : (top.first['attendanceCount'] as num?) ?? 0)
-            .toDouble();
+        final topEntries = _rankContributions(list, byFee: _byFee);
+        if (topEntries.isEmpty) {
+          return const EmptyState(message: '\u6682\u65e0\u6570\u636e');
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,23 +60,23 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
               ],
             ),
             const SizedBox(height: 8),
-            ...top.map((item) {
-              final value = _byFee
-                  ? ((item['totalFee'] as num?) ?? 0).toDouble()
-                  : ((item['attendanceCount'] as num?) ?? 0).toDouble();
-              final ratio = maxVal > 0 ? value / maxVal : 0.0;
-              final rank = top.indexOf(item) + 1;
+            ...topEntries.map((entry) {
+              final item = entry.item;
               final accentColor = _byFee ? kPrimaryBlue : kGreen;
 
               return GestureDetector(
                 onTap: () => context.push('/students/${item['studentId']}'),
                 child: Container(
-                  margin: EdgeInsets.only(bottom: item == top.last ? 0 : 10),
+                  margin: EdgeInsets.only(
+                    bottom: entry.rank == topEntries.length ? 0 : 10,
+                  ),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.56),
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: accentColor.withValues(alpha: 0.1)),
+                    border: Border.all(
+                      color: accentColor.withValues(alpha: 0.1),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,7 +90,7 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          '$rank',
+                          '${entry.rank}',
                           style: theme.textTheme.titleSmall?.copyWith(
                             color: accentColor,
                             fontWeight: FontWeight.w800,
@@ -114,14 +106,19 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    displayNames[item['studentId']] ?? item['studentName'] as String,
+                                    displayNames[item['studentId']] ??
+                                        item['studentName'] as String,
                                     overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  _byFee ? '¥${value.toStringAsFixed(0)}' : '${value.toInt()}节',
+                                  _byFee
+                                      ? '¥${entry.value.toStringAsFixed(0)}'
+                                      : '${entry.value.toInt()}节',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: accentColor,
                                     fontWeight: FontWeight.w700,
@@ -135,21 +132,27 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
                                 Container(
                                   height: 18,
                                   decoration: BoxDecoration(
-                                    color: kInkSecondary.withValues(alpha: 0.14),
+                                    color: kInkSecondary.withValues(
+                                      alpha: 0.14,
+                                    ),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                 ),
                                 FractionallySizedBox(
-                                  widthFactor: ratio,
+                                  widthFactor: entry.ratio,
                                   child: _byFee
                                       ? Container(
                                           height: 18,
                                           decoration: BoxDecoration(
-                                            color: accentColor.withValues(alpha: 0.72),
-                                            borderRadius: BorderRadius.circular(999),
+                                            color: accentColor.withValues(
+                                              alpha: 0.72,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
                                           ),
                                         )
-                                      : _buildSegmentedBar(item, value),
+                                      : _buildSegmentedBar(item, entry.value),
                                 ),
                               ],
                             ),
@@ -173,7 +176,10 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
                         children: [
                           Container(width: 10, height: 10, color: e.value),
                           const SizedBox(width: 4),
-                          Text(kStatusLabel[e.key] ?? e.key.name, style: theme.textTheme.bodySmall),
+                          Text(
+                            kStatusLabel[e.key] ?? e.key.name,
+                            style: theme.textTheme.bodySmall,
+                          ),
                         ],
                       ),
                     )
@@ -208,7 +214,7 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
         children: parts
             .map(
               (s) => Expanded(
-                flex: (s.ratio * 1000).round(),
+                flex: math.max(1, (s.ratio * 1000).round()),
                 child: Container(color: s.color),
               ),
             )
@@ -224,6 +230,59 @@ class _Segment {
   const _Segment(this.ratio, this.color);
 }
 
+class _ContributionEntry {
+  final int rank;
+  final Map<String, dynamic> item;
+  final double value;
+  final double ratio;
+
+  const _ContributionEntry({
+    required this.rank,
+    required this.item,
+    required this.value,
+    required this.ratio,
+  });
+}
+
+List<_ContributionEntry> _rankContributions(
+  List<Map<String, dynamic>> list, {
+  required bool byFee,
+}) {
+  final sorted = [...list]
+    ..sort(
+      (a, b) =>
+          _contributionValue(b, byFee).compareTo(_contributionValue(a, byFee)),
+    );
+
+  final top = sorted.take(10).toList(growable: false);
+  if (top.isEmpty) {
+    return const <_ContributionEntry>[];
+  }
+
+  final maxValue = _contributionValue(top.first, byFee);
+  final entries = <_ContributionEntry>[];
+  for (var i = 0; i < top.length; i++) {
+    final item = top[i];
+    final value = _contributionValue(item, byFee);
+    entries.add(
+      _ContributionEntry(
+        rank: i + 1,
+        item: item,
+        value: value,
+        ratio: maxValue > 0 ? value / maxValue : 0,
+      ),
+    );
+  }
+  return entries;
+}
+
+double _contributionValue(Map<String, dynamic> item, bool byFee) {
+  if (byFee) {
+    return ((item['totalFee'] as num?) ?? 0).toDouble();
+  }
+  return ((item['attendanceCount'] as num?) ?? 0).toDouble();
+}
+
 class StatusPieChart extends ConsumerWidget {
   const StatusPieChart({super.key});
 
@@ -236,7 +295,9 @@ class StatusPieChart extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Text('加载失败: $e'),
       data: (list) {
-        if (list.isEmpty) return const EmptyState(message: '暂无数据');
+        if (list.isEmpty) {
+          return const EmptyState(message: '\u6682\u65e0\u6570\u636e');
+        }
 
         return SizedBox(
           height: 200,
@@ -250,7 +311,8 @@ class StatusPieChart extends ConsumerWidget {
                   final idx = response?.touchedSection?.touchedSectionIndex;
                   if (idx == null || idx < 0 || idx >= list.length) return;
                   final status = list[idx]['status'] as String;
-                  ref.read(statusFilterProvider.notifier).state = selected == status ? null : status;
+                  ref.read(statusFilterProvider.notifier).state =
+                      selected == status ? null : status;
                 },
               ),
               sections: list.asMap().entries.map((e) {
@@ -263,7 +325,10 @@ class StatusPieChart extends ConsumerWidget {
                   color: statusColor(status),
                   title: '${statusLabel(status)}\n$count',
                   radius: isSelected ? 70 : 60,
-                  titleStyle: const TextStyle(fontSize: 10, color: Colors.white),
+                  titleStyle: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.white,
+                  ),
                 );
               }).toList(),
             ),
@@ -282,8 +347,7 @@ class StatusFilteredList extends ConsumerWidget {
     final selected = ref.watch(statusFilterProvider);
     if (selected == null) return const SizedBox();
 
-    final students = ref.watch(studentProvider).valueOrNull ?? [];
-    final nameMap = buildDisplayNameMap(students.map((m) => m.student).toList());
+    final nameMap = ref.watch(studentDisplayNameMapProvider);
 
     final asyncRecords = ref.watch(filteredAttendanceProvider);
 
@@ -291,7 +355,9 @@ class StatusFilteredList extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Text('加载失败: $e'),
       data: (records) {
-        if (records.isEmpty) return const EmptyState(message: '暂无记录');
+        if (records.isEmpty) {
+          return const EmptyState(message: '\u6682\u65e0\u8bb0\u5f55');
+        }
 
         return ListView.builder(
           shrinkWrap: true,
@@ -324,7 +390,8 @@ class StatusFilteredList extends ConsumerWidget {
                       children: [
                         Text(
                           nameMap[r.studentId] ?? r.studentId,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
                         Text(

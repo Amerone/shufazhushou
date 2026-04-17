@@ -51,8 +51,10 @@ void main() {
     test(
       'strips legacy mojibake/abnormal title lines from structured progress notes',
       () {
-        const legacyTitle = '\uFFFD\uFFFDAI \u5B66\u4E60\u5206\u6790 2026-03-30 09:15\uFFFD\uFFFD';
-        const normalTitle = '\u3010AI \u5B66\u4E60\u5206\u6790 2026-03-31 10:00\u3011';
+        const legacyTitle =
+            '\uFFFD\uFFFDAI \u5B66\u4E60\u5206\u6790 2026-03-30 09:15\uFFFD\uFFFD';
+        const normalTitle =
+            '\u3010AI \u5B66\u4E60\u5206\u6790 2026-03-31 10:00\u3011';
 
         final note = [
           '[AI_ANALYSIS_START|progress|2026-03-30T09:15:00.000]',
@@ -78,7 +80,8 @@ void main() {
     );
 
     test('falls back to legacy plain-text progress analysis blocks', () {
-      const note = 'manual note\n\n'
+      const note =
+          'manual note\n\n'
           'AI \u5B66\u4E60\u5206\u6790\n'
           '\u603B\u4F53\u8BC4\u4EF7\uFF1A\u7A33\u6B65\u8FDB\u6B65\n'
           '\u8D8B\u52BF\u5206\u6790\uFF1A\u51FA\u52E4\u4E0E\u8BFE\u540E\u7EC3\u4E60\u66F4\u7A33\u5B9A\n'
@@ -94,35 +97,44 @@ void main() {
       );
     });
 
-    test('falls back to English legacy plain-text progress analysis blocks', () {
-      const note = 'manual note\n\n'
-          'AI Progress Analysis\n'
+    test(
+      'falls back to English legacy plain-text progress analysis blocks',
+      () {
+        const note =
+            'manual note\n\n'
+            'AI Progress Analysis\n'
+            'Overall: steady progress\n'
+            'Trend: attendance and practice are more stable\n'
+            'Teaching suggestions:\n'
+            '1. Keep daily basic practice';
+
+        expect(
+          AiAnalysisNoteCodec.latestProgressContentForExport(note),
           'Overall: steady progress\n'
           'Trend: attendance and practice are more stable\n'
           'Teaching suggestions:\n'
-          '1. Keep daily basic practice';
+          '1. Keep daily basic practice',
+        );
+      },
+    );
 
-      expect(
-        AiAnalysisNoteCodec.latestProgressContentForExport(note),
-        'Overall: steady progress\n'
-        'Trend: attendance and practice are more stable\n'
-        'Teaching suggestions:\n'
-        '1. Keep daily basic practice',
-      );
-    });
+    test(
+      'prefers structured progress analysis over legacy plain-text blocks',
+      () {
+        final structured = AiAnalysisNoteCodec.appendProgressAnalysis(
+          existingNote:
+              'AI \u5B66\u4E60\u5206\u6790\n'
+              '\u603B\u4F53\u8BC4\u4EF7\uFF1A\u65E7\u7248\u5185\u5BB9',
+          analysisText:
+              '\u603B\u4F53\u8BC4\u4EF7\uFF1A\u7ED3\u6784\u5316\u5185\u5BB9',
+          analyzedAt: DateTime(2026, 4, 1, 9, 0),
+        );
 
-    test('prefers structured progress analysis over legacy plain-text blocks', () {
-      final structured = AiAnalysisNoteCodec.appendProgressAnalysis(
-        existingNote: 'AI \u5B66\u4E60\u5206\u6790\n'
-            '\u603B\u4F53\u8BC4\u4EF7\uFF1A\u65E7\u7248\u5185\u5BB9',
-        analysisText: '\u603B\u4F53\u8BC4\u4EF7\uFF1A\u7ED3\u6784\u5316\u5185\u5BB9',
-        analyzedAt: DateTime(2026, 4, 1, 9, 0),
-      );
-
-      expect(
-        AiAnalysisNoteCodec.latestProgressContentForExport(structured),
-        '\u603B\u4F53\u8BC4\u4EF7\uFF1A\u7ED3\u6784\u5316\u5185\u5BB9',
-      );
-    });
+        expect(
+          AiAnalysisNoteCodec.latestProgressContentForExport(structured),
+          '\u603B\u4F53\u8BC4\u4EF7\uFF1A\u7ED3\u6784\u5316\u5185\u5BB9',
+        );
+      },
+    );
   });
 }

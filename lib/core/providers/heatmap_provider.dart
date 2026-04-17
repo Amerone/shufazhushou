@@ -6,11 +6,11 @@ class HeatmapNotifier extends AsyncNotifier<List<Map<String, dynamic>>> {
   @override
   Future<List<Map<String, dynamic>>> build() {
     final range = ref.watch(statisticsPeriodProvider);
-    return ref.read(attendanceDaoProvider)
-        .getTimeHeatmap(range.from, range.to);
+    return ref.read(attendanceDaoProvider).getTimeHeatmap(range.from, range.to);
   }
 }
 
 final heatmapProvider =
     AsyncNotifierProvider<HeatmapNotifier, List<Map<String, dynamic>>>(
-        HeatmapNotifier.new);
+      HeatmapNotifier.new,
+    );

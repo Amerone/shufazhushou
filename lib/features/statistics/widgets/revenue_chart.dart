@@ -1,4 +1,4 @@
-﻿import 'package:fl_chart/fl_chart.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/revenue_provider.dart';
@@ -21,17 +21,22 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
     final asyncRevenue = ref.watch(revenueProvider);
 
     return asyncRevenue.when(
-      loading: () => const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
+      loading: () => const SizedBox(
+        height: 200,
+        child: Center(child: CircularProgressIndicator()),
+      ),
       error: (e, _) => Text('加载失败: $e'),
       data: (data) {
         final months = <String>{
           ...data.monthlyReceivable.map((m) => m['month'] as String),
           ...data.monthlyReceived.map((m) => m['month'] as String),
-        }.toList()
-          ..sort();
+        }.toList()..sort();
 
         if (months.isEmpty) {
-          return const SizedBox(height: 200, child: Center(child: Text('暂无数据')));
+          return const SizedBox(
+            height: 200,
+            child: Center(child: Text('暂无数据')),
+          );
         }
 
         final receivableMap = {
@@ -40,7 +45,8 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
         };
         final receivedMap = {
           for (final m in data.monthlyReceived)
-            m['month'] as String: ((m['totalReceived'] as num?) ?? 0).toDouble(),
+            m['month'] as String: ((m['totalReceived'] as num?) ?? 0)
+                .toDouble(),
         };
 
         final spots1 = months
@@ -53,8 +59,14 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
             .entries
             .map((e) => FlSpot(e.key.toDouble(), receivedMap[e.value] ?? 0))
             .toList();
-        final totalReceivable = receivableMap.values.fold<double>(0, (sum, item) => sum + item);
-        final totalReceived = receivedMap.values.fold<double>(0, (sum, item) => sum + item);
+        final totalReceivable = receivableMap.values.fold<double>(
+          0,
+          (sum, item) => sum + item,
+        );
+        final totalReceived = receivedMap.values.fold<double>(
+          0,
+          (sum, item) => sum + item,
+        );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,15 +134,23 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
                               months[i].substring(5),
-                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 10,
+                              ),
                             ),
                           );
                         },
                       ),
                     ),
-                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   gridData: FlGridData(
                     show: true,

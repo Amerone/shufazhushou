@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/database/dao/student_dao.dart' show StudentWithMeta;
+import '../../../core/models/attendance.dart';
 import '../../../core/models/business_data_summary.dart';
 import '../../../core/models/data_insight_result.dart';
-import '../../../core/models/student.dart';
+import '../../../core/models/student.dart' show Student;
 import '../../../core/providers/ai_provider.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/contribution_provider.dart';
@@ -92,32 +94,41 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
       final statusDistributionFuture = ref
           .read(attendanceDaoProvider)
           .getStatusDistribution(range.from, range.to);
-      final periodRevenueFuture = ref
-          .read(paymentDaoProvider)
-          .getTotalByDateRange(range.from, range.to);
 
-      final metrics = await metricsFuture;
-      final contributions = await contributionsFuture;
-      final studentMeta = await studentMetaFuture;
-      final statusDistribution = await statusDistributionFuture;
-      final periodRevenue = await periodRevenueFuture;
+      final dataResults = await Future.wait<Object?>([
+        metricsFuture,
+        contributionsFuture,
+        studentMetaFuture,
+        statusDistributionFuture,
+      ]);
+      final metrics = dataResults[0] as MetricsData;
+      final contributions = dataResults[1] as List<Map<String, dynamic>>;
+      final studentMeta = dataResults[2] as List<StudentWithMeta>;
+      final statusDistribution = dataResults[3] as List<Map<String, dynamic>>;
       if (!mounted || currentRequestId != _analysisRequestId) return;
 
       final students = studentMeta
           .map((item) => item.student)
           .toList(growable: false);
+      final displayNames = ref.read(studentDisplayNameMapProvider);
       final periodInsightsFuture = _buildPeriodInsights(
         range: range,
         students: students,
+        displayNames: displayNames,
         activeStudentCount: metrics.activeStudentCount,
       );
       final topContributorsFuture = _buildTopContributors(
         range: range,
-        students: students,
+        displayNames: displayNames,
         contributions: contributions,
       );
-      final periodInsights = await periodInsightsFuture;
-      final topContributors = await topContributorsFuture;
+      final insightResults = await Future.wait<Object?>([
+        periodInsightsFuture,
+        topContributorsFuture,
+      ]);
+      final periodInsights = insightResults[0] as List<Insight>;
+      final topContributors =
+          insightResults[1] as List<BusinessContributorSnapshot>;
       if (!mounted || currentRequestId != _analysisRequestId) return;
 
       final summary = BusinessDataSummary(
@@ -127,7 +138,7 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
           0,
           students.length - metrics.activeStudentCount,
         ),
-        periodRevenue: periodRevenue,
+        periodRevenue: metrics.totalReceived,
         attendanceStatusDistribution: <String, int>{
           for (final row in statusDistribution)
             row['status']?.toString() ?? '\u672a\u77e5':
@@ -164,16 +175,17 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
   Future<List<Insight>> _buildPeriodInsights({
     required StatisticsRange range,
     required List<Student> students,
+    required Map<String, String> displayNames,
     required int activeStudentCount,
   }) async {
-    final attendance = await ref
-        .read(attendanceDaoProvider)
-        .getAllGroupedByStudent();
-    final payments = await ref.read(paymentDaoProvider).getTotalByAllStudents();
-    final dismissedKeys = await ref
-        .read(dismissedInsightDaoProvider)
-        .getAllActiveKeys();
-    final displayNames = buildDisplayNameMap(students);
+    final insightData = await Future.wait<Object?>([
+      ref.read(allAttendanceByStudentProvider.future),
+      ref.read(allPaymentsByStudentProvider.future),
+      ref.read(dismissedInsightDaoProvider).getAllActiveKeys(),
+    ]);
+    final attendance = insightData[0] as Map<String, List<Attendance>>;
+    final payments = insightData[1] as Map<String, double>;
+    final dismissedKeys = insightData[2] as Set<String>;
     final service = ref.read(insightServiceProvider);
 
     return service.buildInsights(
@@ -190,10 +202,9 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
 
   Future<List<BusinessContributorSnapshot>> _buildTopContributors({
     required StatisticsRange range,
-    required List<Student> students,
+    required Map<String, String> displayNames,
     required List<Map<String, dynamic>> contributions,
   }) async {
-    final displayNames = buildDisplayNameMap(students);
     final attendanceCountByStudent = <String, int>{
       for (final row in contributions)
         (row['studentId'] ?? '').toString():

@@ -7,11 +7,14 @@ class StatusDistributionNotifier
   @override
   Future<List<Map<String, dynamic>>> build() {
     final range = ref.watch(statisticsPeriodProvider);
-    return ref.read(attendanceDaoProvider)
+    return ref
+        .read(attendanceDaoProvider)
         .getStatusDistribution(range.from, range.to);
   }
 }
 
-final statusDistributionProvider = AsyncNotifierProvider<
-    StatusDistributionNotifier,
-    List<Map<String, dynamic>>>(StatusDistributionNotifier.new);
+final statusDistributionProvider =
+    AsyncNotifierProvider<
+      StatusDistributionNotifier,
+      List<Map<String, dynamic>>
+    >(StatusDistributionNotifier.new);

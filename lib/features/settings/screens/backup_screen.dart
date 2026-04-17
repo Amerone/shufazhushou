@@ -395,7 +395,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           children: [
             PageHeader(
               title: '数据备份与恢复',
-              subtitle: '应用内保留最近备份；真正对外分享时，会先转换成需要口令才能恢复的加密备份文件。',
+              subtitle: '备份后可加密分享，恢复时需口令。',
               onBack: () => context.pop(),
             ),
             Expanded(
@@ -496,13 +496,6 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                                                 ?.copyWith(
                                                   fontWeight: FontWeight.w700,
                                                 ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            '应用内会保留最近备份，外发时再临时生成加密文件；恢复最近备份或再次分享都可以直接从这里操作。',
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.bodySmall,
                                           ),
                                         ],
                                       ),
@@ -625,17 +618,6 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                                                 .bodySmall
                                                 ?.copyWith(height: 1.5),
                                           ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            '如果系统文件里暂时找不到，请直接回到本页，从最近备份重新生成一份加密分享文件即可。',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall
-                                                ?.copyWith(
-                                                  color: kPrimaryBlue,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                          ),
                                         ],
                                       ),
                                     );
@@ -703,18 +685,6 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                                     );
                                   },
                                 ),
-                                const SizedBox(height: 14),
-                                const _InfoRow(
-                                  icon: Icons.share_outlined,
-                                  text:
-                                      '生成后会自动打开系统分享面板，分享出去的是加密备份文件；建议直接另存到文件、云盘或另一台设备。',
-                                ),
-                                const SizedBox(height: 10),
-                                const _InfoRow(
-                                  icon: Icons.warning_amber_rounded,
-                                  text:
-                                      '恢复前会校验备份文件格式；如果选择的是加密备份，还需要输入创建时设置的口令。',
-                                ),
                               ],
                             ),
                           ),
@@ -756,7 +726,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                                       ),
                                     ),
                                     child: Text(
-                                      '还没有应用内备份。先点上面的生成加密备份并分享，之后就能在这里直接找到最近几份副本。',
+                                      '还没有应用内备份，先生成一份。',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall
@@ -802,9 +772,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
 class _SectionHeader extends StatelessWidget {
   final String title;
-  final String subtitle;
+  final String? subtitle;
 
-  const _SectionHeader({required this.title, required this.subtitle});
+  const _SectionHeader({required this.title, this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -817,8 +787,10 @@ class _SectionHeader extends StatelessWidget {
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
-        const SizedBox(height: 4),
-        Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+        ],
       ],
     );
   }
@@ -932,30 +904,6 @@ class _BackupRecordCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _InfoRow({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: kPrimaryBlue),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.5),
-          ),
-        ),
-      ],
     );
   }
 }

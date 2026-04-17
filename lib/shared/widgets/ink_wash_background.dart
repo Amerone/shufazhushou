@@ -12,7 +12,7 @@ class InkWashBackground extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFF9F5EC), Color(0xFFF3EEE3), Color(0xFFF7F2E9)],
+          colors: [Color(0xFFFBF7EE), Color(0xFFF3EEE2), Color(0xFFF8F3E8)],
         ),
       ),
       child: Stack(
@@ -23,7 +23,7 @@ class InkWashBackground extends StatelessWidget {
             child: _InkBlob(
               width: 220,
               height: 180,
-              start: Color(0x26B7A48D),
+              start: Color(0x2A9FB7C8),
               end: Color(0x00B7A48D),
             ),
           ),
@@ -33,17 +33,17 @@ class InkWashBackground extends StatelessWidget {
             child: _InkBlob(
               width: 240,
               height: 220,
-              start: Color(0x18B44A3E),
+              start: Color(0x1FC24E40),
               end: Color(0x00B44A3E),
             ),
           ),
           Positioned(
-            left: 60,
-            bottom: -100,
+            left: 30,
+            bottom: -110,
             child: _InkBlob(
-              width: 280,
-              height: 200,
-              start: kPrimaryBlue.withValues(alpha: 0.07),
+              width: 320,
+              height: 220,
+              start: kPrimaryBlue.withValues(alpha: 0.08),
               end: Colors.transparent,
             ),
           ),

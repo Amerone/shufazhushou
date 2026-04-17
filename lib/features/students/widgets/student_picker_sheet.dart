@@ -169,9 +169,7 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                           .where((item) => _matchesQuery(item.student))
                           .toList()
                         ..sort(_compareStudents);
-                  final displayNames = buildDisplayNameMap(
-                    visibleStudents.map((item) => item.student).toList(),
-                  );
+                  final displayNames = ref.watch(studentDisplayNameMapProvider);
 
                   if (visibleStudents.isEmpty) {
                     return Column(

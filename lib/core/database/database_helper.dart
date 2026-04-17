@@ -8,7 +8,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._();
   static const databaseFileName = 'moyun.db';
   static const legacyDatabaseFileName = 'calligraphy_assistant.db';
-  static const databaseVersion = 5;
+  static const databaseVersion = 6;
   static const _legacySuffixes = ['-wal', '-shm', '-journal'];
 
   Future<Database>? _dbFuture;
@@ -31,6 +31,7 @@ class DatabaseHelper {
       onUpgrade: _onUpgrade,
       onOpen: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
+        await _ensureIndexes(db);
       },
     );
   }
@@ -112,10 +113,6 @@ class DatabaseHelper {
         FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
       )
     ''');
-    await db.execute(
-      'CREATE INDEX idx_attendance_student_date ON attendance(student_id, date)',
-    );
-    await db.execute('CREATE INDEX idx_attendance_date ON attendance(date)');
     await db.execute('''
       CREATE TABLE payments (
         id TEXT PRIMARY KEY,
@@ -127,9 +124,6 @@ class DatabaseHelper {
         FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
       )
     ''');
-    await db.execute(
-      'CREATE INDEX idx_payments_student ON payments(student_id)',
-    );
     await db.execute('''
       CREATE TABLE class_templates (
         id TEXT PRIMARY KEY,
@@ -154,6 +148,7 @@ class DatabaseHelper {
         dismissed_at INTEGER NOT NULL
       )
     ''');
+    await _ensureIndexes(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -179,6 +174,48 @@ class DatabaseHelper {
     if (oldVersion < 5) {
       await _addColumnIfMissing(db, 'attendance', 'artwork_image_path TEXT');
     }
+    if (oldVersion < 6) {
+      await _ensureIndexes(db);
+    }
+  }
+
+  Future<void> _ensureIndexes(Database db) async {
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_attendance_student_date
+      ON attendance(student_id, date)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_attendance_date
+      ON attendance(date)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_attendance_date_status
+      ON attendance(date, status)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_attendance_student_timeline
+      ON attendance(student_id, date DESC, start_time DESC, created_at DESC)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_attendance_student_status_date
+      ON attendance(student_id, status, date DESC)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_students_status_created
+      ON students(status, created_at DESC)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_payments_student
+      ON payments(student_id)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_payments_payment_date
+      ON payments(payment_date)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_payments_student_date
+      ON payments(student_id, payment_date DESC)
+    ''');
   }
 
   Future<void> _addColumnIfMissing(

@@ -37,61 +37,69 @@ class AttendanceArtworkPreview extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: hasImageFile
-              ? () => showAttendanceArtworkPreviewDialog(
-                  context,
-                  imagePath: normalizedPath,
-                  title: title,
-                )
-              : null,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: kPrimaryBlue.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: AspectRatio(
-                    aspectRatio: 4 / 3,
-                    child: hasImageFile
-                        ? Image.file(
-                            imageFile,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                _ArtworkUnavailable(label: emptyLabel),
-                          )
-                        : _ArtworkUnavailable(label: emptyLabel),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.open_in_full_outlined,
-                      size: 16,
-                      color: kPrimaryBlue,
+        Semantics(
+          label: hasImageFile ? '$title，点击查看原图' : emptyLabel,
+          button: hasImageFile,
+          image: true,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: hasImageFile
+                ? () => showAttendanceArtworkPreviewDialog(
+                    context,
+                    imagePath: normalizedPath,
+                    title: title,
+                  )
+                : null,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: kPrimaryBlue.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: AspectRatio(
+                      aspectRatio: 4 / 3,
+                      child: hasImageFile
+                          ? Image.file(
+                              imageFile,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _ArtworkUnavailable(label: emptyLabel),
+                            )
+                          : _ArtworkUnavailable(label: emptyLabel),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        hasImageFile ? '点击查看原图' : emptyLabel,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: hasImageFile ? kPrimaryBlue : kInkSecondary,
-                          fontWeight: FontWeight.w600,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.open_in_full_outlined,
+                        size: 16,
+                        color: kPrimaryBlue,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          hasImageFile ? '点击查看原图' : emptyLabel,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: hasImageFile
+                                    ? kPrimaryBlue
+                                    : kInkSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

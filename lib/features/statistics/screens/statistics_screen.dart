@@ -134,11 +134,6 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
       StatisticsPeriod.month => '本月',
       StatisticsPeriod.year => '本年',
     };
-    final periodDescription = switch (range.period) {
-      StatisticsPeriod.week => '聚焦本周排课密度和即时收入表现。',
-      StatisticsPeriod.month => '查看本月经营节奏、贡献结构与提醒。',
-      StatisticsPeriod.year => '回看全年课程累计和营收趋势。',
-    };
     final updatedLabel = DateFormat(
       'M月d日 HH:mm',
       'zh_CN',
@@ -150,7 +145,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
       body: InkWashBackground(
         child: Column(
           children: [
-            const PageHeader(title: '经营统计', subtitle: '查看课时收入、出勤结构和当前周期提醒。'),
+            const PageHeader(title: '经营统计'),
             Expanded(
               child: RefreshIndicator(
                 color: kSealRed,
@@ -165,7 +160,6 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                     _StatisticsOverviewCard(
                       range: range,
                       periodLabel: periodLabel,
-                      periodDescription: periodDescription,
                       updatedLabel: updatedLabel,
                       onExport: _exportAttendance,
                       onPeriodChanged: () {
@@ -182,7 +176,6 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                     _StatisticsSectionBlock(
                       anchorKey: _sectionKeys[_StatisticsAnchor.metrics],
                       title: '核心指标',
-                      subtitle: '收入、出勤和活跃人数会跟随顶部周期切换自动刷新。',
                       child: GlassCard(
                         padding: const EdgeInsets.all(18),
                         child: const RepaintBoundary(child: MetricsGrid()),
@@ -192,7 +185,6 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                     _StatisticsSectionBlock(
                       anchorKey: _sectionKeys[_StatisticsAnchor.revenue],
                       title: '收入走势',
-                      subtitle: '观察当前周期内的进账波动，及时识别高峰与空档。',
                       child: GlassCard(
                         padding: const EdgeInsets.all(18),
                         child: const RepaintBoundary(child: RevenueChart()),
@@ -202,7 +194,6 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                     _StatisticsSectionBlock(
                       anchorKey: _sectionKeys[_StatisticsAnchor.contribution],
                       title: '学生贡献',
-                      subtitle: '对比学员在收入和到课上的贡献度，便于安排回访与续费。',
                       child: GlassCard(
                         padding: const EdgeInsets.all(18),
                         child: const RepaintBoundary(
@@ -214,7 +205,6 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                     _StatisticsSectionBlock(
                       anchorKey: _sectionKeys[_StatisticsAnchor.status],
                       title: '状态分布',
-                      subtitle: '查看出勤状态占比，并快速定位异常记录。',
                       child: GlassCard(
                         padding: const EdgeInsets.all(18),
                         child: Column(
@@ -231,7 +221,6 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                     _StatisticsSectionBlock(
                       anchorKey: _sectionKeys[_StatisticsAnchor.heatmap],
                       title: '上课热力',
-                      subtitle: '识别常见上课时段，为排课和招生沟通提供参考。',
                       child: GlassCard(
                         padding: const EdgeInsets.all(18),
                         child: const RepaintBoundary(child: TimeHeatmap()),
@@ -241,7 +230,6 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                     _StatisticsSectionBlock(
                       anchorKey: _sectionKeys[_StatisticsAnchor.insights],
                       title: '经营提醒',
-                      subtitle: '聚焦当前周期内需要跟进的续费、流失与排课信号。',
                       child: GlassCard(
                         padding: const EdgeInsets.all(18),
                         child: const InsightList(),
@@ -251,7 +239,6 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                     _StatisticsSectionBlock(
                       anchorKey: _sectionKeys[_StatisticsAnchor.ai],
                       title: 'AI 经营洞察',
-                      subtitle: '基于当前周期核心数据生成经营分析和可执行建议。',
                       child: const DataInsightCard(),
                     ),
                   ],
@@ -362,19 +349,7 @@ class _StatisticsQuickNavigator extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                '长页面目录',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: kInkSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
             ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '轻触标签即可直接跳到对应分析区块，避免在长列表里反复滚动查找。',
-            style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
           ),
           const SizedBox(height: 14),
           LayoutBuilder(
@@ -490,13 +465,11 @@ class _StatisticsQuickNavChip extends StatelessWidget {
 class _StatisticsSectionBlock extends StatelessWidget {
   final Key? anchorKey;
   final String title;
-  final String subtitle;
   final Widget child;
 
   const _StatisticsSectionBlock({
     this.anchorKey,
     required this.title,
-    required this.subtitle,
     required this.child,
   });
 
@@ -507,7 +480,7 @@ class _StatisticsSectionBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionTitle(title: title, subtitle: subtitle),
+          _SectionTitle(title: title),
           const SizedBox(height: 12),
           child,
         ],
@@ -519,7 +492,6 @@ class _StatisticsSectionBlock extends StatelessWidget {
 class _StatisticsOverviewCard extends ConsumerWidget {
   final StatisticsRange range;
   final String periodLabel;
-  final String periodDescription;
   final String updatedLabel;
   final VoidCallback onExport;
   final VoidCallback onPeriodChanged;
@@ -527,7 +499,6 @@ class _StatisticsOverviewCard extends ConsumerWidget {
   const _StatisticsOverviewCard({
     required this.range,
     required this.periodLabel,
-    required this.periodDescription,
     required this.updatedLabel,
     required this.onExport,
     required this.onPeriodChanged,
@@ -587,11 +558,6 @@ class _StatisticsOverviewCard extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                periodDescription,
-                                style: theme.textTheme.bodySmall,
-                              ),
-                              const SizedBox(height: 8),
                               Text(
                                 '数据更新于 $updatedLabel',
                                 style: theme.textTheme.bodySmall?.copyWith(
@@ -706,9 +672,8 @@ class _StatisticsOverviewCard extends ConsumerWidget {
 
 class _SectionTitle extends StatelessWidget {
   final String title;
-  final String? subtitle;
 
-  const _SectionTitle({required this.title, this.subtitle});
+  const _SectionTitle({required this.title});
 
   @override
   Widget build(BuildContext context) {
@@ -723,10 +688,6 @@ class _SectionTitle extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(subtitle!, style: theme.textTheme.bodySmall),
-        ],
       ],
     );
   }

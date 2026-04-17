@@ -12,7 +12,7 @@ import '../../../core/providers/home_workbench_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../shared/constants.dart'
-    show formatDate, kDefaultInstitutionName, kDefaultTeacherName;
+    show kDefaultInstitutionName, kDefaultTeacherName;
 import '../../../shared/theme.dart';
 import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/widgets/glass_card.dart';
@@ -89,9 +89,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       context: context,
       isScrollControlled: true,
       builder: (_) => const StudentPickerSheet(
-        title: '选择缴费学生',
-        subtitle: '先选学生，再直接录入本次缴费金额。',
-        actionLabel: '记录缴费',
+        title: '\u9009\u62e9\u7f34\u8d39\u5b66\u751f',
+        subtitle:
+            '\u5148\u9009\u5b66\u751f\uff0c\u518d\u76f4\u63a5\u5f55\u5165\u672c\u6b21\u7f34\u8d39\u91d1\u989d\u3002',
+        actionLabel: '\u8bb0\u5f55\u7f34\u8d39',
       ),
     );
     if (selectedStudent == null || !mounted) return;
@@ -121,36 +122,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final theme = Theme.of(context);
     final selectedDate = ref.watch(selectedDateProvider);
     final selectedMonth = ref.watch(selectedMonthProvider);
-    final asyncRecords = ref.watch(attendanceProvider);
-    final workbenchTasks = ref.watch(homeWorkbenchProvider);
-    final asyncStudents = ref.watch(studentProvider);
+    final dayCount = ref.watch(
+      selectedDateAttendanceProvider.select(
+        (value) => value.valueOrNull?.length ?? 0,
+      ),
+    );
+    final monthCount = ref.watch(
+      attendanceProvider.select((value) => value.valueOrNull?.length ?? 0),
+    );
+    final pendingTaskCount = ref.watch(
+      homeWorkbenchProvider.select((value) => value.valueOrNull?.length),
+    );
+    final studentSummary = ref.watch(studentRosterSummaryProvider);
     final templates = ref.watch(classTemplateProvider).valueOrNull ?? const [];
     final settings = ref.watch(settingsProvider).valueOrNull ?? const {};
     final today = DateTime.now();
 
-    final dateStr = formatDate(selectedDate);
-    final dayCount =
-        asyncRecords.valueOrNull
-            ?.where((record) => record.date == dateStr)
-            .length ??
-        0;
-    final monthKey = DateFormat('yyyy-MM', 'zh_CN').format(selectedMonth);
-    final monthCount =
-        asyncRecords.valueOrNull
-            ?.where((record) => record.date.startsWith(monthKey))
-            .length ??
-        0;
-    final pendingTaskCount = workbenchTasks.valueOrNull?.length;
-    final studentCount = asyncStudents.valueOrNull?.length ?? 0;
-    final hasStudents = studentCount > 0;
+    final studentCount = studentSummary.count;
+    final hasStudents = studentSummary.hasStudents;
     final teacherReady = _isTeacherProfileReady(settings);
-    final studentIds = {
-      for (final item in asyncStudents.valueOrNull ?? const <StudentWithMeta>[])
-        item.student.id,
-    };
     final recentSelectedIds = parseQuickEntryRecentStudentIds(
       settings,
-    ).intersection(studentIds);
+    ).intersection(studentSummary.ids);
     final recentStartTime = settings[quickEntryDefaultStartTimeSettingKey]
         ?.trim();
     final recentEndTime = settings[quickEntryDefaultEndTimeSettingKey]?.trim();
@@ -164,18 +157,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? '$recentStartTime-$recentEndTime'
         : null;
 
-    final monthLabel = DateFormat('yyyy年M月', 'zh_CN').format(selectedMonth);
-    final dateLabel = DateFormat('M月d日 EEEE', 'zh_CN').format(selectedDate);
+    final monthLabel = DateFormat(
+      'yyyy\u5e74M\u6708',
+      'zh_CN',
+    ).format(selectedMonth);
+    final dateLabel = DateFormat(
+      'M\u6708d\u65e5 EEEE',
+      'zh_CN',
+    ).format(selectedDate);
     final isToday =
         selectedDate.year == today.year &&
         selectedDate.month == today.month &&
         selectedDate.day == today.day;
-    final sectionTitle = isToday ? '今日出勤名单' : '$dateLabel 出勤名单';
-    final headerSubtitle = !hasStudents
-        ? '先建立学生档案，再开始记课、查出勤和记录缴费。'
-        : isToday
-        ? '先看今天谁已出勤，再继续记课或记录缴费。'
-        : '$dateLabel 已选中，可继续核对当日出勤和课程记录。';
+    final sectionTitle = isToday
+        ? '\u4eca\u65e5\u51fa\u52e4\u540d\u5355'
+        : '$dateLabel \u51fa\u52e4\u540d\u5355';
+    final String? headerSubtitle = hasStudents
+        ? null
+        : '\u5148\u65b0\u589e\u6216\u5bfc\u5165\u5b66\u751f';
 
     final homeTheme = theme.copyWith(
       splashColor: kPrimaryBlue.withValues(alpha: 0.08),
@@ -191,7 +190,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Column(
             children: [
               PageHeader(
-                title: hasStudents ? '今日工作台' : '开始使用',
+                title: hasStudents
+                    ? '\u4eca\u65e5\u5de5\u4f5c\u53f0'
+                    : '\u5f00\u59cb\u4f7f\u7528',
                 subtitle: headerSubtitle,
                 trailing: _TodayAction(
                   onPressed: () {
@@ -201,7 +202,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       today.year,
                       today.month,
                     );
-                    ref.read(attendanceProvider.notifier).reload();
                   },
                 ),
               ),
@@ -211,8 +211,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   edgeOffset: 20,
                   displacement: 28,
                   onRefresh: () async {
-                    ref.read(attendanceProvider.notifier).reload();
-                    await ref.read(studentProvider.notifier).reload();
+                    await Future.wait([
+                      ref.read(attendanceProvider.notifier).reload(),
+                      ref.read(studentProvider.notifier).reload(),
+                    ]);
                   },
                   child: CustomScrollView(
                     controller: _scrollController,
@@ -224,17 +226,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              if (showInitialSetupBanner) ...[
-                                _InitialSetupBanner(
-                                  teacherReady: teacherReady,
-                                  onOpenSetup: () async {
-                                    await InteractionFeedback.pageTurn(context);
-                                    if (!context.mounted) return;
-                                    context.push('/setup');
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                              ],
                               _HomeFocusCard(
                                 monthLabel: monthLabel,
                                 dateLabel: dateLabel,
@@ -256,6 +247,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 onCreateStudent: _openCreateStudent,
                                 onImportStudents: _openImportStudents,
                               ),
+                              if (hasStudents &&
+                                  (pendingTaskCount ?? 0) > 0) ...[
+                                const SizedBox(height: 16),
+                                const HomeWorkbenchPanel(),
+                              ],
                               if (showQuickLaunchPanel) ...[
                                 const SizedBox(height: 16),
                                 _QuickLaunchPanel(
@@ -299,53 +295,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   ],
                                 ),
                               ],
-                              if (hasStudents &&
-                                  (pendingTaskCount ?? 0) > 0) ...[
+                              if (showInitialSetupBanner) ...[
                                 const SizedBox(height: 16),
-                                const HomeWorkbenchPanel(),
+                                _InitialSetupBanner(
+                                  teacherReady: teacherReady,
+                                  onOpenSetup: () async {
+                                    await InteractionFeedback.pageTurn(context);
+                                    if (!context.mounted) return;
+                                    context.push('/setup');
+                                  },
+                                ),
                               ],
                             ],
-                          ),
-                        ),
-                      ),
-                      SliverPadding(
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          hasStudents ? 24 : 20,
-                          20,
-                          0,
-                        ),
-                        sliver: SliverToBoxAdapter(
-                          child: KeyedSubtree(
-                            key: _attendanceSectionKey,
-                            child: _SectionTitleRow(
-                              title: sectionTitle,
-                              countText: '$dayCount 条',
-                              color: kSealRed,
-                            ),
-                          ),
-                        ),
-                      ),
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                        sliver: SliverToBoxAdapter(
-                          child: GlassCard(
-                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  hasStudents
-                                      ? '按时间顺序查看和调整当日出勤记录'
-                                      : '建好学生后，这里会直接显示当天谁出勤了。',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    height: 1.45,
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                const AttendanceList(),
-                              ],
-                            ),
                           ),
                         ),
                       ),
@@ -357,9 +318,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           0,
                         ),
                         sliver: SliverToBoxAdapter(
+                          child: KeyedSubtree(
+                            key: _attendanceSectionKey,
+                            child: _SectionTitleRow(
+                              title: sectionTitle,
+                              countText: '$dayCount \u6761',
+                              color: kSealRed,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SliverPadding(
+                        padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: GlassCard(
+                            padding: EdgeInsets.fromLTRB(20, 16, 20, 18),
+                            child: AttendanceList(),
+                          ),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                        sliver: SliverToBoxAdapter(
                           child: _SectionTitleRow(
-                            title: '本月课历',
-                            countText: '$monthCount 次',
+                            title: '\u672c\u6708\u8bfe\u5386',
+                            countText: '$monthCount \u6b21',
                             color: kPrimaryBlue,
                           ),
                         ),
@@ -426,10 +409,10 @@ class _HomeFocusCard extends StatelessWidget {
     final theme = Theme.of(context);
     final pendingCount = taskCount ?? 0;
     final statusText = !hasStudents
-        ? '先建立学生档案'
+        ? '\u5148\u5efa\u7acb\u5b66\u751f\u6863\u6848'
         : pendingCount > 0
-        ? '待处理 $pendingCount 项'
-        : '今日已记 $dayCount 节课';
+        ? '\u5f85\u5904\u7406 $pendingCount \u9879'
+        : '\u4eca\u65e5\u5df2\u8bb0 $dayCount \u8282\u8bfe';
 
     return GlassCard(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
@@ -471,7 +454,11 @@ class _HomeFocusCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  hasStudents ? (isToday ? '今日优先' : '当前日期') : '首次建档',
+                  hasStudents
+                      ? (isToday
+                            ? '\u4eca\u65e5\u4f18\u5148'
+                            : '\u5f53\u524d\u65e5\u671f')
+                      : '\u9996\u6b21\u5efa\u6863',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: kSealRed,
                     fontWeight: FontWeight.w700,
@@ -482,7 +469,9 @@ class _HomeFocusCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            hasStudents ? dateLabel : '先建学生档案',
+            hasStudents
+                ? dateLabel
+                : '\u5148\u5efa\u7acb\u5b66\u751f\u6863\u6848',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
             ),
@@ -495,7 +484,7 @@ class _HomeFocusCard extends StatelessWidget {
               _HomeStatusPill(label: '今日出勤 $dayCount', color: kSealRed),
               _HomeStatusPill(label: '本月课次 $monthCount', color: kPrimaryBlue),
               _HomeStatusPill(
-                label: hasStudents ? '学生 $studentCount' : statusText,
+                label: hasStudents ? '学生总数 $studentCount' : statusText,
                 color: kOrange,
               ),
             ],
@@ -525,7 +514,7 @@ class _HomeFocusCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         icon: const Icon(Icons.person_add_alt_1),
-                        label: const Text('新增学生'),
+                        label: const Text('\u65b0\u589e\u5b66\u751f'),
                       ),
                     ),
                     SizedBox(
@@ -536,7 +525,7 @@ class _HomeFocusCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         icon: const Icon(Icons.upload_file_outlined),
-                        label: const Text('批量导入'),
+                        label: const Text('\u6279\u91cf\u5bfc\u5165'),
                       ),
                     ),
                   ],
@@ -556,7 +545,7 @@ class _HomeFocusCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       icon: const Icon(Icons.brush_outlined),
-                      label: const Text('立即记课'),
+                      label: const Text('\u7acb\u5373\u8bb0\u8bfe'),
                     ),
                   ),
                   SizedBox(
@@ -567,7 +556,11 @@ class _HomeFocusCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       icon: const Icon(Icons.fact_check_outlined),
-                      label: Text(isToday ? '查看今日出勤' : '查看当天出勤'),
+                      label: Text(
+                        isToday
+                            ? '\u67e5\u770b\u4eca\u65e5\u51fa\u52e4'
+                            : '\u67e5\u770b\u5f53\u5929\u51fa\u52e4',
+                      ),
                     ),
                   ),
                   SizedBox(
@@ -578,7 +571,7 @@ class _HomeFocusCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       icon: const Icon(Icons.person_add_alt_1_outlined),
-                      label: const Text('新增学生'),
+                      label: const Text('\u65b0\u589e\u5b66\u751f'),
                     ),
                   ),
                 ],
@@ -600,7 +593,7 @@ class _HomeFocusCard extends StatelessWidget {
                     ),
                   ),
                   icon: const Icon(Icons.payments_outlined, size: 18),
-                  label: const Text('记录缴费'),
+                  label: const Text('\u8bb0\u5f55\u7f34\u8d39'),
                 ),
                 OutlinedButton.icon(
                   onPressed: onOpenStudents,
@@ -611,7 +604,7 @@ class _HomeFocusCard extends StatelessWidget {
                     ),
                   ),
                   icon: const Icon(Icons.people_alt_outlined, size: 18),
-                  label: const Text('学生档案'),
+                  label: const Text('\u5b66\u751f\u6863\u6848'),
                 ),
               ],
             ),
@@ -686,7 +679,7 @@ class _QuickLaunchPanel extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '常用记课捷径',
+                  '\u5e38\u7528\u8bb0\u8bfe\u6377\u5f84',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -702,7 +695,7 @@ class _QuickLaunchPanel extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  '少走一步',
+                  '\u5c11\u8d70\u4e00\u6b65',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: kSealRed,
                     fontWeight: FontWeight.w700,
@@ -710,11 +703,6 @@ class _QuickLaunchPanel extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '直接按最近班级或常用时段开始记课，打开后仍可继续改人、改时间。',
-            style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
           ),
           if (onOpenRecentGroup != null) ...[
             const SizedBox(height: 14),
@@ -746,18 +734,9 @@ class _QuickLaunchPanel extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '按最近班级记课',
+                          '\u6309\u6700\u8fd1\u73ed\u7ea7\u8bb0\u8bfe',
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          recentTimeLabel == null
-                              ? '已预选最近同班的 $recentGroupCount 位学员。'
-                              : '已预选最近同班的 $recentGroupCount 位学员，沿用 $recentTimeLabel。',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            height: 1.45,
                           ),
                         ),
                       ],
@@ -766,7 +745,7 @@ class _QuickLaunchPanel extends StatelessWidget {
                   const SizedBox(width: 12),
                   FilledButton.tonal(
                     onPressed: onOpenRecentGroup,
-                    child: const Text('去记课'),
+                    child: const Text('\u53bb\u8bb0\u8bfe'),
                   ),
                 ],
               ),
@@ -775,7 +754,7 @@ class _QuickLaunchPanel extends StatelessWidget {
           if (templateShortcuts.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              '按常用时段打开',
+              '\u6309\u5e38\u7528\u65f6\u6bb5\u6253\u5f00',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -874,7 +853,7 @@ class _InitialSetupBanner extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '首次使用建议先完成引导',
+                  '\u9996\u6b21\u4f7f\u7528\u5efa\u8bae\u5148\u5b8c\u6210\u5f15\u5bfc',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -890,34 +869,12 @@ class _InitialSetupBanner extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  '$readyCount/2 已准备',
+                  '$readyCount/2 \u5df2\u5b8c\u6210',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: kPrimaryBlue,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '先完善老师信息，再新增或导入学生，首页的记课和缴费入口就会顺手很多。',
-            style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _SetupStatusChip(
-                icon: Icons.edit_note_outlined,
-                label: teacherReady ? '教师抬头已就绪' : '教师抬头待设置',
-                color: teacherReady ? kGreen : kOrange,
-              ),
-              const _SetupStatusChip(
-                icon: Icons.groups_2_outlined,
-                label: '学生档案待建立',
-                color: kSealRed,
               ),
             ],
           ),
@@ -927,44 +884,7 @@ class _InitialSetupBanner extends StatelessWidget {
             child: FilledButton.tonalIcon(
               onPressed: onOpenSetup,
               icon: const Icon(Icons.map_outlined, size: 18),
-              label: const Text('查看开课引导'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SetupStatusChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _SetupStatusChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
+              label: const Text('\u67e5\u770b\u5f00\u8bfe\u5f15\u5bfc'),
             ),
           ),
         ],
@@ -1037,7 +957,7 @@ class _TodayAction extends StatelessWidget {
       ),
       onPressed: onPressed,
       icon: const Icon(Icons.today_outlined, size: 18),
-      label: const Text('回到今天'),
+      label: const Text('\u56de\u5230\u4eca\u5929'),
     );
   }
 }
@@ -1075,7 +995,7 @@ class _QuickEntryAction extends StatelessWidget {
         extendedPadding: const EdgeInsets.symmetric(horizontal: 18),
         icon: const Icon(Icons.brush_outlined),
         label: const Text(
-          '立即记课',
+          '\u7acb\u5373\u8bb0\u8bfe',
           style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.4),
         ),
       ),
@@ -1101,7 +1021,7 @@ class _SetupAction extends StatelessWidget {
       extendedPadding: const EdgeInsets.symmetric(horizontal: 18),
       icon: const Icon(Icons.person_add_alt_1),
       label: const Text(
-        '新增学生',
+        '\u65b0\u589e\u5b66\u751f',
         style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.4),
       ),
     );

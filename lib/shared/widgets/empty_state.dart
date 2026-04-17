@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../theme.dart';
 
 class EmptyState extends StatelessWidget {
@@ -39,9 +39,7 @@ class EmptyState extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: kInkSecondary,
-              ),
+              style: theme.textTheme.bodyMedium?.copyWith(color: kInkSecondary),
               textAlign: TextAlign.center,
             ),
             if (actionLabel != null && onAction != null) ...[

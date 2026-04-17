@@ -28,12 +28,11 @@ class DismissedInsightPolicy {
     return retentionForType(type.name);
   }
 
-  static bool isActive(
-    DismissedInsight insight, {
-    DateTime? now,
-  }) {
+  static bool isActive(DismissedInsight insight, {DateTime? now}) {
     final currentTime = now ?? DateTime.now();
-    final dismissedAt = DateTime.fromMillisecondsSinceEpoch(insight.dismissedAt);
+    final dismissedAt = DateTime.fromMillisecondsSinceEpoch(
+      insight.dismissedAt,
+    );
     final expiresAt = dismissedAt.add(retentionForType(insight.insightType));
     return currentTime.isBefore(expiresAt);
   }

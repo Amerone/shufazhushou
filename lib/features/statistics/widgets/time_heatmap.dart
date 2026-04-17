@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/heatmap_provider.dart';
 import '../../../shared/theme.dart';
@@ -13,7 +13,25 @@ class TimeHeatmap extends ConsumerStatefulWidget {
 class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
   String? _tooltip;
 
-  static const _hours = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
+  static const _hours = [
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+  ];
   static const _days = ['一', '二', '三', '四', '五', '六', '日'];
 
   @override
@@ -66,7 +84,12 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                       ..._hours.map(
                         (h) => SizedBox(
                           height: 20,
-                          child: Text('$h', style: theme.textTheme.bodySmall?.copyWith(fontSize: 10)),
+                          child: Text(
+                            '$h',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 10,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -82,24 +105,31 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                             child: Center(
                               child: Text(
                                 _days[dayIdx],
-                                style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 10,
+                                ),
                               ),
                             ),
                           ),
                           ..._hours.map((h) {
                             final count = map['$dayIdx-$h'] ?? 0;
-                            final opacity = count == 0 ? 0.05 : count / maxCount;
+                            final opacity = count == 0
+                                ? 0.05
+                                : count / maxCount;
 
                             return GestureDetector(
                               onTap: () => setState(
-                                () => _tooltip = '周${_days[dayIdx]} $h:00  $count 人次',
+                                () => _tooltip =
+                                    '周${_days[dayIdx]} $h:00  $count 人次',
                               ),
                               child: Container(
                                 width: 28,
                                 height: 20,
                                 margin: const EdgeInsets.all(1),
                                 decoration: BoxDecoration(
-                                  color: kPrimaryBlue.withValues(alpha: opacity),
+                                  color: kPrimaryBlue.withValues(
+                                    alpha: opacity,
+                                  ),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                               ),
@@ -123,10 +153,7 @@ class _HeatLevelChip extends StatelessWidget {
   final String label;
   final double opacity;
 
-  const _HeatLevelChip({
-    required this.label,
-    required this.opacity,
-  });
+  const _HeatLevelChip({required this.label, required this.opacity});
 
   @override
   Widget build(BuildContext context) {

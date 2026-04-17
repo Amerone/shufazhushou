@@ -41,7 +41,10 @@ Future<TimeOfDay?> showTimeWheelPicker({
                     onPressed: () => Navigator.pop(ctx),
                     child: Text(
                       '取消',
-                      style: TextStyle(color: kInkSecondary, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: kInkSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                   if (label != null)
@@ -69,7 +72,13 @@ Future<TimeOfDay?> showTimeWheelPicker({
               child: CupertinoDatePicker(
                 mode: CupertinoDatePickerMode.time,
                 use24hFormat: true,
-                initialDateTime: DateTime(2024, 1, 1, initialTime.hour, initialTime.minute),
+                initialDateTime: DateTime(
+                  2024,
+                  1,
+                  1,
+                  initialTime.hour,
+                  initialTime.minute,
+                ),
                 onDateTimeChanged: (dt) {
                   HapticFeedback.selectionClick();
                   selected = TimeOfDay(hour: dt.hour, minute: dt.minute);

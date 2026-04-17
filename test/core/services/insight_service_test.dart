@@ -257,35 +257,38 @@ void main() {
       expect(peak.calcLogic, contains('\u672C\u6708'));
     });
 
-    test('does not create renewal insight for student without balance history', () {
-      final students = [
-        const Student(
-          id: 'student-3',
-          name: 'Dylan',
-          parentName: null,
-          parentPhone: null,
-          pricePerClass: 100,
-          status: 'active',
-          note: null,
-          createdAt: 1,
-          updatedAt: 1,
-        ),
-      ];
+    test(
+      'does not create renewal insight for student without balance history',
+      () {
+        final students = [
+          const Student(
+            id: 'student-3',
+            name: 'Dylan',
+            parentName: null,
+            parentPhone: null,
+            pricePerClass: 100,
+            status: 'active',
+            note: null,
+            createdAt: 1,
+            updatedAt: 1,
+          ),
+        ];
 
-      final insights = service.buildInsights(
-        students: students,
-        displayNames: const {'student-3': 'Dylan'},
-        allAttendance: const {'student-3': <Attendance>[]},
-        allPayments: const {'student-3': 0},
-        dismissedKeys: const <String>{},
-        activeStudentCount: 0,
-        now: DateTime(2026, 3, 27, 9, 0),
-      );
+        final insights = service.buildInsights(
+          students: students,
+          displayNames: const {'student-3': 'Dylan'},
+          allAttendance: const {'student-3': <Attendance>[]},
+          allPayments: const {'student-3': 0},
+          dismissedKeys: const <String>{},
+          activeStudentCount: 0,
+          now: DateTime(2026, 3, 27, 9, 0),
+        );
 
-      expect(
-        insights.where((item) => item.type == InsightType.renewal),
-        isEmpty,
-      );
-    });
+        expect(
+          insights.where((item) => item.type == InsightType.renewal),
+          isEmpty,
+        );
+      },
+    );
   });
 }

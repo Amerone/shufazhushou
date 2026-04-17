@@ -22,6 +22,7 @@ import 'package:moyun/core/services/data_insight_service.dart';
 import 'package:moyun/core/services/insight_aggregation_service.dart';
 import 'package:moyun/core/services/vision_analysis_gateway.dart';
 import 'package:moyun/features/statistics/widgets/data_insight_card.dart';
+import 'package:moyun/shared/constants.dart';
 
 void main() {
   testWidgets('rerun failure clears previous insight result and shows error', (
@@ -184,6 +185,86 @@ void main() {
     expect(find.text('stale-summary'), findsNothing);
     expect(find.text('stale-revenue'), findsNothing);
   });
+
+  testWidgets('uses one duplicate-name map for insight summary inputs', (
+    tester,
+  ) async {
+    final service = _CaptureDataInsightService();
+    final paymentDao = _FakePaymentDao();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dataInsightServiceProvider.overrideWithValue(service),
+          statisticsNowProvider.overrideWith((ref) => DateTime(2026, 4, 3)),
+          studentDaoProvider.overrideWithValue(
+            _FakeStudentDao(const [
+              StudentWithMeta(
+                Student(
+                  id: 'student-1',
+                  name: 'Alex',
+                  parentName: 'Parent A',
+                  pricePerClass: 200,
+                  status: 'active',
+                  createdAt: 1,
+                  updatedAt: 1,
+                ),
+                '2026-03-30',
+              ),
+              StudentWithMeta(
+                Student(
+                  id: 'student-2',
+                  name: 'Alex',
+                  parentName: 'Parent B',
+                  pricePerClass: 200,
+                  status: 'active',
+                  createdAt: 2,
+                  updatedAt: 2,
+                ),
+                null,
+              ),
+            ]),
+          ),
+          attendanceDaoProvider.overrideWithValue(_FakeAttendanceDao()),
+          paymentDaoProvider.overrideWithValue(paymentDao),
+          dismissedInsightDaoProvider.overrideWithValue(
+            _FakeDismissedInsightDao(),
+          ),
+          insightServiceProvider.overrideWithValue(
+            _DisplayNameInsightAggregationService(),
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: SafeArea(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: DataInsightCard(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    await tester.tap(find.byType(FilledButton));
+    await _settleUi(tester);
+
+    final summary = service.lastSummary;
+
+    expect(summary, isNotNull);
+    expect(summary!.periodRevenue, 200);
+    expect(paymentDao.totalByDateRangeCalls, 1);
+    expect(summary.topContributors.single.name, 'Alex\uFF08Parent A\uFF09');
+    expect(summary.riskStudentNames, ['Alex\uFF08Parent A\uFF09']);
+    expect(
+      summary.insightMessages.single,
+      'Alex\uFF08Parent A\uFF09: \u9700\u5173\u6CE8',
+    );
+  });
 }
 
 class _SequenceDataInsightService extends DataInsightService {
@@ -219,6 +300,30 @@ class _CompleterDataInsightService extends DataInsightService {
     double temperature = 0.2,
   }) {
     return completer.future;
+  }
+}
+
+class _CaptureDataInsightService extends DataInsightService {
+  BusinessDataSummary? lastSummary;
+
+  _CaptureDataInsightService() : super(gateway: _NoopVisionGateway());
+
+  @override
+  Future<DataInsightResult> analyzeBusinessData(
+    BusinessDataSummary summary, {
+    double temperature = 0.2,
+  }) async {
+    lastSummary = summary;
+    return const DataInsightResult(
+      isStructured: true,
+      model: 'fake-model',
+      rawText: '{"summary":"ok"}',
+      summary: 'ok',
+      revenueInsight: '',
+      engagementInsight: '',
+      riskAlerts: [],
+      recommendations: [],
+    );
   }
 }
 
@@ -318,10 +423,15 @@ class _FakeAttendanceDao extends AttendanceDao {
 }
 
 class _FakePaymentDao extends PaymentDao {
+  int totalByDateRangeCalls = 0;
+
   _FakePaymentDao() : super(DatabaseHelper.instance);
 
   @override
-  Future<double> getTotalByDateRange(String? from, String? to) async => 200;
+  Future<double> getTotalByDateRange(String? from, String? to) async {
+    totalByDateRangeCalls += 1;
+    return 200;
+  }
 
   @override
   Future<Map<String, double>> getTotalByAllStudentsAndDateRange(
@@ -357,6 +467,32 @@ class _FakeInsightAggregationService extends InsightAggregationService {
     DateTime? now,
   }) {
     return const [];
+  }
+}
+
+class _DisplayNameInsightAggregationService extends InsightAggregationService {
+  @override
+  List<Insight> buildInsights({
+    required List<Student> students,
+    required Map<String, String> displayNames,
+    required Map<String, List<Attendance>> allAttendance,
+    required Map<String, double> allPayments,
+    required Set<String> dismissedKeys,
+    required int activeStudentCount,
+    String activePeriodLabel = '\u672C\u5468',
+    DateTime? now,
+  }) {
+    return [
+      Insight(
+        type: InsightType.renewal,
+        studentId: 'student-1',
+        studentName: displayNames['student-1'] ?? 'student-1',
+        message: '\u9700\u5173\u6CE8',
+        suggestion: '',
+        calcLogic: '',
+        dataFreshness: '',
+      ),
+    ];
   }
 }
 
