@@ -68,8 +68,25 @@ class AttendanceDao {
           );
           final oldArtworkPath =
               oldRows.firstOrNull?['artwork_image_path'] as String?;
-          if (oldArtworkPath?.trim().isNotEmpty == true) {
-            obsoleteArtworkPaths.add(oldArtworkPath!.trim());
+          final trimmedOldArtworkPath = oldArtworkPath?.trim();
+          final trimmedNewArtworkPath = record.artworkImagePath?.trim();
+
+          if (trimmedOldArtworkPath?.isNotEmpty == true &&
+              trimmedOldArtworkPath != trimmedNewArtworkPath) {
+            obsoleteArtworkPaths.add(trimmedOldArtworkPath!);
+          }
+
+          if (oldId == record.id) {
+            final updated = await txn.update(
+              'attendance',
+              record.toMap(),
+              where: 'id = ?',
+              whereArgs: [oldId],
+            );
+            if (updated == 0) {
+              await txn.insert('attendance', record.toMap());
+            }
+            continue;
           }
           await txn.delete('attendance', where: 'id = ?', whereArgs: [oldId]);
         }

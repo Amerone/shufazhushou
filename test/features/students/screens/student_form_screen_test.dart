@@ -54,6 +54,45 @@ void main() {
     expect(find.text('180'), findsOneWidget);
     expect(find.text('Prefers weekend classes'), findsOneWidget);
   });
+
+  testWidgets('student form rejects negative class price', (tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: StudentFormScreen())),
+    );
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'Alice');
+    await tester.ensureVisible(find.byType(TextFormField).at(3));
+    await tester.enterText(find.byType(TextFormField).at(3), '-1');
+    await tester.ensureVisible(find.byType(ElevatedButton));
+    await tester.tap(find.byType(ElevatedButton));
+    await tester.pump();
+
+    expect(find.text('课时单价不能小于 0'), findsOneWidget);
+  });
+
+  testWidgets('edit form does not create when original student is missing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [studentProvider.overrideWith(_EmptyStudentNotifier.new)],
+        child: const MaterialApp(
+          home: StudentFormScreen(studentId: 'missing-student'),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'Alice');
+    await tester.ensureVisible(find.byType(TextFormField).at(3));
+    await tester.enterText(find.byType(TextFormField).at(3), '180');
+    await tester.ensureVisible(find.byType(ElevatedButton));
+    await tester.tap(find.byType(ElevatedButton));
+    await tester.pumpAndSettle();
+
+    expect(find.text('学生档案不存在或尚未加载完成，请返回后重试。'), findsOneWidget);
+  });
 }
 
 class _DelayedStudentNotifier extends StudentNotifier {
@@ -63,4 +102,9 @@ class _DelayedStudentNotifier extends StudentNotifier {
   Future<List<StudentWithMeta>> build() async {
     return pendingResult!.future;
   }
+}
+
+class _EmptyStudentNotifier extends StudentNotifier {
+  @override
+  Future<List<StudentWithMeta>> build() async => const <StudentWithMeta>[];
 }

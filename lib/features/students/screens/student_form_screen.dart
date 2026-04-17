@@ -89,6 +89,10 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
+    if (_isEdit && _original == null) {
+      AppToast.showError(context, '学生档案不存在或尚未加载完成，请返回后重试。');
+      return;
+    }
 
     setState(() => _loading = true);
     try {
@@ -263,9 +267,11 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
                             ),
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) return '请输入单价';
-                              if (double.tryParse(v.trim()) == null) {
+                              final price = double.tryParse(v.trim());
+                              if (price == null) {
                                 return '请输入有效数字';
                               }
+                              if (price < 0) return '课时单价不能小于 0';
                               return null;
                             },
                           ),

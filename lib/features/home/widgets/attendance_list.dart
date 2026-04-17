@@ -66,10 +66,14 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final asyncRecords = ref.watch(selectedDateAttendanceProvider);
     final hasStudents = ref.watch(
       studentProvider.select((async) => async.valueOrNull?.isNotEmpty ?? false),
     );
+    if (!hasStudents) {
+      return const EmptyState(message: '当日暂无出勤记录');
+    }
+
+    final asyncRecords = ref.watch(selectedDateAttendanceProvider);
     final nameMap = ref.watch(studentDisplayNameMapProvider);
     final studentMap = ref.watch(studentByIdMapProvider);
 
@@ -84,10 +88,6 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
           ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
         if (sortedRecords.isEmpty) {
-          if (!hasStudents) {
-            return const EmptyState(message: '当日暂无出勤记录');
-          }
-
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [

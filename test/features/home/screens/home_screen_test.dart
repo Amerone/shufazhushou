@@ -72,6 +72,52 @@ void main() {
     expect(find.text('setup'), findsOneWidget);
   });
 
+  testWidgets('empty home state avoids attendance-dependent providers', (
+    tester,
+  ) async {
+    _setLargeHomeViewport(tester);
+    _FakeSettingsNotifier.seededSettings = const {
+      InteractionFeedback.hapticsEnabledKey: 'false',
+      InteractionFeedback.soundEnabledKey: 'false',
+    };
+    _FakeStudentNotifier.seededStudents = const [];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_FakeStudentNotifier.new),
+          attendanceProvider.overrideWith(_ThrowingAttendanceNotifier.new),
+          selectedDateAttendanceProvider.overrideWith(
+            (ref) => throw StateError('selected attendance should not load'),
+          ),
+          classTemplateProvider.overrideWith(
+            _ThrowingClassTemplateNotifier.new,
+          ),
+          homeWorkbenchProvider.overrideWith(
+            (ref) => throw StateError('workbench should not load'),
+          ),
+        ],
+        child: MaterialApp.router(
+          theme: buildAppTheme(),
+          routerConfig: GoRouter(
+            initialLocation: '/',
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (context, state) => const HomeScreen(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    expect(find.textContaining('should not load'), findsNothing);
+    expect(find.byType(HomeScreen), findsOneWidget);
+  });
+
   testWidgets(
     'home shows quick entry shortcuts for recent group and template',
     (tester) async {
@@ -247,11 +293,25 @@ class _EmptyAttendanceNotifier extends MonthAttendanceNotifier {
   Future<List<Attendance>> build() async => const [];
 }
 
+class _ThrowingAttendanceNotifier extends MonthAttendanceNotifier {
+  @override
+  Future<List<Attendance>> build() async {
+    throw StateError('attendance should not load');
+  }
+}
+
 class _FakeClassTemplateNotifier extends ClassTemplateNotifier {
   static List<ClassTemplate> seededTemplates = const [];
 
   @override
   Future<List<ClassTemplate>> build() async => seededTemplates;
+}
+
+class _ThrowingClassTemplateNotifier extends ClassTemplateNotifier {
+  @override
+  Future<List<ClassTemplate>> build() async {
+    throw StateError('template should not load');
+  }
 }
 
 Future<void> _settleUi(WidgetTester tester) async {

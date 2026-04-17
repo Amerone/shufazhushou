@@ -59,6 +59,18 @@ class AttendanceProgressScores {
     );
   }
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AttendanceProgressScores &&
+          strokeQuality == other.strokeQuality &&
+          structureAccuracy == other.structureAccuracy &&
+          rhythmConsistency == other.rhythmConsistency;
+
+  @override
+  int get hashCode =>
+      Object.hash(strokeQuality, structureAccuracy, rhythmConsistency);
+
   static num? _toJsonNumber(double? value) {
     if (value == null) return null;
     return value == value.truncateToDouble() ? value.toInt() : value;

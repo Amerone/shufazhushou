@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../../core/models/dismissed_insight.dart';
 import '../../../core/models/export_template.dart';
 import '../../../core/providers/home_workbench_provider.dart';
+import '../../../core/providers/insight_provider.dart';
+import '../../../core/services/dismissed_insight_policy.dart';
 import '../../../core/services/home_workbench_service.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/interaction_feedback.dart';
+import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../students/widgets/student_action_launcher.dart';
 
@@ -15,6 +20,7 @@ class HomeWorkbenchPanel extends ConsumerWidget {
 
   Future<void> _handleTaskTap(
     BuildContext context,
+    WidgetRef ref,
     HomeWorkbenchTask task,
   ) async {
     await InteractionFeedback.selection(context);
@@ -25,35 +31,70 @@ class HomeWorkbenchPanel extends ConsumerWidget {
       case HomeWorkbenchTaskType.debt:
       case HomeWorkbenchTaskType.renewal:
         if (studentId == null) {
-          context.push('/statistics');
-          return;
+          await context.push('/statistics');
+        } else {
+          await showStudentPaymentSheet(
+            context,
+            studentId: studentId,
+            studentName: task.studentName,
+          );
         }
-        await showStudentPaymentSheet(
-          context,
-          studentId: studentId,
-          studentName: task.studentName,
-        );
+        ref.invalidate(homeWorkbenchProvider);
+        ref.invalidate(insightProvider);
         return;
       case HomeWorkbenchTaskType.progress:
       case HomeWorkbenchTaskType.reportReady:
         if (studentId == null) {
-          context.push('/statistics');
-          return;
+          await context.push('/statistics');
+        } else {
+          await showStudentExportSheet(
+            context,
+            studentId: studentId,
+            initialTemplate: ExportTemplateId.parentMonthly,
+          );
         }
-        await showStudentExportSheet(
-          context,
-          studentId: studentId,
-          initialTemplate: ExportTemplateId.parentMonthly,
-        );
+        ref.invalidate(homeWorkbenchProvider);
+        ref.invalidate(insightProvider);
         return;
       case HomeWorkbenchTaskType.churn:
       case HomeWorkbenchTaskType.trial:
         if (studentId != null) {
-          context.push('/students/$studentId');
-          return;
+          await context.push('/students/$studentId');
+        } else {
+          await context.push('/statistics');
         }
-        context.push('/statistics');
+        ref.invalidate(homeWorkbenchProvider);
+        return;
     }
+  }
+
+  Future<void> _dismissTask(
+    BuildContext context,
+    WidgetRef ref,
+    HomeWorkbenchTask task,
+  ) async {
+    final dismissType = homeWorkbenchDismissTypeForTask(task.type);
+    final snoozeDays = DismissedInsightPolicy.retentionForType(
+      dismissType,
+    ).inDays;
+
+    await InteractionFeedback.selection(context);
+    await ref
+        .read(dismissedInsightDaoProvider)
+        .insert(
+          DismissedInsight(
+            id: const Uuid().v4(),
+            insightType: dismissType,
+            studentId: task.studentId,
+            dismissedAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        );
+
+    ref.invalidate(homeWorkbenchProvider);
+    ref.invalidate(insightProvider);
+
+    if (!context.mounted) return;
+    AppToast.showSuccess(context, '${task.title} 已稍后 $snoozeDays 天');
   }
 
   @override
@@ -115,7 +156,10 @@ class HomeWorkbenchPanel extends ConsumerWidget {
                   for (var index = 0; index < visibleTasks.length; index++) ...[
                     _WorkbenchTaskCard(
                       task: visibleTasks[index],
-                      onTap: () => _handleTaskTap(context, visibleTasks[index]),
+                      onTap: () =>
+                          _handleTaskTap(context, ref, visibleTasks[index]),
+                      onDismissTap: () =>
+                          _dismissTask(context, ref, visibleTasks[index]),
                     ),
                     if (index != visibleTasks.length - 1)
                       const SizedBox(height: 10),
@@ -126,7 +170,7 @@ class HomeWorkbenchPanel extends ConsumerWidget {
                       onPressed: () async {
                         await InteractionFeedback.pageTurn(context);
                         if (!context.mounted) return;
-                        context.push('/statistics');
+                        await context.push('/statistics');
                       },
                       icon: const Icon(Icons.arrow_forward_outlined, size: 18),
                       label: Text('还有 $hiddenCount 项待办，去统计页查看'),
@@ -170,103 +214,156 @@ class _CountBadge extends StatelessWidget {
 class _WorkbenchTaskCard extends StatelessWidget {
   final HomeWorkbenchTask task;
   final VoidCallback onTap;
+  final VoidCallback onDismissTap;
 
-  const _WorkbenchTaskCard({required this.task, required this.onTap});
+  const _WorkbenchTaskCard({
+    required this.task,
+    required this.onTap,
+    required this.onDismissTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final config = _TaskVisualConfig.fromType(task.type);
+    final dismissLabel =
+        '稍后 ${DismissedInsightPolicy.retentionForType(homeWorkbenchDismissTypeForTask(task.type)).inDays} 天';
 
     return Material(
       color: Colors.transparent,
-      child: Semantics(
-        button: true,
-        label: '${task.title}，${task.summary}，${task.actionLabel}',
-        child: InkWell(
+      child: Ink(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.58),
           borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Ink(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.58),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: config.color.withValues(alpha: 0.14)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: config.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(config.icon, color: config.color, size: 20),
+          border: Border.all(color: config.color.withValues(alpha: 0.14)),
+        ),
+        child: Column(
+          children: [
+            Semantics(
+              button: true,
+              label: '${task.title}，${task.summary}，${task.actionLabel}',
+              child: InkWell(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        task.title,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: config.color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
                         ),
+                        child: Icon(config.icon, color: config.color, size: 20),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        task.summary,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
-                      ),
-                      const SizedBox(height: 12),
-                      _TaskActionCue(
-                        icon: config.actionIcon,
-                        label: task.actionLabel,
-                        color: config.color,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              task.title,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              task.summary,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                height: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: _TaskActions(
+                actionIcon: config.actionIcon,
+                actionLabel: task.actionLabel,
+                actionColor: config.color,
+                dismissLabel: dismissLabel,
+                onDismissTap: onDismissTap,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _TaskActionCue extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
+class _TaskActions extends StatelessWidget {
+  final IconData actionIcon;
+  final String actionLabel;
+  final Color actionColor;
+  final String dismissLabel;
+  final VoidCallback onDismissTap;
 
-  const _TaskActionCue({
-    required this.icon,
-    required this.label,
-    required this.color,
+  const _TaskActions({
+    required this.actionIcon,
+    required this.actionLabel,
+    required this.actionColor,
+    required this.dismissLabel,
+    required this.onDismissTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w700,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 260;
+        final actionCue = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(actionIcon, size: 18, color: actionColor),
+            const SizedBox(width: 6),
+            Text(
+              actionLabel,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: actionColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        );
+        final dismissButton = TextButton.icon(
+          onPressed: onDismissTap,
+          style: TextButton.styleFrom(
+            foregroundColor: kInkSecondary,
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
           ),
-        ),
-      ],
+          icon: const Icon(Icons.visibility_off_outlined, size: 18),
+          label: Text(dismissLabel),
+        );
+
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [actionCue, const SizedBox(height: 8), dismissButton],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: actionCue),
+            dismissButton,
+          ],
+        );
+      },
     );
   }
 }

@@ -28,6 +28,64 @@ import '../../../shared/widgets/brush_stroke_divider.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 
+const _sharedExportTempCleanupDelay = Duration(minutes: 10);
+
+@visibleForTesting
+Future<void> deleteExportTempFileForTesting(String path) =>
+    _deleteExportTempFile(path);
+
+@visibleForTesting
+Future<void> cleanupExportTempFileForShareForTesting(
+  String path,
+  ShareResultStatus status, {
+  Duration deferredDelay = _sharedExportTempCleanupDelay,
+}) =>
+    _cleanupExportTempFileForShare(path, status, deferredDelay: deferredDelay);
+
+@visibleForTesting
+bool shouldTreatShareAsCompletedForTesting(ShareResultStatus status) =>
+    _shouldTreatShareAsCompleted(status);
+
+Future<void> _deleteExportTempFile(String? path) async {
+  final trimmedPath = path?.trim();
+  if (trimmedPath == null || trimmedPath.isEmpty) {
+    return;
+  }
+
+  try {
+    final file = File(trimmedPath);
+    if (await file.exists()) {
+      await file.delete();
+    }
+  } on FileSystemException {
+    // Ignore cleanup failures for temporary export artifacts.
+  }
+}
+
+Future<void> _cleanupExportTempFileForShare(
+  String? path,
+  ShareResultStatus status, {
+  Duration deferredDelay = _sharedExportTempCleanupDelay,
+}) async {
+  if (status == ShareResultStatus.dismissed) {
+    await _deleteExportTempFile(path);
+    return;
+  }
+
+  if (deferredDelay <= Duration.zero) {
+    await _deleteExportTempFile(path);
+    return;
+  }
+
+  unawaited(
+    Future<void>.delayed(deferredDelay, () => _deleteExportTempFile(path)),
+  );
+}
+
+bool _shouldTreatShareAsCompleted(ShareResultStatus status) {
+  return status != ShareResultStatus.dismissed;
+}
+
 class ExportConfigScreen extends ConsumerStatefulWidget {
   final String studentId;
   final ExportTemplateId? initialTemplate;
@@ -219,15 +277,17 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     return AiAnalysisNoteCodec.latestProgressContentForExport(note);
   }
 
-  Future<bool> _shareFile(BuildContext feedbackContext, String path) async {
+  Future<ShareResult?> _shareFile(
+    BuildContext feedbackContext,
+    String path,
+  ) async {
     try {
-      await SharePlus.instance.share(ShareParams(files: [XFile(path)]));
-      return true;
+      return await SharePlus.instance.share(ShareParams(files: [XFile(path)]));
     } catch (e) {
       if (feedbackContext.mounted) {
         AppToast.showError(feedbackContext, e.toString());
       }
-      return false;
+      return null;
     }
   }
 
@@ -235,9 +295,11 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     if (!_validateRange()) return;
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
+    String? tempPath;
     try {
       final preparedPdf = await _buildPdf();
       final path = preparedPdf.path;
+      tempPath = path;
       final student = preparedPdf.student;
 
       if (mounted) {
@@ -381,6 +443,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
+      await _deleteExportTempFile(tempPath);
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -389,15 +452,23 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     if (!_validateRange()) return;
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
+    String? tempPath;
     try {
       final preparedPdf = await _buildPdf();
+      tempPath = preparedPdf.path;
       if (!mounted) return;
       await InteractionFeedback.seal(context);
       if (!mounted) return;
-      await _shareFile(context, preparedPdf.path);
+      final shareResult = await _shareFile(context, preparedPdf.path);
+      if (shareResult == null) {
+        return;
+      }
+      await _cleanupExportTempFileForShare(tempPath, shareResult.status);
+      tempPath = null;
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
+      await _deleteExportTempFile(tempPath);
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -406,6 +477,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     if (!_validateRange()) return;
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
+    String? tempPath;
     try {
       final data = await _loadData();
       final student = await _loadStudent();
@@ -423,9 +495,15 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
         payments: data.payments,
         feeSummary: feeSummary,
       );
+      tempPath = path;
       if (!mounted) return;
-      final shared = await _shareFile(context, path);
-      if (!shared) {
+      final shareResult = await _shareFile(context, path);
+      if (shareResult == null) {
+        return;
+      }
+      await _cleanupExportTempFileForShare(tempPath, shareResult.status);
+      tempPath = null;
+      if (!_shouldTreatShareAsCompleted(shareResult.status)) {
         return;
       }
       if (!mounted) return;
@@ -439,6 +517,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
+      await _deleteExportTempFile(tempPath);
       if (mounted) setState(() => _loading = false);
     }
   }

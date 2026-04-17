@@ -137,15 +137,38 @@ class Attendance {
           priceSnapshot == other.priceSnapshot &&
           feeAmount == other.feeAmount &&
           note == other.note &&
+          _stringListEquals(lessonFocusTags, other.lessonFocusTags) &&
           homePracticeNote == other.homePracticeNote &&
+          progressScores == other.progressScores &&
           artworkImagePath == other.artworkImagePath &&
           createdAt == other.createdAt &&
           updatedAt == other.updatedAt;
 
   @override
   int get hashCode => Object.hash(
-    id, studentId, date, startTime, endTime,
-    status, priceSnapshot, feeAmount, note,
-    homePracticeNote, artworkImagePath, createdAt, updatedAt,
+    id,
+    studentId,
+    date,
+    startTime,
+    endTime,
+    status,
+    priceSnapshot,
+    feeAmount,
+    note,
+    Object.hashAll(lessonFocusTags),
+    homePracticeNote,
+    progressScores,
+    artworkImagePath,
+    createdAt,
+    updatedAt,
   );
+}
+
+bool _stringListEquals(List<String> left, List<String> right) {
+  if (identical(left, right)) return true;
+  if (left.length != right.length) return false;
+  for (var i = 0; i < left.length; i++) {
+    if (left[i] != right[i]) return false;
+  }
+  return true;
 }

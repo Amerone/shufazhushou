@@ -116,7 +116,11 @@ class _NotFoundScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.explore_off_rounded, size: 64, color: theme.colorScheme.outline),
+            Icon(
+              Icons.explore_off_rounded,
+              size: 64,
+              color: theme.colorScheme.outline,
+            ),
             const SizedBox(height: 16),
             Text('页面未找到', style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
@@ -299,66 +303,75 @@ class _BrushNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = selected ? kPrimaryBlue : kInkSecondary;
+    void handleTap() {
+      if (!selected) {
+        unawaited(InteractionFeedback.pageTurn(context));
+      }
+      onTap();
+    }
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        overlayColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.pressed)) {
-            return kPrimaryBlue.withValues(alpha: 0.08);
-          }
-          if (states.contains(WidgetState.hovered)) {
-            return kPrimaryBlue.withValues(alpha: 0.03);
-          }
-          return null;
-        }),
-        onTap: () {
-          if (!selected) {
-            unawaited(InteractionFeedback.pageTurn(context));
-          }
-          onTap();
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: selected
-                ? kPrimaryBlue.withValues(alpha: 0.08)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                selected ? data.selectedIcon : data.icon,
-                size: 22,
-                color: color,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: data.label,
+      onTap: handleTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            overlayColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.pressed)) {
+                return kPrimaryBlue.withValues(alpha: 0.08);
+              }
+              if (states.contains(WidgetState.hovered)) {
+                return kPrimaryBlue.withValues(alpha: 0.03);
+              }
+              return null;
+            }),
+            onTap: handleTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected
+                    ? kPrimaryBlue.withValues(alpha: 0.08)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(18),
               ),
-              const SizedBox(height: 4),
-              Text(
-                data.label,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: color,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    selected ? data.selectedIcon : data.icon,
+                    size: 22,
+                    color: color,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    data.label,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: color,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    width: selected ? 26 : 8,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? kSealRed.withValues(alpha: 0.9)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 6),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                width: selected ? 26 : 8,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? kSealRed.withValues(alpha: 0.9)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

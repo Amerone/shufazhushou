@@ -23,29 +23,9 @@ void main() {
   testWidgets('settings screen renders overview progress and shortcuts', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1280, 2400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+    _setLargeViewport(tester);
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
-          packageInfoProvider.overrideWith(
-            (ref) => PackageInfo(
-              appName: '墨韵',
-              packageName: 'com.example.moyun',
-              version: '1.2.3',
-              buildNumber: '12',
-            ),
-          ),
-        ],
-        child: const MaterialApp(home: SettingsScreen()),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await _pumpScreen(tester);
 
     expect(find.text('配置完成度'), findsOneWidget);
     expect(find.text('4/4 项已就绪'), findsOneWidget);
@@ -54,6 +34,61 @@ void main() {
     expect(find.byIcon(Icons.view_quilt_outlined), findsWidgets);
     expect(find.byIcon(Icons.psychology_alt_outlined), findsWidgets);
   });
+
+  testWidgets('developer tools stay hidden until version tapped five times', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+
+    await _pumpScreen(tester);
+
+    expect(find.text('开发者工具'), findsNothing);
+
+    final versionLabel = find.textContaining('版本 1.2.3').last;
+    await tester.ensureVisible(versionLabel);
+
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(versionLabel);
+      await tester.pump();
+    }
+
+    expect(find.text('开发者工具'), findsNothing);
+
+    await tester.tap(versionLabel);
+    await tester.pumpAndSettle();
+
+    expect(find.text('开发者工具'), findsOneWidget);
+    expect(find.text('生成测试数据'), findsOneWidget);
+    expect(find.text('清空全部数据'), findsOneWidget);
+  });
+}
+
+Future<void> _pumpScreen(WidgetTester tester) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+        packageInfoProvider.overrideWith(
+          (ref) => PackageInfo(
+            appName: '墨韵',
+            packageName: 'com.example.moyun',
+            version: '1.2.3',
+            buildNumber: '12',
+          ),
+        ),
+      ],
+      child: const MaterialApp(home: SettingsScreen()),
+    ),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
+void _setLargeViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1280, 2400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 }
 
 class _FakeSettingsNotifier extends SettingsNotifier {

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:async';
 
 import 'package:excel/excel.dart' hide Border;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -405,9 +406,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ],
                         ),
                       ),
-                      if (_devMode) ...[
+                      if (kDebugMode && _devMode) ...[
                         const SizedBox(height: 20),
-                        const SettingsSectionTitle(
+                        SettingsSectionTitle(
                           title: '开发者工具',
                           subtitle: '用于本地演示、压测和初始化环境，操作前请确认风险。',
                         ),
@@ -440,9 +441,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ],
                       const SizedBox(height: 20),
-                      const SettingsSectionTitle(
+                      SettingsSectionTitle(
                         title: '关于应用',
-                        subtitle: '查看版本信息，并保留隐藏的开发者模式入口。',
+                        subtitle: kDebugMode
+                            ? '查看版本信息，并保留隐藏的开发者模式入口。'
+                            : '查看版本信息。',
                       ),
                       const SizedBox(height: 12),
                       GlassCard(
@@ -452,11 +455,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             _SettingsTile(
                               icon: Icons.info_outline,
                               title: '墨韵',
-                              subtitle: _devMode
+                              subtitle: !kDebugMode
+                                  ? '版本 $versionStr'
+                                  : _devMode
                                   ? '版本 $versionStr · 开发者模式已开启'
                                   : '版本 $versionStr · 连续点击 5 次可开启开发者模式',
                               onTap: () {
-                                if (_devMode) return;
+                                if (!kDebugMode || _devMode) return;
                                 _versionTapCount++;
                                 if (_versionTapCount >= 5) {
                                   setState(() => _devMode = true);
@@ -648,6 +653,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _seedTestData() async {
+    if (!kDebugMode) return;
     final confirmed = await AppToast.showConfirm(
       context,
       '将插入 20 名学生和约 5000 条出勤记录，确定继续吗？',
@@ -665,6 +671,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _clearAllData() async {
+    if (!kDebugMode) return;
     final confirmed = await AppToast.showConfirm(
       context,
       '将删除所有本地数据且不可恢复，确定继续吗？',

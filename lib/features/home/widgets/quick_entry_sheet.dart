@@ -256,6 +256,20 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       final selectedStudents = students
           .where((m) => _selectedIds.contains(m.student.id))
           .toList();
+      final invalidPriceStudent = selectedStudents
+          .where((m) => m.student.pricePerClass < 0)
+          .firstOrNull;
+      if (invalidPriceStudent != null) {
+        final displayName =
+            ref.read(
+              studentDisplayNameMapProvider,
+            )[invalidPriceStudent.student.id] ??
+            invalidPriceStudent.student.name;
+        if (mounted) {
+          AppToast.showError(context, '$displayName 的课时单价无效，请先编辑学生档案。');
+        }
+        return;
+      }
 
       final displayNames = ref.read(studentDisplayNameMapProvider);
       final conflictRecords = await dao.findConflictsForStudents(
@@ -285,29 +299,56 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         (e) => e.name == _status,
       );
       final now = DateTime.now().millisecondsSinceEpoch;
+      final lessonFocusTags = _lessonFocusTags.toList(growable: false);
+      final homePracticeNote = _homePracticeCtrl.text.trim();
+      final progressScores = _buildProgressScores();
 
       final records = <Attendance>[];
       for (final m in selectedStudents) {
         final price = m.student.pricePerClass;
         final fee = FeeCalculator.calcFee(statusEnum, price);
+        final existingRecord = conflictRecords[m.student.id];
+        final resolvedLessonFocusTags =
+            existingRecord != null && lessonFocusTags.isEmpty
+            ? existingRecord.lessonFocusTags
+            : lessonFocusTags;
+        final resolvedHomePracticeNote =
+            existingRecord != null && homePracticeNote.isEmpty
+            ? existingRecord.homePracticeNote
+            : (homePracticeNote.isEmpty ? null : homePracticeNote);
+        final resolvedProgressScores =
+            existingRecord != null && progressScores == null
+            ? existingRecord.progressScores
+            : progressScores;
+
         records.add(
-          Attendance(
-            id: const Uuid().v4(),
-            studentId: m.student.id,
-            date: _dateStr(),
-            startTime: _startTime,
-            endTime: _endTime,
-            status: _status,
-            priceSnapshot: price,
-            feeAmount: fee,
-            lessonFocusTags: _lessonFocusTags.toList(growable: false),
-            homePracticeNote: _homePracticeCtrl.text.trim().isEmpty
-                ? null
-                : _homePracticeCtrl.text.trim(),
-            progressScores: _buildProgressScores(),
-            createdAt: now,
-            updatedAt: now,
-          ),
+          existingRecord?.copyWith(
+                date: _dateStr(),
+                startTime: _startTime,
+                endTime: _endTime,
+                status: _status,
+                priceSnapshot: price,
+                feeAmount: fee,
+                lessonFocusTags: resolvedLessonFocusTags,
+                homePracticeNote: resolvedHomePracticeNote,
+                progressScores: resolvedProgressScores,
+                updatedAt: now,
+              ) ??
+              Attendance(
+                id: const Uuid().v4(),
+                studentId: m.student.id,
+                date: _dateStr(),
+                startTime: _startTime,
+                endTime: _endTime,
+                status: _status,
+                priceSnapshot: price,
+                feeAmount: fee,
+                lessonFocusTags: resolvedLessonFocusTags,
+                homePracticeNote: resolvedHomePracticeNote,
+                progressScores: resolvedProgressScores,
+                createdAt: now,
+                updatedAt: now,
+              ),
         );
       }
 
@@ -321,6 +362,15 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       if (!mounted) return;
       AppToast.showSuccess(context, '已保存 ${selectedStudents.length} 条出勤记录');
       Navigator.of(context).pop();
+    } on FormatException catch (error) {
+      if (mounted) {
+        AppToast.showError(
+          context,
+          error.message.isEmpty ? '出勤记录格式无效，请检查学生档案和记课设置。' : error.message,
+        );
+      }
+    } catch (error) {
+      if (mounted) AppToast.showError(context, '保存出勤记录失败：$error');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -118,4 +118,52 @@ void main() {
     expect(tasks.first.title, contains('Bella'));
     expect(tasks.first.summary, contains('本月已完成 2 节正式课程'));
   });
+  test('hides dismissed report-ready task until retention expires', () {
+    final tasks = service.buildTasks(
+      insights: const [],
+      students: const [
+        Student(
+          id: 'student-3',
+          name: 'Chris',
+          parentName: null,
+          parentPhone: null,
+          pricePerClass: 100,
+          status: 'active',
+          note: null,
+          createdAt: 1,
+          updatedAt: 1,
+        ),
+      ],
+      displayNames: const {'student-3': 'Chris'},
+      monthAttendance: [
+        Attendance(
+          id: 'c-1',
+          studentId: 'student-3',
+          date: '2026-04-01',
+          startTime: '09:00',
+          endTime: '10:00',
+          status: 'present',
+          priceSnapshot: 100,
+          feeAmount: 100,
+          createdAt: 1,
+          updatedAt: 1,
+        ),
+        Attendance(
+          id: 'c-2',
+          studentId: 'student-3',
+          date: '2026-04-08',
+          startTime: '09:00',
+          endTime: '10:00',
+          status: 'present',
+          priceSnapshot: 100,
+          feeAmount: 100,
+          createdAt: 2,
+          updatedAt: 2,
+        ),
+      ],
+      dismissedKeys: const {'workbench_report_ready:student-3'},
+    );
+
+    expect(tasks, isEmpty);
+  });
 }

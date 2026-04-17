@@ -120,26 +120,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final selectedDate = ref.watch(selectedDateProvider);
-    final selectedMonth = ref.watch(selectedMonthProvider);
-    final dayCount = ref.watch(
-      selectedDateAttendanceProvider.select(
-        (value) => value.valueOrNull?.length ?? 0,
-      ),
-    );
-    final monthCount = ref.watch(
-      attendanceProvider.select((value) => value.valueOrNull?.length ?? 0),
-    );
-    final pendingTaskCount = ref.watch(
-      homeWorkbenchProvider.select((value) => value.valueOrNull?.length),
-    );
     final studentSummary = ref.watch(studentRosterSummaryProvider);
-    final templates = ref.watch(classTemplateProvider).valueOrNull ?? const [];
     final settings = ref.watch(settingsProvider).valueOrNull ?? const {};
     final today = DateTime.now();
 
     final studentCount = studentSummary.count;
     final hasStudents = studentSummary.hasStudents;
+    final selectedDate = ref.watch(selectedDateProvider);
+    final selectedMonth = ref.watch(selectedMonthProvider);
+    final dayCount = hasStudents
+        ? ref.watch(
+            selectedDateAttendanceProvider.select(
+              (value) => value.valueOrNull?.length ?? 0,
+            ),
+          )
+        : 0;
+    final monthCount = hasStudents
+        ? ref.watch(
+            attendanceProvider.select(
+              (value) => value.valueOrNull?.length ?? 0,
+            ),
+          )
+        : 0;
+    final pendingTaskCount = hasStudents
+        ? ref.watch(
+            homeWorkbenchProvider.select(
+              (value) => value.valueOrNull?.length ?? 0,
+            ),
+          )
+        : 0;
+    final templates = hasStudents
+        ? ref.watch(classTemplateProvider).valueOrNull ?? const []
+        : const [];
     final teacherReady = _isTeacherProfileReady(settings);
     final recentSelectedIds = parseQuickEntryRecentStudentIds(
       settings,
@@ -247,8 +259,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 onCreateStudent: _openCreateStudent,
                                 onImportStudents: _openImportStudents,
                               ),
-                              if (hasStudents &&
-                                  (pendingTaskCount ?? 0) > 0) ...[
+                              if (hasStudents && pendingTaskCount > 0) ...[
                                 const SizedBox(height: 16),
                                 const HomeWorkbenchPanel(),
                               ],
@@ -376,7 +387,7 @@ class _HomeFocusCard extends StatelessWidget {
   final String dateLabel;
   final int dayCount;
   final int monthCount;
-  final int? taskCount;
+  final int taskCount;
   final int studentCount;
   final bool isToday;
   final bool hasStudents;
@@ -407,7 +418,7 @@ class _HomeFocusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final pendingCount = taskCount ?? 0;
+    final pendingCount = taskCount;
     final statusText = !hasStudents
         ? '\u5148\u5efa\u7acb\u5b66\u751f\u6863\u6848'
         : pendingCount > 0

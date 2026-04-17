@@ -149,5 +149,42 @@ void main() {
       expect(updated.structureAccuracy, 3);
       expect(updated.rhythmConsistency, 6);
     });
+
+    test('equality includes focus tags and progress scores', () {
+      final base = Attendance(
+        id: 'attendance-5',
+        studentId: 'student-1',
+        date: '2026-03-28',
+        startTime: '09:00',
+        endTime: '10:00',
+        status: 'present',
+        priceSnapshot: 120,
+        feeAmount: 120,
+        lessonFocusTags: const <String>['控笔稳定'],
+        progressScores: const AttendanceProgressScores(strokeQuality: 4),
+        createdAt: 1711584000000,
+        updatedAt: 1711584000000,
+      );
+
+      expect(
+        base,
+        base.copyWith(
+          lessonFocusTags: const <String>['控笔稳定'],
+          progressScores: const AttendanceProgressScores(strokeQuality: 4),
+        ),
+      );
+      expect(
+        base,
+        isNot(base.copyWith(lessonFocusTags: const <String>['结构观察'])),
+      );
+      expect(
+        base,
+        isNot(
+          base.copyWith(
+            progressScores: const AttendanceProgressScores(strokeQuality: 5),
+          ),
+        ),
+      );
+    });
   });
 }

@@ -337,7 +337,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                   children: [
-                    // 1. 闂備浇宕垫慨鐢稿礉閺囩儑鑰块梺顒€绉撮弸渚€鏌曢崼婵囧婵炵》绻濋弻娑氫沪閸撗咁吋濠电偛鍚嬪Λ鍐蓟閵娿儮妲堟俊顖滃帶閳煡姊洪柅鐐茶嫰閸樺摜绱掗埀顒佹媴閾忓湱鐣堕梺閫炲苯澧撮柡宀嬬節瀹曠厧顫濋鍨棜闂傚倷鑳堕…鍫㈡崲閹版澘鐤悹鎭掑妿缁憋箑螖閿濆懎鏆為柡?
+                    // 1. 费用概览
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.finance],
                       child: StudentFinanceOverviewCard(
@@ -349,7 +349,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // 2. 缂傚倸鍊风欢锟犲窗閺嶃劍娅犲ù鐘差儐閸嬧晜绻濋棃娑欙紞婵炲瓨鐗犻弻銊モ攽閸℃﹫绱為梺琛″亾闁规儼濮ら悡銉︾箾閹寸儐鐒藉褎娲橀妵鍕敃閿濆繗鈧法鈧?闂備浇顕уù鐑藉箠閹剧粯鍋夊┑鍌滎焾濮?闂傚倷鐒﹀鍨熆閳ь剛绱掗幓鎺濈吋闁?闂傚倷鑳剁划顖炩€﹂崼銉ユ槬闁哄稁鍘奸悞鍨亜閹达絾纭剁紒娑樼箳缁辨帗娼忛妸褏鐤勯悗瑙勬磸閸ㄨ崵妲愰幒鎳崇喖鎼圭拠鈥茬礃闂傚倷娴囧銊╂倿閿曗偓椤灝顫滈埀顒勫箖妤︽妯勫Δ鐘靛仦閸旀瑥鐣烽崼鏇炍╃憸宥夋倶闁秵鈷戦柛娑橆煬濞堬絿绱掓潏銊︾闁哄懎鐖煎浠嬵敇閻斿憡鐝?
+                    // 2. 学生资料与成长工作台
                     GlassCard(
                       padding: const EdgeInsets.all(18),
                       child: Row(
@@ -467,7 +467,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     const SizedBox(height: 16),
                     StudentArtworkTimelineCard(entries: artworkTimeline),
                     const SizedBox(height: 22),
-                    // 3. 缂傚倸鍊搁崐鎼佸磹婵犳澶愬箛閺夊灝鐎梺绋挎湰缁秵鍒婃總鍛婄厸濠㈣泛瀛╃涵鍓佺磼?
+                    // 3. 缴费记录
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.payments],
                       child: Column(
@@ -514,7 +514,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    // 4. 闂傚倷绀侀幉锟犲垂閻㈢绠规い鎰╁€愰崑鎾愁潩閸楃偞鐏侀梺鐟板槻椤戝顕ｉ崜浣瑰磯闁靛鐏?
+                    // 4. 出勤记录
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.attendance],
                       child: Column(
@@ -572,7 +572,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    // 5. 闂傚倷鑳堕幊鎾绘倶濠靛牏鐭撶€规洖娲ㄧ粈濠囨煛閸愩劎澧涙い銉ョ墦閺屾洝绠涙繝鍌氣拤缂備浇鍩栭悡锟犲蓟閵娿儮妲堟俊顖滃帶閳亶姊哄Ч鍥р偓鏇炍涘┑鍡欐殾闁靛闄勯崕鐔搞亜閺嶃劎鐭屾い锔诲枛閳规垿鎮欓崣澶屼槐闂侀潧鐗嗙€涒晠鎯屽Δ鍛拺缂佸娉曠粻鐐烘煕鎼淬倗绨块柕鍥ㄥ姇閳藉濮€閳╁啯鐝?
+                    // 5. AI 分析工具
                     GlassCard(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Theme(

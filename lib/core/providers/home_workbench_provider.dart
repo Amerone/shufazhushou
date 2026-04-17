@@ -70,5 +70,6 @@ final homeWorkbenchProvider = FutureProvider<List<HomeWorkbenchTask>>((
     students: students,
     displayNames: displayNames,
     monthAttendance: monthAttendance,
+    dismissedKeys: dismissedKeys,
   );
 });

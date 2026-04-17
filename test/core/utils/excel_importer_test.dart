@@ -82,4 +82,22 @@ void main() {
     expect(preview.toInsert, hasLength(1));
     expect(preview.toInsert.single.parentName, '\u738b\u5973\u58eb');
   });
+
+  test('parse rejects invalid negative class price', () {
+    final bytes = buildWorkbook(
+      header: [
+        TextCellValue('\u5b66\u751f\u59d3\u540d'),
+        TextCellValue('\u8bfe\u65f6\u5355\u4ef7'),
+      ],
+      rows: [
+        [TextCellValue('\u5f20\u4e09'), TextCellValue('-120')],
+      ],
+    );
+
+    final preview = ExcelImporter.parse(bytes, const <Student>[]);
+
+    expect(preview.toInsert, isEmpty);
+    expect(preview.skipped, 1);
+    expect(preview.errors.single, contains('\u8bfe\u65f6\u5355\u4ef7'));
+  });
 }

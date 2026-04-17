@@ -16,6 +16,7 @@ class DismissedInsightPolicy {
       case 'churn':
       case 'peak':
       case 'trial':
+      case 'workbench_report_ready':
         return _defaultRetention;
       case 'progress':
         return _progressRetention;

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,8 +16,91 @@ import 'package:moyun/core/providers/settings_provider.dart';
 import 'package:moyun/core/providers/student_provider.dart';
 import 'package:moyun/core/services/ai_analysis_note_codec.dart';
 import 'package:moyun/features/export/screens/export_config_screen.dart';
+import 'package:share_plus/share_plus.dart';
 
 void main() {
+  test('deleteExportTempFileForTesting removes temporary exports', () async {
+    final directory = await Directory.systemTemp.createTemp('moyun_export_');
+    addTearDown(() async {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    });
+
+    final file = File('${directory.path}/report.pdf');
+    await file.writeAsString('temp');
+
+    expect(await file.exists(), isTrue);
+
+    await deleteExportTempFileForTesting(file.path);
+
+    expect(await file.exists(), isFalse);
+  });
+
+  test(
+    'cleanupExportTempFileForShareForTesting defers deletion after share',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('moyun_export_');
+      addTearDown(() async {
+        if (await directory.exists()) {
+          await directory.delete(recursive: true);
+        }
+      });
+
+      final file = File('${directory.path}/report.pdf');
+      await file.writeAsString('temp');
+
+      await cleanupExportTempFileForShareForTesting(
+        file.path,
+        ShareResultStatus.success,
+        deferredDelay: const Duration(milliseconds: 40),
+      );
+
+      expect(await file.exists(), isTrue);
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      expect(await file.exists(), isFalse);
+    },
+  );
+
+  test(
+    'cleanupExportTempFileForShareForTesting deletes dismissed share immediately',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('moyun_export_');
+      addTearDown(() async {
+        if (await directory.exists()) {
+          await directory.delete(recursive: true);
+        }
+      });
+
+      final file = File('${directory.path}/report.xlsx');
+      await file.writeAsString('temp');
+
+      await cleanupExportTempFileForShareForTesting(
+        file.path,
+        ShareResultStatus.dismissed,
+      );
+
+      expect(await file.exists(), isFalse);
+    },
+  );
+
+  test('shouldTreatShareAsCompletedForTesting ignores dismissed share', () {
+    expect(
+      shouldTreatShareAsCompletedForTesting(ShareResultStatus.dismissed),
+      isFalse,
+    );
+    expect(
+      shouldTreatShareAsCompletedForTesting(ShareResultStatus.success),
+      isTrue,
+    );
+    expect(
+      shouldTreatShareAsCompletedForTesting(ShareResultStatus.unavailable),
+      isTrue,
+    );
+  });
+
   testWidgets('shows saved AI analysis hint after enabling include toggle', (
     tester,
   ) async {

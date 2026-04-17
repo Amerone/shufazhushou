@@ -43,6 +43,14 @@ class ExcelImporter {
     return -1;
   }
 
+  static double? _parsePrice(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return 0;
+    final parsed = double.tryParse(value);
+    if (parsed == null || parsed < 0) return null;
+    return parsed;
+  }
+
   static Future<ImportPreview?> pick(List<Student> existing) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -124,8 +132,13 @@ class ExcelImporter {
 
       var price = 0.0;
       if (priceCol >= 0 && row.length > priceCol) {
-        price =
-            double.tryParse(row[priceCol]?.value?.toString().trim() ?? '') ?? 0;
+        final parsedPrice = _parsePrice(row[priceCol]?.value?.toString() ?? '');
+        if (parsedPrice == null) {
+          errors.add('第 ${i + 1} 行：课时单价必须是不小于 0 的数字，已跳过');
+          skipped++;
+          continue;
+        }
+        price = parsedPrice;
       }
 
       final now = DateTime.now().millisecondsSinceEpoch;

@@ -13,6 +13,7 @@ import 'package:moyun/shared/constants.dart';
 import 'package:moyun/shared/theme.dart';
 import 'package:moyun/shared/utils/interaction_feedback.dart';
 import 'package:moyun/shared/widgets/attendance_artwork_preview.dart';
+import 'package:moyun/shared/widgets/empty_state.dart';
 
 void main() {
   testWidgets('empty attendance state exposes direct quick entry action', (
@@ -24,6 +25,49 @@ void main() {
     await _pumpAttendanceList(tester);
 
     expect(find.text('立即记课'), findsOneWidget);
+  });
+
+  testWidgets('no-student state does not read attendance provider', (
+    tester,
+  ) async {
+    _FakeStudentNotifier.seededStudents = const [];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_FakeStudentNotifier.new),
+          selectedDateAttendanceProvider.overrideWith(
+            (ref) => throw StateError('attendance should not load'),
+          ),
+        ],
+        child: MaterialApp.router(
+          theme: buildAppTheme(),
+          routerConfig: GoRouter(
+            initialLocation: '/',
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (context, state) => const Scaffold(
+                  body: SafeArea(
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: AttendanceList(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    expect(find.textContaining('attendance should not load'), findsNothing);
+    expect(find.byType(EmptyState), findsOneWidget);
   });
 
   testWidgets('attendance card shows direct payment and profile actions', (

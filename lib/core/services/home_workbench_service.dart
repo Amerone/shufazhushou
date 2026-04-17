@@ -30,6 +30,29 @@ class HomeWorkbenchTask {
   });
 }
 
+const homeWorkbenchReportReadyDismissType = 'workbench_report_ready';
+
+String homeWorkbenchDismissTypeForTask(HomeWorkbenchTaskType type) {
+  switch (type) {
+    case HomeWorkbenchTaskType.debt:
+      return InsightType.debt.name;
+    case HomeWorkbenchTaskType.renewal:
+      return InsightType.renewal.name;
+    case HomeWorkbenchTaskType.churn:
+      return InsightType.churn.name;
+    case HomeWorkbenchTaskType.trial:
+      return InsightType.trial.name;
+    case HomeWorkbenchTaskType.progress:
+      return InsightType.progress.name;
+    case HomeWorkbenchTaskType.reportReady:
+      return homeWorkbenchReportReadyDismissType;
+  }
+}
+
+String homeWorkbenchDismissKey(String dismissType, String? studentId) {
+  return '$dismissType:${studentId ?? ''}';
+}
+
 class HomeWorkbenchService {
   const HomeWorkbenchService();
 
@@ -47,6 +70,7 @@ class HomeWorkbenchService {
     required List<Student> students,
     required Map<String, String> displayNames,
     required List<Attendance> monthAttendance,
+    Set<String> dismissedKeys = const <String>{},
     int maxTasks = 4,
   }) {
     final tasks = <HomeWorkbenchTask>[];
@@ -68,6 +92,7 @@ class HomeWorkbenchService {
       displayNames: displayNames,
       monthAttendance: monthAttendance,
       occupiedStudentIds: occupiedStudentIds,
+      dismissedKeys: dismissedKeys,
     );
     tasks.addAll(reportCandidates);
 
@@ -144,6 +169,7 @@ class HomeWorkbenchService {
     required Map<String, String> displayNames,
     required List<Attendance> monthAttendance,
     required Set<String> occupiedStudentIds,
+    required Set<String> dismissedKeys,
   }) {
     final formalCountByStudent = <String, int>{};
     for (final record in monthAttendance) {
@@ -162,7 +188,13 @@ class HomeWorkbenchService {
 
     for (final student in activeStudents) {
       final count = formalCountByStudent[student.id] ?? 0;
-      if (count < 2 || occupiedStudentIds.contains(student.id)) {
+      final dismissKey = homeWorkbenchDismissKey(
+        homeWorkbenchReportReadyDismissType,
+        student.id,
+      );
+      if (count < 2 ||
+          occupiedStudentIds.contains(student.id) ||
+          dismissedKeys.contains(dismissKey)) {
         continue;
       }
 
