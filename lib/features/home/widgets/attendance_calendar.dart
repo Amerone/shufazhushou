@@ -93,23 +93,32 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
             ],
           ),
           const SizedBox(height: 14),
-          TableCalendar(
+          RepaintBoundary(
+            child: TableCalendar(
             locale: 'zh_CN',
             firstDay: DateTime(2020),
             lastDay: DateTime(2030),
             focusedDay: _focusedDay,
             selectedDayPredicate: (d) => isSameDay(d, selectedDate),
-            onDaySelected: (selected, focused) {
-              ref.read(selectedDateProvider.notifier).state = selected;
-              setState(() => _focusedDay = focused);
-            },
-            onPageChanged: (focused) {
-              setState(() => _focusedDay = focused);
-              ref.read(selectedMonthProvider.notifier).state = DateTime(
-                focused.year,
-                focused.month,
-              );
-            },
+              onDaySelected: (selected, focused) {
+                if (!isSameDay(selected, selectedDate)) {
+                  ref.read(selectedDateProvider.notifier).state = selected;
+                }
+                if (!isSameDay(focused, _focusedDay)) {
+                  setState(() => _focusedDay = focused);
+                }
+              },
+              onPageChanged: (focused) {
+                if (!isSameDay(focused, _focusedDay)) {
+                  setState(() => _focusedDay = focused);
+                }
+
+                final nextMonth = DateTime(focused.year, focused.month);
+                final currentMonth = ref.read(selectedMonthProvider);
+                if (!_isSameMonth(nextMonth, currentMonth)) {
+                  ref.read(selectedMonthProvider.notifier).state = nextMonth;
+                }
+              },
             headerStyle: HeaderStyle(
               formatButtonVisible: false,
               titleCentered: true,
@@ -172,11 +181,16 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
                 );
               },
             ),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+bool _isSameMonth(DateTime a, DateTime b) {
+  return a.year == b.year && a.month == b.month;
 }
 
 Color? _summaryColor(AttendanceDaySummary? summary) {

@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../core/models/student.dart';
+import '../../../core/models/student.dart' show buildDisplayNameMap;
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/statistics_period_provider.dart';
@@ -46,6 +45,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
   final Map<_StatisticsAnchor, GlobalKey> _sectionKeys = {
     for (final anchor in _StatisticsAnchor.values) anchor: GlobalKey(),
   };
+
   DateTime _lastUpdatedAt = DateTime.now();
   bool _showScrollToTop = false;
   _StatisticsAnchor? _lastFocusedAnchor;
@@ -65,6 +65,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
   }
 
   void _handleScroll() {
+    if (!_scrollController.hasClients) return;
     final shouldShow = _scrollController.offset > 280;
     if (shouldShow == _showScrollToTop) return;
     setState(() => _showScrollToTop = shouldShow);
@@ -89,8 +90,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
     );
   }
 
-  Future<void> _scrollToTop() async {
-    await InteractionFeedback.selection(context);
+  Future<void> _scrollToTop({bool withFeedback = true}) async {
+    if (withFeedback) {
+      await InteractionFeedback.selection(context);
+    }
     if (!_scrollController.hasClients) return;
     await _scrollController.animateTo(
       0,
@@ -120,24 +123,17 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
       if (!mounted) return;
       await SharePlus.instance.share(ShareParams(files: [XFile(path)]));
       _markUpdated();
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
-      AppToast.showError(context, '导出失败：$e');
+      AppToast.showError(context, '导出失败：$error');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final range = ref.watch(statisticsPeriodProvider);
-    final periodLabel = switch (range.period) {
-      StatisticsPeriod.week => '本周',
-      StatisticsPeriod.month => '本月',
-      StatisticsPeriod.year => '本年',
-    };
-    final updatedLabel = DateFormat(
-      'M月d日 HH:mm',
-      'zh_CN',
-    ).format(_lastUpdatedAt);
+    final periodLabel = _periodLabel(range.period);
+    final updatedLabel = _formatUpdatedAt(_lastUpdatedAt);
     final viewPaddingBottom = MediaQuery.viewPaddingOf(context).bottom;
 
     return Scaffold(
@@ -153,93 +149,116 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                   invalidateStatistics(ref);
                   _markUpdated();
                 },
-                child: ListView(
+                child: CustomScrollView(
                   controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
-                  children: [
-                    _StatisticsOverviewCard(
-                      range: range,
-                      periodLabel: periodLabel,
-                      updatedLabel: updatedLabel,
-                      onExport: _exportAttendance,
-                      onPeriodChanged: () {
-                        _markUpdated();
-                        setState(() => _lastFocusedAnchor = null);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _StatisticsQuickNavigator(
-                      activeAnchor: _lastFocusedAnchor,
-                      onTap: _scrollToSection,
-                    ),
-                    const SizedBox(height: 20),
-                    _StatisticsSectionBlock(
-                      anchorKey: _sectionKeys[_StatisticsAnchor.metrics],
-                      title: '核心指标',
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: const RepaintBoundary(child: MetricsGrid()),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          _StatisticsOverviewCard(
+                            range: range,
+                            periodLabel: periodLabel,
+                            updatedLabel: updatedLabel,
+                            onExport: _exportAttendance,
+                            onPeriodChanged: (period) {
+                              ref
+                                  .read(
+                                    statisticsPeriodSelectionProvider.notifier,
+                                  )
+                                  .state = period;
+                              _markUpdated();
+                              setState(() => _lastFocusedAnchor = null);
+                              unawaited(_scrollToTop(withFeedback: false));
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          _StatisticsQuickNavigator(
+                            activeAnchor: _lastFocusedAnchor,
+                            onTap: _scrollToSection,
+                          ),
+                          const SizedBox(height: 20),
+                          _StatisticsSectionBlock(
+                            anchorKey: _sectionKeys[_StatisticsAnchor.metrics],
+                            title: '核心指标',
+                            child: GlassCard(
+                              padding: const EdgeInsets.all(18),
+                              child: const RepaintBoundary(
+                                child: MetricsGrid(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          _StatisticsSectionBlock(
+                            anchorKey: _sectionKeys[_StatisticsAnchor.revenue],
+                            title: '收入走势',
+                            child: GlassCard(
+                              padding: const EdgeInsets.all(18),
+                              child: const RepaintBoundary(
+                                child: RevenueChart(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          _StatisticsSectionBlock(
+                            anchorKey:
+                                _sectionKeys[_StatisticsAnchor.contribution],
+                            title: '学生贡献',
+                            child: GlassCard(
+                              padding: const EdgeInsets.all(18),
+                              child: const RepaintBoundary(
+                                child: ContributionChart(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          _StatisticsSectionBlock(
+                            anchorKey: _sectionKeys[_StatisticsAnchor.status],
+                            title: '状态分布',
+                            child: GlassCard(
+                              padding: const EdgeInsets.all(18),
+                              child: const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  RepaintBoundary(child: StatusPieChart()),
+                                  SizedBox(height: 8),
+                                  StatusFilteredList(),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          _StatisticsSectionBlock(
+                            anchorKey: _sectionKeys[_StatisticsAnchor.heatmap],
+                            title: '上课热力',
+                            child: GlassCard(
+                              padding: const EdgeInsets.all(18),
+                              child: const RepaintBoundary(
+                                child: TimeHeatmap(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          _StatisticsSectionBlock(
+                            anchorKey:
+                                _sectionKeys[_StatisticsAnchor.insights],
+                            title: '经营提醒',
+                            child: GlassCard(
+                              padding: const EdgeInsets.all(18),
+                              child: const InsightList(),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          _StatisticsSectionBlock(
+                            anchorKey: _sectionKeys[_StatisticsAnchor.ai],
+                            title: 'AI 经营洞察',
+                            child: const RepaintBoundary(
+                              child: DataInsightCard(),
+                            ),
+                          ),
+                        ]),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    _StatisticsSectionBlock(
-                      anchorKey: _sectionKeys[_StatisticsAnchor.revenue],
-                      title: '收入走势',
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: const RepaintBoundary(child: RevenueChart()),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _StatisticsSectionBlock(
-                      anchorKey: _sectionKeys[_StatisticsAnchor.contribution],
-                      title: '学生贡献',
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: const RepaintBoundary(
-                          child: ContributionChart(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _StatisticsSectionBlock(
-                      anchorKey: _sectionKeys[_StatisticsAnchor.status],
-                      title: '状态分布',
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            RepaintBoundary(child: StatusPieChart()),
-                            SizedBox(height: 8),
-                            StatusFilteredList(),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _StatisticsSectionBlock(
-                      anchorKey: _sectionKeys[_StatisticsAnchor.heatmap],
-                      title: '上课热力',
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: const RepaintBoundary(child: TimeHeatmap()),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _StatisticsSectionBlock(
-                      anchorKey: _sectionKeys[_StatisticsAnchor.insights],
-                      title: '经营提醒',
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: const InsightList(),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _StatisticsSectionBlock(
-                      anchorKey: _sectionKeys[_StatisticsAnchor.ai],
-                      title: 'AI 经营洞察',
-                      child: const DataInsightCard(),
                     ),
                   ],
                 ),
@@ -271,6 +290,108 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StatisticsOverviewCard extends StatelessWidget {
+  final StatisticsRange range;
+  final String periodLabel;
+  final String updatedLabel;
+  final VoidCallback onExport;
+  final ValueChanged<StatisticsPeriod> onPeriodChanged;
+
+  const _StatisticsOverviewCard({
+    required this.range,
+    required this.periodLabel,
+    required this.updatedLabel,
+    required this.onExport,
+    required this.onPeriodChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return GlassCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: kPrimaryBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(
+                  Icons.bar_chart_rounded,
+                  color: kPrimaryBlue,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$periodLabel经营总览',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${range.from} 至 ${range.to} · 更新 $updatedLabel',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SegmentedButton<StatisticsPeriod>(
+            segments: const [
+              ButtonSegment(
+                value: StatisticsPeriod.week,
+                icon: Icon(Icons.view_week_outlined, size: 18),
+                label: Text('本周'),
+              ),
+              ButtonSegment(
+                value: StatisticsPeriod.month,
+                icon: Icon(Icons.calendar_view_month_outlined, size: 18),
+                label: Text('本月'),
+              ),
+              ButtonSegment(
+                value: StatisticsPeriod.year,
+                icon: Icon(Icons.event_available_outlined, size: 18),
+                label: Text('本年'),
+              ),
+            ],
+            selected: {range.period},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) {
+              final period = selection.first;
+              if (period == range.period) return;
+              onPeriodChanged(period);
+            },
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onExport,
+              icon: const Icon(Icons.ios_share_outlined),
+              label: const Text('导出当前周期明细'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -326,59 +447,24 @@ class _StatisticsQuickNavigator extends StatelessWidget {
       anchor: _StatisticsAnchor.ai,
       icon: Icons.auto_awesome_outlined,
       label: 'AI',
-      color: kOrange,
+      color: kGreen,
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return GlassCard(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '快速定位',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 720
-                  ? 4
-                  : constraints.maxWidth >= 460
-                  ? 3
-                  : 2;
-              final itemWidth =
-                  (constraints.maxWidth - 10 * (columns - 1)) / columns;
-
-              return Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final item in _items)
-                    SizedBox(
-                      width: itemWidth,
-                      child: _StatisticsQuickNavChip(
-                        item: item,
-                        selected: activeAnchor == item.anchor,
-                        onTap: () => onTap(item.anchor),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
+          for (final item in _items) ...[
+            _StatisticsQuickNavChip(
+              item: item,
+              selected: activeAnchor == item.anchor,
+              onTap: () => onTap(item.anchor),
+            ),
+            const SizedBox(width: 8),
+          ],
         ],
       ),
     );
@@ -412,48 +498,29 @@ class _StatisticsQuickNavChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
+    final foreground = selected ? Colors.white : item.color;
     return Material(
-      color: Colors.transparent,
+      color: selected
+          ? item.color
+          : Colors.white.withValues(alpha: 0.66),
+      borderRadius: BorderRadius.circular(999),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-          decoration: BoxDecoration(
-            color: selected
-                ? item.color.withValues(alpha: 0.14)
-                : Colors.white.withValues(alpha: 0.52),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: item.color.withValues(alpha: selected ? 0.22 : 0.1),
-            ),
-          ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(item.icon, size: 18, color: item.color),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  item.label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: item.color,
-                    fontWeight: FontWeight.w700,
-                  ),
+              Icon(item.icon, size: 16, color: foreground),
+              const SizedBox(width: 6),
+              Text(
+                item.label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              if (selected)
-                Icon(Icons.check_circle, size: 16, color: item.color),
             ],
           ),
         ),
@@ -468,7 +535,7 @@ class _StatisticsSectionBlock extends StatelessWidget {
   final Widget child;
 
   const _StatisticsSectionBlock({
-    this.anchorKey,
+    required this.anchorKey,
     required this.title,
     required this.child,
   });
@@ -480,8 +547,10 @@ class _StatisticsSectionBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionTitle(title: title),
-          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+            child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          ),
           child,
         ],
       ),
@@ -489,282 +558,21 @@ class _StatisticsSectionBlock extends StatelessWidget {
   }
 }
 
-class _StatisticsOverviewCard extends ConsumerWidget {
-  final StatisticsRange range;
-  final String periodLabel;
-  final String updatedLabel;
-  final VoidCallback onExport;
-  final VoidCallback onPeriodChanged;
-
-  const _StatisticsOverviewCard({
-    required this.range,
-    required this.periodLabel,
-    required this.updatedLabel,
-    required this.onExport,
-    required this.onPeriodChanged,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-
-    return GlassCard(
-      padding: const EdgeInsets.all(18),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 560;
-          final buttonWidth = compact ? constraints.maxWidth : 136.0;
-          final contentWidth = compact
-              ? constraints.maxWidth
-              : constraints.maxWidth - buttonWidth - 14;
-          final summaryWidth = constraints.maxWidth < 460
-              ? (constraints.maxWidth - 12) / 2
-              : (constraints.maxWidth - 24) / 3;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 14,
-                runSpacing: 14,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: contentWidth,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: kSealRed.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(
-                            Icons.tune_outlined,
-                            color: kSealRed,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '统计周期与导出',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '数据更新于 $updatedLabel',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: kInkSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  _RangeChip(
-                                    icon: Icons.event_note_outlined,
-                                    label: periodLabel,
-                                    color: kPrimaryBlue,
-                                  ),
-                                  _RangeChip(
-                                    icon: Icons.date_range_outlined,
-                                    label: '${range.from} 至 ${range.to}',
-                                    color: kSealRed,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    width: buttonWidth,
-                    child: FilledButton.tonalIcon(
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: onExport,
-                      icon: const Icon(Icons.file_download_outlined),
-                      label: const Text('导出当前周期'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SegmentedButton<StatisticsPeriod>(
-                  segments: const [
-                    ButtonSegment(
-                      value: StatisticsPeriod.week,
-                      icon: Icon(Icons.calendar_view_week_outlined, size: 18),
-                      label: Text('周视图'),
-                    ),
-                    ButtonSegment(
-                      value: StatisticsPeriod.month,
-                      icon: Icon(Icons.calendar_view_month_outlined, size: 18),
-                      label: Text('月视图'),
-                    ),
-                    ButtonSegment(
-                      value: StatisticsPeriod.year,
-                      icon: Icon(Icons.calendar_today_outlined, size: 18),
-                      label: Text('年视图'),
-                    ),
-                  ],
-                  selected: {range.period},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (selection) {
-                    unawaited(InteractionFeedback.selection(context));
-                    ref.read(statisticsPeriodSelectionProvider.notifier).state =
-                        selection.first;
-                    onPeriodChanged();
-                  },
-                ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  SizedBox(
-                    width: summaryWidth,
-                    child: _PeriodMetric(
-                      label: '统计周期',
-                      value: periodLabel,
-                      color: kPrimaryBlue,
-                    ),
-                  ),
-                  SizedBox(
-                    width: summaryWidth,
-                    child: _PeriodMetric(
-                      label: '开始日期',
-                      value: range.from,
-                      color: kSealRed,
-                    ),
-                  ),
-                  SizedBox(
-                    width: summaryWidth,
-                    child: _PeriodMetric(
-                      label: '结束日期',
-                      value: range.to,
-                      color: kGreen,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
-      ),
-    );
+String _periodLabel(StatisticsPeriod period) {
+  switch (period) {
+    case StatisticsPeriod.week:
+      return '本周';
+    case StatisticsPeriod.month:
+      return '本月';
+    case StatisticsPeriod.year:
+      return '本年';
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  final String title;
-
-  const _SectionTitle({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RangeChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _RangeChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PeriodMetric extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _PeriodMetric({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+String _formatUpdatedAt(DateTime time) {
+  final month = time.month.toString().padLeft(2, '0');
+  final day = time.day.toString().padLeft(2, '0');
+  final hour = time.hour.toString().padLeft(2, '0');
+  final minute = time.minute.toString().padLeft(2, '0');
+  return '$month月$day日 $hour:$minute';
 }

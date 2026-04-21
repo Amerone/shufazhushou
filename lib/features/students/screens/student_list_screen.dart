@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/database/dao/student_dao.dart';
-import '../../../core/models/student.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/interaction_feedback.dart';
@@ -14,8 +13,6 @@ import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../widgets/student_action_launcher.dart';
-
-enum _StudentListFilter { all, active, suspended }
 
 class StudentListScreen extends ConsumerStatefulWidget {
   const StudentListScreen({super.key});
@@ -27,8 +24,6 @@ class StudentListScreen extends ConsumerStatefulWidget {
 class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _queryDebounce;
-  String _query = '';
-  _StudentListFilter _filter = _StudentListFilter.all;
 
   @override
   void dispose() {
@@ -41,40 +36,28 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     final normalized = value.trim();
     _queryDebounce?.cancel();
     _queryDebounce = Timer(const Duration(milliseconds: 180), () {
-      if (!mounted || _query == normalized) return;
-      setState(() => _query = normalized);
+      if (!mounted) return;
+      final current = ref.read(studentListQueryProvider);
+      if (current.text == normalized) return;
+      ref.read(studentListQueryProvider.notifier).state = current.copyWith(
+        text: normalized,
+      );
     });
   }
 
   void _clearQuery() {
     _queryDebounce?.cancel();
     _searchController.clear();
-    setState(() => _query = '');
+    final current = ref.read(studentListQueryProvider);
+    ref.read(studentListQueryProvider.notifier).state = current.copyWith(
+      text: '',
+    );
   }
 
   void _resetFilters() {
     _queryDebounce?.cancel();
     _searchController.clear();
-    setState(() {
-      _query = '';
-      _filter = _StudentListFilter.all;
-    });
-  }
-
-  bool _matchesFilter(StudentWithMeta item) {
-    return switch (_filter) {
-      _StudentListFilter.all => true,
-      _StudentListFilter.active => item.student.status == 'active',
-      _StudentListFilter.suspended => item.student.status != 'active',
-    };
-  }
-
-  bool _matchesQuery(Student student) {
-    if (_query.isEmpty) return true;
-    final query = _query.toLowerCase();
-    return student.name.toLowerCase().contains(query) ||
-        (student.parentPhone?.toLowerCase().contains(query) ?? false) ||
-        (student.parentName?.toLowerCase().contains(query) ?? false);
+    ref.read(studentListQueryProvider.notifier).state = StudentListQuery.empty;
   }
 
   @override
@@ -103,24 +86,10 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                 child: asyncStudents.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('加载失败：$e')),
-                  data: (list) {
-                    final filtered = list
-                        .where((item) => _matchesFilter(item))
-                        .where((item) => _matchesQuery(item.student))
-                        .toList();
-                    final displayNames = ref.watch(
-                      studentDisplayNameMapProvider,
-                    );
-                    final activeCount = list
-                        .where((item) => item.student.status == 'active')
-                        .length;
-                    final suspendedCount = list.length - activeCount;
-                    final hasActiveFilter =
-                        _query.isNotEmpty || _filter != _StudentListFilter.all;
-                    final resultSummary = hasActiveFilter
-                        ? '当前显示 ${filtered.length} / ${list.length} 位学生'
-                        : '共 ${list.length} 位学生';
+                  error: (error, _) => Center(child: Text('加载失败：$error')),
+                  data: (_) {
+                    final viewModel = ref.watch(studentListViewModelProvider);
+                    final query = viewModel.query;
 
                     return CustomScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -128,205 +97,24 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                         SliverPadding(
                           padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
                           sliver: SliverToBoxAdapter(
-                            child: GlassCard(
-                              padding: const EdgeInsets.all(18),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final compact =
-                                          constraints.maxWidth < 420;
-                                      final buttonWidth = compact
-                                          ? constraints.maxWidth
-                                          : (constraints.maxWidth - 12) / 2;
-
-                                      return Wrap(
-                                        spacing: 12,
-                                        runSpacing: 12,
-                                        children: [
-                                          SizedBox(
-                                            width: buttonWidth,
-                                            child: FilledButton.icon(
-                                              onPressed: () {
-                                                unawaited(
-                                                  InteractionFeedback.selection(
-                                                    context,
-                                                  ),
-                                                );
-                                                context.push(
-                                                  '/students/create',
-                                                );
-                                              },
-                                              icon: const Icon(Icons.add),
-                                              label: const Text('新增学生'),
-                                            ),
-                                          ),
-                                          SizedBox(
-                                            width: buttonWidth,
-                                            child: OutlinedButton.icon(
-                                              onPressed: () {
-                                                unawaited(
-                                                  InteractionFeedback.selection(
-                                                    context,
-                                                  ),
-                                                );
-                                                context.push(
-                                                  '/students/import',
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.upload_file_outlined,
-                                              ),
-                                              label: const Text('批量导入'),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      _StudentSummaryPill(
-                                        label: '在读 $activeCount',
-                                        color: kPrimaryBlue,
-                                      ),
-                                      _StudentSummaryPill(
-                                        label: '休学 $suspendedCount',
-                                        color: kOrange,
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 14),
-                                  TextField(
-                                    controller: _searchController,
-                                    textInputAction: TextInputAction.search,
-                                    decoration: InputDecoration(
-                                      hintText: '搜索姓名、家长姓名或电话',
-                                      prefixIcon: const Icon(Icons.search),
-                                      suffixIcon: _query.isEmpty
-                                          ? null
-                                          : IconButton(
-                                              tooltip: '清空搜索',
-                                              onPressed: () {
-                                                unawaited(
-                                                  InteractionFeedback.selection(
-                                                    context,
-                                                  ),
-                                                );
-                                                _clearQuery();
-                                              },
-                                              icon: const Icon(Icons.close),
-                                            ),
-                                    ),
-                                    onChanged: _updateQuery,
-                                  ),
-                                  const SizedBox(height: 14),
-                                  SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: SegmentedButton<_StudentListFilter>(
-                                      segments: const [
-                                        ButtonSegment(
-                                          value: _StudentListFilter.all,
-                                          icon: Icon(
-                                            Icons.grid_view_rounded,
-                                            size: 18,
-                                          ),
-                                          label: Text('全部'),
-                                        ),
-                                        ButtonSegment(
-                                          value: _StudentListFilter.active,
-                                          icon: Icon(
-                                            Icons.verified_user_outlined,
-                                            size: 18,
-                                          ),
-                                          label: Text('在读'),
-                                        ),
-                                        ButtonSegment(
-                                          value: _StudentListFilter.suspended,
-                                          icon: Icon(
-                                            Icons.pause_circle_outline,
-                                            size: 18,
-                                          ),
-                                          label: Text('休学'),
-                                        ),
-                                      ],
-                                      selected: {_filter},
-                                      showSelectedIcon: false,
-                                      onSelectionChanged: (selection) {
-                                        unawaited(
-                                          InteractionFeedback.selection(
-                                            context,
-                                          ),
-                                        );
-                                        setState(
-                                          () => _filter = selection.first,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.fromLTRB(
-                                      12,
-                                      10,
-                                      12,
-                                      10,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.5,
-                                      ),
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: kInkSecondary.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          hasActiveFilter
-                                              ? Icons.filter_alt_outlined
-                                              : Icons.people_outline,
-                                          size: 18,
-                                          color: kPrimaryBlue,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            resultSummary,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall
-                                                ?.copyWith(
-                                                  color: kPrimaryBlue,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                          ),
-                                        ),
-                                        if (hasActiveFilter)
-                                          TextButton(
-                                            onPressed: () {
-                                              unawaited(
-                                                InteractionFeedback.selection(
-                                                  context,
-                                                ),
-                                              );
-                                              _resetFilters();
-                                            },
-                                            child: const Text('重置筛选'),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            child: _StudentListToolbar(
+                              query: query,
+                              searchController: _searchController,
+                              activeCount: viewModel.activeCount,
+                              suspendedCount: viewModel.suspendedCount,
+                              resultSummary: viewModel.resultSummary,
+                              onQueryChanged: _updateQuery,
+                              onClearQuery: _clearQuery,
+                              onResetFilters: _resetFilters,
+                              onFilterChanged: (filter) {
+                                final current = ref.read(
+                                  studentListQueryProvider,
+                                );
+                                if (current.filter == filter) return;
+                                ref
+                                    .read(studentListQueryProvider.notifier)
+                                    .state = current.copyWith(filter: filter);
+                              },
                             ),
                           ),
                         ),
@@ -334,11 +122,11 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                           padding: EdgeInsets.only(top: 16),
                           sliver: SliverToBoxAdapter(child: SizedBox.shrink()),
                         ),
-                        if (filtered.isEmpty)
+                        if (viewModel.filtered.isEmpty)
                           SliverPadding(
                             padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
                             sliver: SliverToBoxAdapter(
-                              child: _buildEmptyState(),
+                              child: _buildEmptyState(query),
                             ),
                           )
                         else ...[
@@ -346,11 +134,11 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                             padding: const EdgeInsets.fromLTRB(28, 0, 24, 10),
                             sliver: SliverToBoxAdapter(
                               child: Text(
-                                _query.isEmpty
-                                    ? switch (_filter) {
-                                        _StudentListFilter.all => '全部学生',
-                                        _StudentListFilter.active => '在读学生',
-                                        _StudentListFilter.suspended => '休学学生',
+                                query.text.isEmpty
+                                    ? switch (query.filter) {
+                                        StudentListFilter.all => '全部学生',
+                                        StudentListFilter.active => '在读学生',
+                                        StudentListFilter.suspended => '休学学生',
                                       }
                                     : '搜索结果',
                                 style: Theme.of(context).textTheme.titleMedium,
@@ -360,8 +148,8 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                           SliverPadding(
                             padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
                             sliver: _buildStudentListSliver(
-                              filtered: filtered,
-                              displayNames: displayNames,
+                              filtered: viewModel.filtered,
+                              displayNames: viewModel.displayNames,
                             ),
                           ),
                         ],
@@ -377,10 +165,12 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
-    if (_query.isNotEmpty || _filter != _StudentListFilter.all) {
+  Widget _buildEmptyState(StudentListQuery query) {
+    if (query.hasActiveFilter) {
       return EmptyState(
-        message: _query.isNotEmpty ? '没有找到“$_query”' : '没有符合当前筛选的学生',
+        message: query.text.isNotEmpty
+            ? '没有找到“${query.text}”'
+            : '没有符合当前筛选的学生',
         actionLabel: '重置筛选',
         onAction: _resetFilters,
       );
@@ -405,6 +195,176 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
         final item = filtered[index ~/ 2];
         return _StudentCard(meta: item, displayNames: displayNames);
       }, childCount: filtered.isEmpty ? 0 : filtered.length * 2 - 1),
+    );
+  }
+}
+
+class _StudentListToolbar extends StatelessWidget {
+  final StudentListQuery query;
+  final TextEditingController searchController;
+  final int activeCount;
+  final int suspendedCount;
+  final String resultSummary;
+  final ValueChanged<String> onQueryChanged;
+  final VoidCallback onClearQuery;
+  final VoidCallback onResetFilters;
+  final ValueChanged<StudentListFilter> onFilterChanged;
+
+  const _StudentListToolbar({
+    required this.query,
+    required this.searchController,
+    required this.activeCount,
+    required this.suspendedCount,
+    required this.resultSummary,
+    required this.onQueryChanged,
+    required this.onClearQuery,
+    required this.onResetFilters,
+    required this.onFilterChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 420;
+              final buttonWidth = compact
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 12) / 2;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: buttonWidth,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        unawaited(InteractionFeedback.selection(context));
+                        context.push('/students/create');
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('新增学生'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: buttonWidth,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        unawaited(InteractionFeedback.selection(context));
+                        context.push('/students/import');
+                      },
+                      icon: const Icon(Icons.upload_file_outlined),
+                      label: const Text('批量导入'),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StudentSummaryPill(label: '在读 $activeCount', color: kPrimaryBlue),
+              _StudentSummaryPill(label: '休学 $suspendedCount', color: kOrange),
+            ],
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: searchController,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: '搜索姓名、家长姓名或电话',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: query.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: '清空搜索',
+                      onPressed: () {
+                        unawaited(InteractionFeedback.selection(context));
+                        onClearQuery();
+                      },
+                      icon: const Icon(Icons.close),
+                    ),
+            ),
+            onChanged: onQueryChanged,
+          ),
+          const SizedBox(height: 14),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<StudentListFilter>(
+              segments: const [
+                ButtonSegment(
+                  value: StudentListFilter.all,
+                  icon: Icon(Icons.grid_view_rounded, size: 18),
+                  label: Text('全部'),
+                ),
+                ButtonSegment(
+                  value: StudentListFilter.active,
+                  icon: Icon(Icons.verified_user_outlined, size: 18),
+                  label: Text('在读'),
+                ),
+                ButtonSegment(
+                  value: StudentListFilter.suspended,
+                  icon: Icon(Icons.pause_circle_outline, size: 18),
+                  label: Text('休学'),
+                ),
+              ],
+              selected: {query.filter},
+              showSelectedIcon: false,
+              onSelectionChanged: (selection) {
+                unawaited(InteractionFeedback.selection(context));
+                onFilterChanged(selection.first);
+              },
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  query.hasActiveFilter
+                      ? Icons.filter_alt_outlined
+                      : Icons.people_outline,
+                  size: 18,
+                  color: kPrimaryBlue,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    resultSummary,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: kPrimaryBlue,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (query.hasActiveFilter)
+                  TextButton(
+                    onPressed: () {
+                      unawaited(InteractionFeedback.selection(context));
+                      onResetFilters();
+                    },
+                    child: const Text('重置筛选'),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -455,7 +415,8 @@ class _StudentCard extends StatelessWidget {
 
     return RepaintBoundary(
       child: GlassCard(
-        semanticLabel: '$displayName，${isSuspended ? '休学' : '在读'}，轻触查看学生档案',
+        semanticLabel:
+            '$displayName，${isSuspended ? '休学' : '在读'}，轻触查看学生档案',
         onTap: () {
           unawaited(InteractionFeedback.pageTurn(context));
           context.push('/students/${student.id}');
@@ -498,52 +459,21 @@ class _StudentCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    isSuspended ? '休学' : '在读',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: accentColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                _StudentStatusBadge(
+                  label: isSuspended ? '休学' : '在读',
+                  color: accentColor,
                 ),
                 const SizedBox(width: 8),
                 Tooltip(
                   message: '编辑$displayName',
-                  child: Semantics(
-                    button: true,
-                    label: '编辑$displayName档案',
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () {
-                          unawaited(InteractionFeedback.selection(context));
-                          context.push('/students/${student.id}/edit');
-                        },
-                        child: Ink(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.6),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.edit_outlined,
-                            size: 18,
-                            color: accentColor,
-                          ),
-                        ),
-                      ),
-                    ),
+                  child: IconButton.filledTonal(
+                    onPressed: () {
+                      unawaited(InteractionFeedback.selection(context));
+                      context.push('/students/${student.id}/edit');
+                    },
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    color: accentColor,
+                    visualDensity: VisualDensity.compact,
                   ),
                 ),
               ],
@@ -574,65 +504,77 @@ class _StudentCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: accentColor.withValues(alpha: 0.08)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final compact = constraints.maxWidth < 360;
-                      final actionWidth = compact
-                          ? constraints.maxWidth
-                          : (constraints.maxWidth - 12) / 2;
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 360;
+                  final actionWidth = compact
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - 12) / 2;
 
-                      return Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        alignment: WrapAlignment.end,
-                        children: [
-                          SizedBox(
-                            width: actionWidth,
-                            child: OutlinedButton.icon(
-                              onPressed: () async {
-                                await InteractionFeedback.selection(context);
-                                if (!context.mounted) return;
-                                await showStudentPaymentSheet(
-                                  context,
-                                  studentId: student.id,
-                                  studentName: displayName,
-                                  pricePerClass: student.pricePerClass,
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.payments_outlined,
-                                size: 18,
-                              ),
-                              label: const Text('记录缴费'),
-                            ),
-                          ),
-                          SizedBox(
-                            width: actionWidth,
-                            child: FilledButton.tonalIcon(
-                              onPressed: () {
-                                unawaited(
-                                  InteractionFeedback.pageTurn(context),
-                                );
-                                context.push('/students/${student.id}');
-                              },
-                              icon: const Icon(
-                                Icons.arrow_outward_outlined,
-                                size: 18,
-                              ),
-                              label: const Text('查看档案'),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      SizedBox(
+                        width: actionWidth,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await InteractionFeedback.selection(context);
+                            if (!context.mounted) return;
+                            await showStudentPaymentSheet(
+                              context,
+                              studentId: student.id,
+                              studentName: displayName,
+                              pricePerClass: student.pricePerClass,
+                            );
+                          },
+                          icon: const Icon(Icons.payments_outlined, size: 18),
+                          label: const Text('记录缴费'),
+                        ),
+                      ),
+                      SizedBox(
+                        width: actionWidth,
+                        child: FilledButton.tonalIcon(
+                          onPressed: () {
+                            unawaited(InteractionFeedback.pageTurn(context));
+                            context.push('/students/${student.id}');
+                          },
+                          icon: const Icon(Icons.article_outlined, size: 18),
+                          label: const Text('查看档案'),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentStatusBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StudentStatusBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -647,21 +589,19 @@ class _StudentInfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
+        color: Colors.white.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: kInkSecondary),
+          Icon(icon, size: 14, color: kInkSecondary),
           const SizedBox(width: 6),
-          Text(label, style: theme.textTheme.bodySmall),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/dao/dismissed_insight_dao.dart';
 import '../database/dao/student_dao.dart' show StudentWithMeta;
-import '../models/attendance.dart';
+import '../models/student_insight_facts.dart';
 import '../services/insight_aggregation_service.dart';
 import 'attendance_provider.dart';
 import 'database_provider.dart';
@@ -28,15 +28,15 @@ class InsightNotifier extends AsyncNotifier<List<Insight>> {
 
     final deleteExpiredFuture = dismissedDao.deleteExpired();
     final studentsWithMetaFuture = ref.watch(studentProvider.future);
-    final allAttendanceFuture = ref.watch(
-      allAttendanceByStudentProvider.future,
+    final attendanceFactsFuture = ref.watch(
+      attendanceInsightFactsByStudentProvider.future,
     );
     final allPaymentsFuture = ref.watch(allPaymentsByStudentProvider.future);
     final metricsFuture = attendanceDao.getMetrics(range.from, range.to);
 
     final dataFuture = Future.wait<Object?>([
       studentsWithMetaFuture,
-      allAttendanceFuture,
+      attendanceFactsFuture,
       allPaymentsFuture,
       metricsFuture,
     ]);
@@ -53,17 +53,18 @@ class InsightNotifier extends AsyncNotifier<List<Insight>> {
         .map((item) => item.student)
         .toList(growable: false);
     final displayNames = ref.read(studentDisplayNameMapProvider);
-    final allAttendance = dataResults[1] as Map<String, List<Attendance>>;
+    final attendanceFacts =
+        dataResults[1] as Map<String, StudentAttendanceInsightFacts>;
     final allPayments = dataResults[2] as Map<String, double>;
     final dismissedKeys = await dismissedKeysFuture;
 
     final now = DateTime.now();
     final metrics = dataResults[3] as Map<String, dynamic>;
 
-    return insightService.buildInsights(
+    return insightService.buildInsightsFromFacts(
       students: students,
       displayNames: displayNames,
-      allAttendance: allAttendance,
+      factsByStudent: attendanceFacts,
       allPayments: allPayments,
       dismissedKeys: dismissedKeys,
       activeStudentCount: (metrics['activeStudentCount'] as num?)?.toInt() ?? 0,

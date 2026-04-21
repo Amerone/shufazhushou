@@ -1,6 +1,7 @@
 import '../../shared/constants.dart';
 import '../models/attendance.dart';
 import '../models/student.dart';
+import '../models/student_insight_facts.dart';
 import '../utils/fee_calculator.dart';
 
 class Insight {
@@ -39,26 +40,50 @@ class InsightAggregationService {
     required Map<String, double> allPayments,
     required Set<String> dismissedKeys,
     required int activeStudentCount,
-    String activePeriodLabel = '本周',
+    String activePeriodLabel = '\u672C\u5468',
+    DateTime? now,
+  }) {
+    final factsByStudent = <String, StudentAttendanceInsightFacts>{
+      for (final entry in allAttendance.entries)
+        entry.key: StudentAttendanceInsightFacts.fromRecords(entry.value),
+    };
+
+    return buildInsightsFromFacts(
+      students: students,
+      displayNames: displayNames,
+      factsByStudent: factsByStudent,
+      allPayments: allPayments,
+      dismissedKeys: dismissedKeys,
+      activeStudentCount: activeStudentCount,
+      activePeriodLabel: activePeriodLabel,
+      now: now,
+    );
+  }
+
+  List<Insight> buildInsightsFromFacts({
+    required List<Student> students,
+    required Map<String, String> displayNames,
+    required Map<String, StudentAttendanceInsightFacts> factsByStudent,
+    required Map<String, double> allPayments,
+    required Set<String> dismissedKeys,
+    required int activeStudentCount,
+    String activePeriodLabel = '\u672C\u5468',
     DateTime? now,
   }) {
     final currentTime = now ?? DateTime.now();
     final insights = <Insight>[];
 
     for (final student in students) {
-      final records = allAttendance[student.id] ?? const <Attendance>[];
+      final facts =
+          factsByStudent[student.id] ?? StudentAttendanceInsightFacts.empty;
       final studentName = displayNames[student.id] ?? student.name;
       final totalReceived = allPayments[student.id] ?? 0;
-      final totalReceivable = records.fold<double>(
-        0,
-        (sum, item) => sum + item.feeAmount,
-      );
       final ledger = StudentLedgerView.fromTotals(
-        totalReceivable: totalReceivable,
+        totalReceivable: facts.totalReceivable,
         totalReceived: totalReceived,
         pricePerClass: student.pricePerClass,
       );
-      final dataFreshness = _buildDataFreshness(records, currentTime);
+      final dataFreshness = _buildDataFreshnessFromFacts(facts, currentTime);
 
       if (!_isDismissed(dismissedKeys, InsightType.debt, student.id) &&
           ledger.needsPaymentAttention) {
@@ -97,13 +122,8 @@ class InsightAggregationService {
 
       if (student.status == 'active' &&
           !_isDismissed(dismissedKeys, InsightType.churn, student.id)) {
-        final formalDates = records
-            .where((item) => item.status == 'present' || item.status == 'late')
-            .map((item) => item.date);
-        if (formalDates.isNotEmpty) {
-          final lastDate = formalDates.reduce(
-            (a, b) => a.compareTo(b) > 0 ? a : b,
-          );
+        final lastDate = facts.lastFormalDate;
+        if (lastDate != null) {
           final inactiveDays = currentTime
               .difference(DateTime.parse(lastDate))
               .inDays;
@@ -124,11 +144,7 @@ class InsightAggregationService {
       }
 
       if (!_isDismissed(dismissedKeys, InsightType.trial, student.id)) {
-        final hasTrial = records.any((item) => item.status == 'trial');
-        final hasFormal = records.any(
-          (item) => item.status == 'present' || item.status == 'late',
-        );
-        if (hasTrial && !hasFormal) {
+        if (facts.hasTrial && !facts.hasFormal) {
           insights.add(
             Insight(
               type: InsightType.trial,
@@ -147,7 +163,7 @@ class InsightAggregationService {
         final progressInsight = _buildProgressInsight(
           studentId: student.id,
           studentName: studentName,
-          records: records,
+          records: facts.recentScoredFormalRecords,
         );
         if (progressInsight != null) {
           insights.add(progressInsight);
@@ -261,15 +277,13 @@ class InsightAggregationService {
     return dismissedKeys.contains('${type.name}:${id ?? ''}');
   }
 
-  String _buildDataFreshness(List<Attendance> records, DateTime fallbackNow) {
-    if (records.isEmpty) {
+  String _buildDataFreshnessFromFacts(
+    StudentAttendanceInsightFacts facts,
+    DateTime fallbackNow,
+  ) {
+    final latest = facts.latestUpdatedAt;
+    if (latest == null) {
       return _formatTimestamp(fallbackNow.millisecondsSinceEpoch);
-    }
-    var latest = records.first.updatedAt;
-    for (final record in records.skip(1)) {
-      if (record.updatedAt > latest) {
-        latest = record.updatedAt;
-      }
     }
     return _formatTimestamp(latest);
   }

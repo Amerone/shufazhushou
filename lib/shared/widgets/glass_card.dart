@@ -28,6 +28,7 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
     final surface = Container(
       width: width,
       height: height,
@@ -42,7 +43,7 @@ class GlassCard extends StatelessWidget {
             Colors.white.withValues(alpha: 0.78),
           ],
         ),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: radius,
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.88),
           width: 1,
@@ -64,7 +65,7 @@ class GlassCard extends StatelessWidget {
     );
 
     final card = ClipRRect(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: radius,
       child: enableBlur
           ? BackdropFilter(
               filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
@@ -75,13 +76,15 @@ class GlassCard extends StatelessWidget {
 
     Widget result = card;
     if (onTap != null) {
-      result = Material(
-        color: Colors.transparent,
-        child: Semantics(
-          button: true,
-          label: semanticLabel,
+      result = Semantics(
+        button: true,
+        label: semanticLabel,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: radius,
             overlayColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.pressed)) {
                 return kPrimaryBlue.withValues(alpha: 0.06);

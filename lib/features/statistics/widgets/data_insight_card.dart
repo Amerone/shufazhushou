@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/dao/student_dao.dart' show StudentWithMeta;
-import '../../../core/models/attendance.dart';
 import '../../../core/models/business_data_summary.dart';
 import '../../../core/models/data_insight_result.dart';
 import '../../../core/models/student.dart' show Student;
+import '../../../core/models/student_insight_facts.dart';
 import '../../../core/providers/ai_provider.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/contribution_provider.dart';
@@ -179,19 +179,20 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
     required int activeStudentCount,
   }) async {
     final insightData = await Future.wait<Object?>([
-      ref.read(allAttendanceByStudentProvider.future),
+      ref.read(attendanceInsightFactsByStudentProvider.future),
       ref.read(allPaymentsByStudentProvider.future),
       ref.read(dismissedInsightDaoProvider).getAllActiveKeys(),
     ]);
-    final attendance = insightData[0] as Map<String, List<Attendance>>;
+    final attendanceFacts =
+        insightData[0] as Map<String, StudentAttendanceInsightFacts>;
     final payments = insightData[1] as Map<String, double>;
     final dismissedKeys = insightData[2] as Set<String>;
     final service = ref.read(insightServiceProvider);
 
-    return service.buildInsights(
+    return service.buildInsightsFromFacts(
       students: students,
       displayNames: displayNames,
-      allAttendance: attendance,
+      factsByStudent: attendanceFacts,
       allPayments: payments,
       dismissedKeys: dismissedKeys,
       activeStudentCount: activeStudentCount,

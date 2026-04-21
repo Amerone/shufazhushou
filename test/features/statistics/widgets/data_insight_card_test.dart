@@ -12,6 +12,7 @@ import 'package:moyun/core/models/attendance.dart';
 import 'package:moyun/core/models/business_data_summary.dart';
 import 'package:moyun/core/models/data_insight_result.dart';
 import 'package:moyun/core/models/student.dart';
+import 'package:moyun/core/models/student_insight_facts.dart';
 import 'package:moyun/core/providers/ai_provider.dart';
 import 'package:moyun/core/providers/attendance_provider.dart';
 import 'package:moyun/core/providers/fee_summary_provider.dart';
@@ -420,6 +421,12 @@ class _FakeAttendanceDao extends AttendanceDao {
       ],
     };
   }
+
+  @override
+  Future<Map<String, StudentAttendanceInsightFacts>>
+  getInsightFactsByStudent() async {
+    return const {'student-1': StudentAttendanceInsightFacts.empty};
+  }
 }
 
 class _FakePaymentDao extends PaymentDao {
@@ -456,10 +463,10 @@ class _FakeDismissedInsightDao extends DismissedInsightDao {
 
 class _FakeInsightAggregationService extends InsightAggregationService {
   @override
-  List<Insight> buildInsights({
+  List<Insight> buildInsightsFromFacts({
     required List<Student> students,
     required Map<String, String> displayNames,
-    required Map<String, List<Attendance>> allAttendance,
+    required Map<String, StudentAttendanceInsightFacts> factsByStudent,
     required Map<String, double> allPayments,
     required Set<String> dismissedKeys,
     required int activeStudentCount,
@@ -472,10 +479,10 @@ class _FakeInsightAggregationService extends InsightAggregationService {
 
 class _DisplayNameInsightAggregationService extends InsightAggregationService {
   @override
-  List<Insight> buildInsights({
+  List<Insight> buildInsightsFromFacts({
     required List<Student> students,
     required Map<String, String> displayNames,
-    required Map<String, List<Attendance>> allAttendance,
+    required Map<String, StudentAttendanceInsightFacts> factsByStudent,
     required Map<String, double> allPayments,
     required Set<String> dismissedKeys,
     required int activeStudentCount,

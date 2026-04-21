@@ -84,10 +84,7 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
       ),
       error: (e, _) => Center(child: Text('加载失败: $e')),
       data: (records) {
-        final sortedRecords = [...records]
-          ..sort((a, b) => a.startTime.compareTo(b.startTime));
-
-        if (sortedRecords.isEmpty) {
+        if (records.isEmpty) {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -115,10 +112,10 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
         return ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: sortedRecords.length,
+          itemCount: records.length,
           separatorBuilder: (_, _) => const SizedBox(height: 14),
           itemBuilder: (_, i) {
-            final r = sortedRecords[i];
+            final r = records[i];
             final status = statusLabel(r.status);
             final sColor = statusColor(r.status);
             final durationLabel = _durationLabel(r.startTime, r.endTime);

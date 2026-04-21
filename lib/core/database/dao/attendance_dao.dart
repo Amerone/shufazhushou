@@ -1,4 +1,5 @@
 import '../../models/attendance.dart';
+import '../../models/student_insight_facts.dart';
 import '../../services/attendance_artwork_storage_service.dart';
 import '../../utils/ledger_record_validator.dart';
 import '../database_helper.dart';
@@ -381,4 +382,83 @@ class AttendanceDao {
     }
     return result;
   }
+
+  Future<Map<String, StudentAttendanceInsightFacts>>
+  getInsightFactsByStudent() async {
+    final db = await _db.database;
+    final aggregateRows = await db.rawQuery('''
+      SELECT
+        student_id,
+        COALESCE(SUM(fee_amount), 0) AS total_receivable,
+        MAX(updated_at) AS latest_updated_at,
+        MAX(CASE WHEN status IN ('present', 'late') THEN date END)
+          AS last_formal_date,
+        COALESCE(SUM(CASE WHEN status = 'trial' THEN 1 ELSE 0 END), 0)
+          AS trial_count,
+        COALESCE(
+          SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END),
+          0
+        ) AS formal_count
+      FROM attendance
+      GROUP BY student_id
+    ''');
+
+    final scoredRows = await db.query(
+      'attendance',
+      where:
+          "status IN ('present', 'late') "
+          "AND progress_scores_json IS NOT NULL "
+          "AND TRIM(progress_scores_json) <> ''",
+      orderBy: 'student_id ASC, date DESC, start_time DESC, created_at DESC',
+    );
+
+    return buildStudentAttendanceInsightFactsByStudent(
+      aggregateRows: aggregateRows,
+      scoredRows: scoredRows,
+    );
+  }
+}
+
+Map<String, StudentAttendanceInsightFacts>
+buildStudentAttendanceInsightFactsByStudent({
+  required Iterable<Map<String, Object?>> aggregateRows,
+  required Iterable<Map<String, Object?>> scoredRows,
+}) {
+  final factsByStudent = <String, StudentAttendanceInsightFacts>{};
+  for (final row in aggregateRows) {
+    final studentId = row['student_id'] as String;
+    factsByStudent[studentId] = StudentAttendanceInsightFacts(
+      totalReceivable: (row['total_receivable'] as num?)?.toDouble() ?? 0,
+      lastFormalDate: row['last_formal_date'] as String?,
+      hasTrial: ((row['trial_count'] as num?)?.toInt() ?? 0) > 0,
+      hasFormal: ((row['formal_count'] as num?)?.toInt() ?? 0) > 0,
+      latestUpdatedAt: (row['latest_updated_at'] as num?)?.toInt(),
+      recentScoredFormalRecords: const <Attendance>[],
+    );
+  }
+
+  final recentScoredRecordsByStudent = <String, List<Attendance>>{};
+  for (final row in scoredRows) {
+    final studentId = row['student_id'] as String;
+    final records = recentScoredRecordsByStudent.putIfAbsent(
+      studentId,
+      () => <Attendance>[],
+    );
+    if (records.length >= 3) {
+      continue;
+    }
+    records.add(Attendance.fromMap(row.cast<String, dynamic>()));
+  }
+
+  for (final entry in recentScoredRecordsByStudent.entries) {
+    final facts = factsByStudent[entry.key];
+    if (facts == null) {
+      continue;
+    }
+    factsByStudent[entry.key] = facts.copyWith(
+      recentScoredFormalRecords: entry.value,
+    );
+  }
+
+  return factsByStudent;
 }

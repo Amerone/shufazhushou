@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme.dart';
 
 class InkWashBackground extends StatelessWidget {
   final Widget child;
@@ -17,39 +16,54 @@ class InkWashBackground extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          const Positioned(
-            top: -80,
-            left: -60,
-            child: _InkBlob(
-              width: 220,
-              height: 180,
-              start: Color(0x2A9FB7C8),
-              end: Color(0x00B7A48D),
-            ),
-          ),
-          const Positioned(
-            right: -90,
-            top: 120,
-            child: _InkBlob(
-              width: 240,
-              height: 220,
-              start: Color(0x1FC24E40),
-              end: Color(0x00B44A3E),
-            ),
-          ),
-          Positioned(
-            left: 30,
-            bottom: -110,
-            child: _InkBlob(
-              width: 320,
-              height: 220,
-              start: kPrimaryBlue.withValues(alpha: 0.08),
-              end: Colors.transparent,
-            ),
+          const Positioned.fill(
+            child: RepaintBoundary(child: _InkWashBackdrop()),
           ),
           child,
         ],
       ),
+    );
+  }
+}
+
+class _InkWashBackdrop extends StatelessWidget {
+  const _InkWashBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Stack(
+      children: [
+        Positioned(
+          top: -80,
+          left: -60,
+          child: _InkBlob(
+            width: 220,
+            height: 180,
+            start: Color(0x2A9FB7C8),
+            end: Color(0x00B7A48D),
+          ),
+        ),
+        Positioned(
+          right: -90,
+          top: 120,
+          child: _InkBlob(
+            width: 240,
+            height: 220,
+            start: Color(0x1FC24E40),
+            end: Color(0x00B44A3E),
+          ),
+        ),
+        Positioned(
+          left: 30,
+          bottom: -110,
+          child: _InkBlob(
+            width: 320,
+            height: 220,
+            start: Color(0x142A4E63),
+            end: Colors.transparent,
+          ),
+        ),
+      ],
     );
   }
 }

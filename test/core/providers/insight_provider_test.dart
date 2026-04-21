@@ -7,6 +7,7 @@ import 'package:moyun/core/database/dao/student_dao.dart';
 import 'package:moyun/core/database/database_helper.dart';
 import 'package:moyun/core/models/attendance.dart';
 import 'package:moyun/core/models/student.dart';
+import 'package:moyun/core/models/student_insight_facts.dart';
 import 'package:moyun/core/providers/attendance_provider.dart';
 import 'package:moyun/core/providers/fee_summary_provider.dart';
 import 'package:moyun/core/providers/insight_provider.dart';
@@ -128,10 +129,10 @@ void main() {
       );
       expect(spyService.capturedAllPayments['student-1'], 300);
       expect(
-        spyService.capturedAllAttendance['student-1']?.single.date,
+        spyService.capturedFactsByStudent['student-1']?.lastFormalDate,
         '2026-02-20',
       );
-      expect(attendanceDao.groupedByStudentCalled, isTrue);
+      expect(attendanceDao.insightFactsCalled, isTrue);
       expect(attendanceDao.metricsFrom, isNotNull);
       expect(attendanceDao.metricsTo, isNotNull);
       expect(attendanceDao.metricsFrom, '2026-03-01');
@@ -167,7 +168,7 @@ class _FakeAttendanceDao extends AttendanceDao {
   final List<Attendance> attendance;
   final Map<String, List<Attendance>> groupedAttendance;
   final Map<String, dynamic> metrics;
-  bool groupedByStudentCalled = false;
+  bool insightFactsCalled = false;
   String? metricsFrom;
   String? metricsTo;
 
@@ -178,13 +179,14 @@ class _FakeAttendanceDao extends AttendanceDao {
   }) : super(DatabaseHelper.instance);
 
   @override
-  Future<Map<String, List<Attendance>>> getAllGroupedByStudent() async {
-    groupedByStudentCalled = true;
+  Future<Map<String, StudentAttendanceInsightFacts>>
+  getInsightFactsByStudent() async {
+    insightFactsCalled = true;
     return {
       for (final entry in groupedAttendance.entries)
-        entry.key: List<Attendance>.from(entry.value),
+        entry.key: StudentAttendanceInsightFacts.fromRecords(entry.value),
       if (!groupedAttendance.containsKey('student-1'))
-        'student-1': List<Attendance>.from(attendance),
+        'student-1': StudentAttendanceInsightFacts.fromRecords(attendance),
     };
   }
 
@@ -232,7 +234,7 @@ class _SpyInsightService extends InsightAggregationService {
   final List<Insight> _result;
   List<Student> capturedStudents = const [];
   Map<String, String> capturedDisplayNames = const {};
-  Map<String, List<Attendance>> capturedAllAttendance = const {};
+  Map<String, StudentAttendanceInsightFacts> capturedFactsByStudent = const {};
   Map<String, double> capturedAllPayments = const {};
   Set<String> capturedDismissedKeys = const {};
   int capturedActiveStudentCount = 0;
@@ -242,10 +244,10 @@ class _SpyInsightService extends InsightAggregationService {
   _SpyInsightService(this._result);
 
   @override
-  List<Insight> buildInsights({
+  List<Insight> buildInsightsFromFacts({
     required List<Student> students,
     required Map<String, String> displayNames,
-    required Map<String, List<Attendance>> allAttendance,
+    required Map<String, StudentAttendanceInsightFacts> factsByStudent,
     required Map<String, double> allPayments,
     required Set<String> dismissedKeys,
     required int activeStudentCount,
@@ -254,7 +256,7 @@ class _SpyInsightService extends InsightAggregationService {
   }) {
     capturedStudents = students;
     capturedDisplayNames = displayNames;
-    capturedAllAttendance = allAttendance;
+    capturedFactsByStudent = factsByStudent;
     capturedAllPayments = allPayments;
     capturedDismissedKeys = dismissedKeys;
     capturedActiveStudentCount = activeStudentCount;

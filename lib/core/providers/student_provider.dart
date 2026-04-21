@@ -98,3 +98,117 @@ final studentByIdMapProvider = Provider<Map<String, Student>>((ref) {
 
   return {for (final item in students) item.student.id: item.student};
 });
+
+final studentByIdAsyncProvider = Provider.family<AsyncValue<Student?>, String>((
+  ref,
+  studentId,
+) {
+  return ref.watch(studentProvider).whenData((students) {
+    for (final item in students) {
+      if (item.student.id == studentId) {
+        return item.student;
+      }
+    }
+    return null;
+  });
+});
+
+enum StudentListFilter { all, active, suspended }
+
+class StudentListQuery {
+  final String text;
+  final StudentListFilter filter;
+
+  const StudentListQuery({
+    this.text = '',
+    this.filter = StudentListFilter.all,
+  });
+
+  static const empty = StudentListQuery();
+
+  bool get hasActiveFilter =>
+      text.isNotEmpty || filter != StudentListFilter.all;
+
+  StudentListQuery copyWith({String? text, StudentListFilter? filter}) {
+    return StudentListQuery(
+      text: text ?? this.text,
+      filter: filter ?? this.filter,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StudentListQuery &&
+          text == other.text &&
+          filter == other.filter;
+
+  @override
+  int get hashCode => Object.hash(text, filter);
+}
+
+final studentListQueryProvider = StateProvider<StudentListQuery>(
+  (ref) => StudentListQuery.empty,
+);
+
+class StudentListViewModel {
+  final StudentListQuery query;
+  final List<StudentWithMeta> filtered;
+  final Map<String, String> displayNames;
+  final int totalCount;
+  final int activeCount;
+  final int suspendedCount;
+  final String resultSummary;
+
+  const StudentListViewModel({
+    required this.query,
+    required this.filtered,
+    required this.displayNames,
+    required this.totalCount,
+    required this.activeCount,
+    required this.suspendedCount,
+    required this.resultSummary,
+  });
+}
+
+final studentListViewModelProvider = Provider<StudentListViewModel>((ref) {
+  final students =
+      ref.watch(studentProvider).valueOrNull ?? const <StudentWithMeta>[];
+  final displayNames = ref.watch(studentDisplayNameMapProvider);
+  final query = ref.watch(studentListQueryProvider);
+  final normalizedQuery = query.text.trim().toLowerCase();
+
+  final activeCount = students
+      .where((item) => item.student.status == 'active')
+      .length;
+  final filtered = students.where((item) {
+    final student = item.student;
+    final matchesFilter = switch (query.filter) {
+      StudentListFilter.all => true,
+      StudentListFilter.active => student.status == 'active',
+      StudentListFilter.suspended => student.status != 'active',
+    };
+    if (!matchesFilter) return false;
+    if (normalizedQuery.isEmpty) return true;
+
+    return student.name.toLowerCase().contains(normalizedQuery) ||
+        (student.parentPhone?.toLowerCase().contains(normalizedQuery) ??
+            false) ||
+        (student.parentName?.toLowerCase().contains(normalizedQuery) ??
+            false);
+  }).toList(growable: false);
+
+  final resultSummary = query.hasActiveFilter
+      ? '当前显示 ${filtered.length} / ${students.length} 位学生'
+      : '共 ${students.length} 位学生';
+
+  return StudentListViewModel(
+    query: query,
+    filtered: filtered,
+    displayNames: displayNames,
+    totalCount: students.length,
+    activeCount: activeCount,
+    suspendedCount: students.length - activeCount,
+    resultSummary: resultSummary,
+  );
+});

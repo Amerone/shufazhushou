@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/dao/student_dao.dart' show StudentWithMeta;
 import '../models/attendance.dart';
+import '../models/student_insight_facts.dart';
 import '../services/home_workbench_service.dart';
 import 'attendance_provider.dart';
 import 'fee_summary_provider.dart';
@@ -23,13 +24,15 @@ final homeWorkbenchProvider = FutureProvider<List<HomeWorkbenchTask>>((
   final deleteExpiredFuture = dismissedDao.deleteExpired();
   final studentsWithMetaFuture = ref.watch(studentProvider.future);
   final monthAttendanceFuture = ref.watch(attendanceProvider.future);
-  final allAttendanceFuture = ref.watch(allAttendanceByStudentProvider.future);
+  final attendanceFactsFuture = ref.watch(
+    attendanceInsightFactsByStudentProvider.future,
+  );
   final allPaymentsFuture = ref.watch(allPaymentsByStudentProvider.future);
 
   final dataFuture = Future.wait<Object?>([
     studentsWithMetaFuture,
     monthAttendanceFuture,
-    allAttendanceFuture,
+    attendanceFactsFuture,
     allPaymentsFuture,
   ]);
 
@@ -43,7 +46,8 @@ final homeWorkbenchProvider = FutureProvider<List<HomeWorkbenchTask>>((
       .toList(growable: false);
   final displayNames = ref.read(studentDisplayNameMapProvider);
   final monthAttendance = dataResults[1] as List<Attendance>;
-  final allAttendance = dataResults[2] as Map<String, List<Attendance>>;
+  final attendanceFacts =
+      dataResults[2] as Map<String, StudentAttendanceInsightFacts>;
   final allPayments = dataResults[3] as Map<String, double>;
   final dismissedKeys = await dismissedKeysFuture;
   final activeStudentCount = {
@@ -54,10 +58,10 @@ final homeWorkbenchProvider = FutureProvider<List<HomeWorkbenchTask>>((
         record.studentId,
   }.length;
 
-  final insights = insightService.buildInsights(
+  final insights = insightService.buildInsightsFromFacts(
     students: students,
     displayNames: displayNames,
-    allAttendance: allAttendance,
+    factsByStudent: attendanceFacts,
     allPayments: allPayments,
     dismissedKeys: dismissedKeys,
     activeStudentCount: activeStudentCount,

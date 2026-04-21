@@ -144,17 +144,18 @@ class InsightList extends ConsumerWidget {
               insight.type,
             ).inDays;
 
-            return Container(
-              margin: EdgeInsets.only(
-                bottom: insight == insights.last ? 0 : 10,
-              ),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.56),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: color.withValues(alpha: 0.14)),
-              ),
-              child: Column(
+            return RepaintBoundary(
+              child: Container(
+                margin: EdgeInsets.only(
+                  bottom: insight == insights.last ? 0 : 10,
+                ),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.56),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: color.withValues(alpha: 0.14)),
+                ),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -299,6 +300,7 @@ class InsightList extends ConsumerWidget {
                     snoozeLabel: '稍后 $snoozeDays 天提醒',
                   ),
                 ],
+                ),
               ),
             );
           }).toList(),

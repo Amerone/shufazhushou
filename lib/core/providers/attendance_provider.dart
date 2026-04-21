@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/constants.dart' show formatDate;
 import '../database/dao/attendance_dao.dart';
 import '../models/attendance.dart';
+import '../models/student_insight_facts.dart';
 import 'database_provider.dart';
 
 final attendanceDaoProvider = Provider<AttendanceDao>((ref) {
@@ -13,6 +14,11 @@ final attendanceDaoProvider = Provider<AttendanceDao>((ref) {
 final allAttendanceByStudentProvider =
     FutureProvider<Map<String, List<Attendance>>>((ref) {
       return ref.watch(attendanceDaoProvider).getAllGroupedByStudent();
+    });
+
+final attendanceInsightFactsByStudentProvider =
+    FutureProvider<Map<String, StudentAttendanceInsightFacts>>((ref) {
+      return ref.watch(attendanceDaoProvider).getInsightFactsByStudent();
     });
 
 // Currently selected day.

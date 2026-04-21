@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/dao/settings_dao.dart';
@@ -20,27 +21,55 @@ class SettingsNotifier extends AsyncNotifier<Map<String, String>> {
   Future<Map<String, String>> build() async {
     final dao = ref.watch(settingsDaoProvider);
     final sensitiveStore = ref.watch(sensitiveSettingsStoreProvider);
-    final settings = await dao.getAll();
-    final sensitive = {...await sensitiveStore.readAll()};
+    Map<String, String> settings = const {};
+    Map<String, String> sensitive = const {};
+
+    try {
+      settings = await dao.getAll();
+    } catch (error) {
+      debugPrint('Failed to load settings from database: $error');
+      settings = const {};
+    }
+
+    try {
+      sensitive = {...await sensitiveStore.readAll()};
+    } catch (error) {
+      debugPrint('Failed to load sensitive settings: $error');
+      // Security store may fail on some platforms; keep database settings.
+      return {...settings};
+    }
+
+    final merged = {...settings};
 
     for (final key in _sensitiveSettingKeys) {
       final dbValue = settings[key]?.trim();
       final localValue = sensitive[key]?.trim();
-      if (dbValue == null || dbValue.isEmpty) continue;
 
-      if (localValue == null || localValue.isEmpty) {
-        await sensitiveStore.set(key, dbValue);
-        sensitive[key] = dbValue;
+      if (localValue != null && localValue.isNotEmpty) {
+        merged[key] = sensitive[key]!;
+      } else if (dbValue != null && dbValue.isNotEmpty) {
+        try {
+          await sensitiveStore.set(key, dbValue);
+          merged[key] = dbValue;
+        } catch (error) {
+          debugPrint('Failed to migrate sensitive setting "$key": $error');
+          merged[key] = dbValue;
+          continue;
+        }
+      } else {
+        continue;
       }
-      await dao.delete(key);
-      settings.remove(key);
+
+      try {
+        await dao.delete(key);
+      } catch (error) {
+        debugPrint(
+          'Failed to remove migrated sensitive setting "$key": $error',
+        );
+      }
     }
 
-    return {
-      ...settings,
-      for (final key in _sensitiveSettingKeys)
-        if (sensitive[key]?.isNotEmpty == true) key: sensitive[key]!,
-    };
+    return merged;
   }
 
   Future<void> set(String key, String value) async {
@@ -50,7 +79,17 @@ class SettingsNotifier extends AsyncNotifier<Map<String, String>> {
       state = AsyncData({...current, key: value});
     }
     if (_sensitiveSettingKeys.contains(key)) {
-      await ref.read(sensitiveSettingsStoreProvider).set(key, value);
+      final dao = ref.read(settingsDaoProvider);
+      try {
+        await ref.read(sensitiveSettingsStoreProvider).set(key, value);
+      } catch (error) {
+        debugPrint('Failed to persist sensitive setting "$key": $error');
+      }
+      try {
+        await dao.delete(key);
+      } catch (error) {
+        debugPrint('Failed to remove legacy sensitive setting "$key": $error');
+      }
       return;
     }
     await ref.read(settingsDaoProvider).set(key, value);
@@ -65,7 +104,18 @@ class SettingsNotifier extends AsyncNotifier<Map<String, String>> {
     final sensitiveStore = ref.read(sensitiveSettingsStoreProvider);
     for (final e in entries.entries) {
       if (_sensitiveSettingKeys.contains(e.key)) {
-        await sensitiveStore.set(e.key, e.value);
+        try {
+          await sensitiveStore.set(e.key, e.value);
+        } catch (error) {
+          debugPrint('Failed to persist sensitive setting "${e.key}": $error');
+        }
+        try {
+          await dao.delete(e.key);
+        } catch (error) {
+          debugPrint(
+            'Failed to remove legacy sensitive setting "${e.key}": $error',
+          );
+        }
         continue;
       }
       await dao.set(e.key, e.value);

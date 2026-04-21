@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 
-class AttendanceArtworkPreview extends StatelessWidget {
+class AttendanceArtworkPreview extends StatefulWidget {
   final String imagePath;
   final String title;
   final String emptyLabel;
@@ -17,93 +17,154 @@ class AttendanceArtworkPreview extends StatelessWidget {
   });
 
   @override
+  State<AttendanceArtworkPreview> createState() =>
+      _AttendanceArtworkPreviewState();
+}
+
+class _AttendanceArtworkPreviewState extends State<AttendanceArtworkPreview> {
+  late String _normalizedPath;
+  late Future<bool> _hasImageFileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateImagePath();
+  }
+
+  @override
+  void didUpdateWidget(covariant AttendanceArtworkPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imagePath == widget.imagePath) return;
+    _updateImagePath();
+  }
+
+  void _updateImagePath() {
+    _normalizedPath = widget.imagePath.trim();
+    _hasImageFileFuture = _normalizedPath.isEmpty
+        ? Future<bool>.value(false)
+        : File(_normalizedPath).exists();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final normalizedPath = imagePath.trim();
-    if (normalizedPath.isEmpty) {
+    if (_normalizedPath.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final imageFile = File(normalizedPath);
-    final hasImageFile = imageFile.existsSync();
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: kPrimaryBlue,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Semantics(
-          label: hasImageFile ? '$title，点击查看原图' : emptyLabel,
-          button: hasImageFile,
-          image: true,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: hasImageFile
-                ? () => showAttendanceArtworkPreviewDialog(
-                    context,
-                    imagePath: normalizedPath,
-                    title: title,
-                  )
-                : null,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: kPrimaryBlue.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
+    return FutureBuilder<bool>(
+      future: _hasImageFileFuture,
+      builder: (context, snapshot) {
+        final hasImageFile = snapshot.data ?? false;
+        final imageFile = File(_normalizedPath);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.title,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: kPrimaryBlue,
+                fontWeight: FontWeight.w700,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: AspectRatio(
-                      aspectRatio: 4 / 3,
-                      child: hasImageFile
-                          ? Image.file(
-                              imageFile,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  _ArtworkUnavailable(label: emptyLabel),
-                            )
-                          : _ArtworkUnavailable(label: emptyLabel),
+            ),
+            const SizedBox(height: 8),
+            Semantics(
+              label: hasImageFile ? '${widget.title}，点击查看原图' : widget.emptyLabel,
+              button: hasImageFile,
+              image: true,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: hasImageFile
+                    ? () => showAttendanceArtworkPreviewDialog(
+                        context,
+                        imagePath: _normalizedPath,
+                        title: widget.title,
+                      )
+                    : null,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: kPrimaryBlue.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: kPrimaryBlue.withValues(alpha: 0.12),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.open_in_full_outlined,
-                        size: 16,
-                        color: kPrimaryBlue,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          hasImageFile ? '点击查看原图' : emptyLabel,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: hasImageFile
-                                    ? kPrimaryBlue
-                                    : kInkSecondary,
-                                fontWeight: FontWeight.w600,
-                              ),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: AspectRatio(
+                          aspectRatio: 4 / 3,
+                          child: hasImageFile
+                              ? RepaintBoundary(
+                                  child: LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final logicalWidth =
+                                          constraints.maxWidth.isFinite
+                                          ? constraints.maxWidth
+                                          : MediaQuery.sizeOf(context).width;
+                                      final cacheWidth =
+                                          (logicalWidth * devicePixelRatio)
+                                              .round()
+                                              .clamp(160, 1200)
+                                              .toInt();
+                                      final cacheHeight =
+                                          (cacheWidth * 3 / 4).round();
+
+                                      return Image.file(
+                                        imageFile,
+                                        fit: BoxFit.cover,
+                                        cacheWidth: cacheWidth,
+                                        cacheHeight: cacheHeight,
+                                        filterQuality: FilterQuality.low,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                _ArtworkUnavailable(
+                                                  label: widget.emptyLabel,
+                                                ),
+                                      );
+                                    },
+                                  ),
+                                )
+                              : _ArtworkUnavailable(label: widget.emptyLabel),
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.open_in_full_outlined,
+                            size: 16,
+                            color: kPrimaryBlue,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              hasImageFile ? '点击查看原图' : widget.emptyLabel,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: hasImageFile
+                                        ? kPrimaryBlue
+                                        : kInkSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }
@@ -163,7 +224,9 @@ Future<void> showAttendanceArtworkPreviewDialog(
                               ),
                             ),
                           )
-                        : const _ArtworkUnavailable(label: '作品文件不存在，请重新上传。'),
+                        : const _ArtworkUnavailable(
+                            label: '作品文件不存在，请重新上传。',
+                          ),
                   ),
                 ),
               ),

@@ -77,7 +77,7 @@ class PageHeader extends StatelessWidget {
               padding: const EdgeInsets.only(left: 12, top: 2),
               child: trailing,
             ),
-        ].whereType<Widget>().toList(),
+        ],
       ),
     );
   }

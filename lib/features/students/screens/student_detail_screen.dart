@@ -48,7 +48,6 @@ class StudentDetailScreen extends ConsumerStatefulWidget {
 
 class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   List<Attendance> _records = [];
-  List<Payment> _payments = [];
   int _page = 0;
   static const _pageSize = 20;
   bool _hasMore = true;
@@ -64,9 +63,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   @override
   void initState() {
     super.initState();
-    Future(() => ref.read(studentProvider.notifier).reload());
     _loadMore();
-    _loadPayments();
     _scrollController.addListener(_onScroll);
   }
 
@@ -116,18 +113,16 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     );
   }
 
-  Future<void> _loadPayments() async {
-    final dao = ref.read(paymentDaoProvider);
-    final list = await dao.getByStudent(widget.studentId);
-    if (!mounted) return;
-    setState(() => _payments = list);
-  }
 
   Future<void> _loadMore({int? generation}) async {
     if (_loadingMore) return;
     final requestGeneration = generation ?? _attendanceLoadGeneration;
     final offset = _page * _pageSize;
-    _loadingMore = true;
+    if (mounted) {
+      setState(() => _loadingMore = true);
+    } else {
+      _loadingMore = true;
+    }
     try {
       final dao = ref.read(attendanceDaoProvider);
       final batch = await dao.getByStudentPaged(
@@ -143,7 +138,11 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       });
     } finally {
       if (requestGeneration == _attendanceLoadGeneration) {
-        _loadingMore = false;
+        if (mounted) {
+          setState(() => _loadingMore = false);
+        } else {
+          _loadingMore = false;
+        }
       }
     }
   }
@@ -151,7 +150,11 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   Future<void> _refresh() async {
     invalidateAfterAttendanceChange(ref);
     ref.invalidate(studentProvider);
-    await Future.wait([_reloadAttendanceRecords(), _loadPayments()]);
+    ref.invalidate(studentPaymentsProvider(widget.studentId));
+    await Future.wait<Object?>([
+      _reloadAttendanceRecords(),
+      ref.read(studentPaymentsProvider(widget.studentId).future),
+    ]);
   }
 
   Future<void> _reloadAttendanceRecords() async {
@@ -186,7 +189,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       studentName: student.name,
       pricePerClass: student.pricePerClass,
     );
-    await _loadPayments();
+    ref.invalidate(studentPaymentsProvider(widget.studentId));
   }
 
   Future<void> _openEditStudent() async {
@@ -247,24 +250,18 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final viewPaddingBottom = MediaQuery.of(context).viewPadding.bottom;
-    final studentsAsync = ref.watch(studentProvider);
-    if (studentsAsync.hasError && !studentsAsync.hasValue) {
+    final studentAsync = ref.watch(studentByIdAsyncProvider(widget.studentId));
+    if (studentAsync.hasError && !studentAsync.hasValue) {
       return _buildMessageState(
-        message:
-            '\u5b66\u751f\u6863\u6848\u52a0\u8f7d\u5931\u8d25\uff1a${studentsAsync.error}',
-        actionLabel: '\u8fd4\u56de\u5b66\u751f\u5217\u8868',
+        message: '瀛︾敓妗ｆ鍔犺浇澶辫触锛?{studentAsync.error}',
+        actionLabel: '杩斿洖瀛︾敓鍒楄〃',
         onAction: () => context.go('/students'),
       );
     }
-    final students = studentsAsync.valueOrNull;
-    if (students == null) {
+    final student = studentAsync.valueOrNull;
+    if (studentAsync.isLoading && student == null) {
       return _buildDetailState(child: const CircularProgressIndicator());
     }
-    final meta = students
-        .where((m) => m.student.id == widget.studentId)
-        .firstOrNull;
-    final student = meta?.student;
-
     if (student == null) {
       return _buildMessageState(
         message:
@@ -311,6 +308,9 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       balance: allTimeFeeAsync.valueOrNull?.balance ?? 0,
       pricePerClass: student.pricePerClass,
     );
+    final paymentsAsync = ref.watch(studentPaymentsProvider(widget.studentId));
+    final payments = paymentsAsync.valueOrNull ?? const <Payment>[];
+    final isLoadingPayments = paymentsAsync.isLoading && !paymentsAsync.hasValue;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: InkWashBackground(
@@ -337,7 +337,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                   children: [
-                    // 1. 费用概览
+                    // 1. 閻犳劕婀遍弫銈咁潡閸屾繍娼?
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.finance],
                       child: StudentFinanceOverviewCard(
@@ -349,7 +349,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // 2. 学生资料与成长工作台
+                    // 2. 閻庢冻濡囬弫鎾舵導閸曨剚鐏愬☉鎾冲閸ㄦ岸姊归崹顔荤矗濞达絾绮岃ぐ?
                     GlassCard(
                       padding: const EdgeInsets.all(18),
                       child: Row(
@@ -446,7 +446,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                       error: (error, _) => GlassCard(
                         padding: const EdgeInsets.all(18),
-                        child: Text('加载成长与沟通摘要失败：$error'),
+                        child: Text('闁告梻濮惧ù鍥箣閹扮増姣愬☉鎾冲閻繝鏌呭顓熷枀閻熸洑绀侀妵鎴犳嫻閵夘垳绐?error'),
                       ),
                       data: (allFee) => StudentGrowthWorkbenchCard(
                         summary: growthSummary,
@@ -467,17 +467,27 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     const SizedBox(height: 16),
                     StudentArtworkTimelineCard(entries: artworkTimeline),
                     const SizedBox(height: 22),
-                    // 3. 缴费记录
+                    // 3. 缂傚倻顥愰崹鍌滄媼閺夎法绉?
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.payments],
                       child: Column(
                         children: [
                           _SectionHeader(
                             title: '\u7f34\u8d39\u8bb0\u5f55',
-                            trailing: '${_payments.length} \u6761',
+                            trailing: '${payments.length} \u6761',
                           ),
                           const SizedBox(height: 10),
-                          if (_payments.isEmpty)
+                          if (isLoadingPayments)
+                            const GlassCard(
+                              padding: EdgeInsets.all(18),
+                              child: SizedBox(
+                                height: 72,
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                            )
+                          else if (payments.isEmpty)
                             GlassCard(
                               padding: const EdgeInsets.all(18),
                               child: EmptyState(
@@ -488,10 +498,10 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                               ),
                             )
                           else
-                            ..._payments.map(
+                            ...payments.map(
                               (payment) => Padding(
                                 padding: EdgeInsets.only(
-                                  bottom: payment == _payments.last ? 0 : 10,
+                                  bottom: payment == payments.last ? 0 : 10,
                                 ),
                                 child: _PaymentCard(
                                   payment: payment,
@@ -505,8 +515,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                         .read(paymentDaoProvider)
                                         .delete(payment.id);
                                     invalidateAfterPaymentChange(ref);
-                                    _loadPayments();
-                                  },
+                                                                  },
                                 ),
                               ),
                             ),
@@ -514,7 +523,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    // 4. 出勤记录
+                    // 4. 闁告垵鎼€氱喓鎷嬮弶璺ㄧЭ
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.attendance],
                       child: Column(
@@ -572,7 +581,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    // 5. AI 分析工具
+                    // 5. AI 闁告帒妫欓悗钘夘啅閵夈儱寰?
                     GlassCard(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Theme(
