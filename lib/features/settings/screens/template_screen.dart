@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../../../core/models/class_template.dart';
 import '../../../core/providers/class_template_provider.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
+import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/async_value_widget.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -36,6 +39,9 @@ class TemplateScreen extends ConsumerWidget {
             Expanded(
               child: AsyncValueWidget<List<ClassTemplate>>(
                 value: asyncTemplates,
+                onRetry: () {
+                  ref.read(classTemplateProvider.notifier).reload();
+                },
                 builder: (templates) {
                   final orderedTemplates = List<ClassTemplate>.of(templates)
                     ..sort((left, right) {
@@ -195,11 +201,13 @@ class TemplateScreen extends ConsumerWidget {
                                     ),
                                   ),
                                   IconButton(
+                                    tooltip: '编辑模板',
                                     icon: const Icon(Icons.edit_outlined),
                                     onPressed: () =>
                                         _showForm(context, ref, template),
                                   ),
                                   IconButton(
+                                    tooltip: '删除模板',
                                     icon: const Icon(
                                       Icons.delete_outline,
                                       color: kRed,
@@ -232,7 +240,10 @@ class TemplateScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showForm(context, ref, null),
+        onPressed: () {
+          unawaited(InteractionFeedback.selection(context));
+          _showForm(context, ref, null);
+        },
         icon: const Icon(Icons.add),
         label: const Text('新增模板'),
       ),
@@ -243,6 +254,7 @@ class TemplateScreen extends ConsumerWidget {
     final nameCtrl = TextEditingController(text: template?.name ?? '');
     TimeOfDay startTime = parseTime(template?.startTime ?? '09:00');
     TimeOfDay endTime = parseTime(template?.endTime ?? '10:00');
+    var saving = false;
 
     showModalBottomSheet(
       context: context,
@@ -372,7 +384,9 @@ class TemplateScreen extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    onPressed: () async {
+                    onPressed: saving
+                        ? null
+                        : () async {
                       final name = nameCtrl.text.trim();
                       if (name.isEmpty) {
                         AppToast.showError(stCtx, '请输入模板名称');
@@ -399,32 +413,48 @@ class TemplateScreen extends ConsumerWidget {
                         return;
                       }
 
-                      final dao = ref.read(classTemplateDaoProvider);
-                      final now = DateTime.now().millisecondsSinceEpoch;
-                      if (template == null) {
-                        await dao.insert(
-                          ClassTemplate(
-                            id: const Uuid().v4(),
-                            name: name,
-                            startTime: startStr,
-                            endTime: endStr,
-                            createdAt: now,
-                          ),
-                        );
-                      } else {
-                        await dao.update(
-                          template.copyWith(
-                            name: name,
-                            startTime: startStr,
-                            endTime: endStr,
-                          ),
-                        );
-                      }
+                      setSheetState(() => saving = true);
+                      try {
+                        final dao = ref.read(classTemplateDaoProvider);
+                        final now = DateTime.now().millisecondsSinceEpoch;
+                        if (template == null) {
+                          await dao.insert(
+                            ClassTemplate(
+                              id: const Uuid().v4(),
+                              name: name,
+                              startTime: startStr,
+                              endTime: endStr,
+                              createdAt: now,
+                            ),
+                          );
+                        } else {
+                          await dao.update(
+                            template.copyWith(
+                              name: name,
+                              startTime: startStr,
+                              endTime: endStr,
+                            ),
+                          );
+                        }
 
-                      ref.read(classTemplateProvider.notifier).reload();
-                      if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
+                        ref.read(classTemplateProvider.notifier).reload();
+                        if (!sheetCtx.mounted) return;
+                        AppToast.showSuccess(
+                          context,
+                          template == null ? '模板已新增' : '模板已更新',
+                        );
+                        Navigator.of(sheetCtx).pop();
+                      } catch (error) {
+                        if (stCtx.mounted) {
+                          AppToast.showError(stCtx, error.toString());
+                        }
+                      } finally {
+                        if (stCtx.mounted) {
+                          setSheetState(() => saving = false);
+                        }
+                      }
                     },
-                    child: const Text('保存模板'),
+                    child: Text(saving ? '保存中...' : '保存模板'),
                   ),
                 ],
               ),

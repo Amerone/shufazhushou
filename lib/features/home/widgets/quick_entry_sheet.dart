@@ -378,8 +378,16 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
 
   Future<void> _quickSaveWithDefaults() async {
     if (_saving || _selectedIds.isEmpty) return;
+    if (_endTime.compareTo(_startTime) <= 0) {
+      AppToast.showError(context, '结束时间必须晚于开始时间');
+      return;
+    }
     final students = ref.read(studentProvider).valueOrNull ?? const [];
     final selectedStudents = _selectedStudentsFrom(students);
+    if (selectedStudents.isEmpty) {
+      AppToast.showError(context, '没有可保存的学生');
+      return;
+    }
     final totalFee = _estimatedTotalFee(selectedStudents);
     final statusLabel = quickEntryStatusLabel(_status);
     final confirmed = await AppToast.showConfirm(
@@ -466,7 +474,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   }
 
   Widget _buildStep0(ScrollController controller) {
-    final students = ref.watch(studentProvider).valueOrNull ?? [];
+    final studentsAsync = ref.watch(studentProvider);
+    final students = studentsAsync.valueOrNull ?? const <StudentWithMeta>[];
+    final studentsLoading = studentsAsync.isLoading && students.isEmpty;
+    final studentsLoadFailed = studentsAsync.hasError && students.isEmpty;
     final settings = ref.watch(settingsProvider).valueOrNull ?? const {};
     final activeStudents = _showSuspended
         ? students
@@ -492,6 +503,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         restorableRecentIds.every((id) => _selectedIds.contains(id));
     final selectedStudents = _selectedStudentsFrom(students);
     final estimatedTotalFee = _estimatedTotalFee(selectedStudents);
+    final canContinue =
+        !studentsLoading && !studentsLoadFailed && selectedStudents.isNotEmpty;
 
     return Column(
       children: [
@@ -599,7 +612,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           ),
         const SizedBox(height: 10),
         Expanded(
-          child: filtered.isEmpty
+          child: studentsLoading
+              ? const _QuickEntryStudentLoading()
+              : studentsLoadFailed
+              ? _QuickEntryStudentLoadError(
+                  onRetry: () => ref.invalidate(studentProvider),
+                )
+              : filtered.isEmpty
               ? Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Center(
@@ -668,104 +687,106 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   itemBuilder: (_, i) {
                     final m = filtered[i];
                     final selected = _selectedIds.contains(m.student.id);
+                    final displayName =
+                        displayNames[m.student.id] ?? m.student.name;
                     final statusText = m.student.status == 'active'
                         ? '在读'
                         : '休学';
                     final statusColorValue = m.student.status == 'active'
                         ? kGreen
                         : kOrange;
+                    void toggleSelection([bool? value]) {
+                      unawaited(InteractionFeedback.selection(context));
+                      setState(() {
+                        final shouldSelect = value ?? !selected;
+                        if (shouldSelect) {
+                          _selectedIds.add(m.student.id);
+                        } else {
+                          _selectedIds.remove(m.student.id);
+                        }
+                      });
+                    }
 
-                    return Container(
-                      margin: EdgeInsets.only(
-                        bottom: i == filtered.length - 1 ? 0 : 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? kPrimaryBlue.withValues(alpha: 0.08)
-                            : Colors.white.withValues(alpha: 0.56),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: selected
-                              ? kPrimaryBlue.withValues(alpha: 0.28)
-                              : kInkSecondary.withValues(alpha: 0.1),
-                        ),
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(18),
-                        onTap: () {
-                          unawaited(InteractionFeedback.selection(context));
-                          setState(() {
-                            if (selected) {
-                              _selectedIds.remove(m.student.id);
-                            } else {
-                              _selectedIds.add(m.student.id);
-                            }
-                          });
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
-                            children: [
-                              Checkbox(
-                                value: selected,
-                                onChanged: (v) {
-                                  unawaited(
-                                    InteractionFeedback.selection(context),
-                                  );
-                                  setState(() {
-                                    if (v == true) {
-                                      _selectedIds.add(m.student.id);
-                                    } else {
-                                      _selectedIds.remove(m.student.id);
-                                    }
-                                  });
-                                },
-                              ),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      displayNames[m.student.id] ??
-                                          m.student.name,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleSmall
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                    ),
-                                    if (m.student.parentPhone?.isNotEmpty ??
-                                        false) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        m.student.parentPhone!,
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
+                    return Semantics(
+                      button: true,
+                      selected: selected,
+                      label:
+                          '$displayName，$statusText，${selected ? '已选择' : '未选择'}，轻触切换选择',
+                      onTap: toggleSelection,
+                      child: ExcludeSemantics(
+                        child: Container(
+                          margin: EdgeInsets.only(
+                            bottom: i == filtered.length - 1 ? 0 : 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? kPrimaryBlue.withValues(alpha: 0.08)
+                                : Colors.white.withValues(alpha: 0.56),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: selected
+                                  ? kPrimaryBlue.withValues(alpha: 0.28)
+                                  : kInkSecondary.withValues(alpha: 0.1),
+                            ),
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(18),
+                            onTap: toggleSelection,
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  Checkbox(
+                                    value: selected,
+                                    onChanged: toggleSelection,
+                                  ),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        _QuickInfoPill(
-                                          icon: Icons.payments_outlined,
-                                          label:
-                                              '¥${m.student.pricePerClass.toStringAsFixed(0)}/节',
+                                        Text(
+                                          displayName,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                         ),
-                                        _QuickInfoPill(
-                                          icon: Icons.badge_outlined,
-                                          label: statusText,
-                                          color: statusColorValue,
+                                        if (m.student.parentPhone?.isNotEmpty ??
+                                            false) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            m.student.parentPhone!,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
+                                          ),
+                                        ],
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: [
+                                            _QuickInfoPill(
+                                              icon: Icons.payments_outlined,
+                                              label:
+                                                  '¥${m.student.pricePerClass.toStringAsFixed(0)}/节',
+                                            ),
+                                            _QuickInfoPill(
+                                              icon: Icons.badge_outlined,
+                                              label: statusText,
+                                              color: statusColorValue,
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -780,7 +801,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _selectedIds.isEmpty
+                  onPressed: !canContinue
                       ? null
                       : () {
                           unawaited(InteractionFeedback.selection(context));
@@ -799,7 +820,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _selectedIds.isEmpty
+                  onPressed: !canContinue
                       ? null
                       : () {
                           unawaited(InteractionFeedback.selection(context));
@@ -1193,6 +1214,87 @@ class _QuickActionChip extends StatelessWidget {
       onPressed: onTap,
       backgroundColor: Colors.white.withValues(alpha: 0.56),
       side: BorderSide(color: kInkSecondary.withValues(alpha: 0.14)),
+    );
+  }
+}
+
+class _QuickEntryStudentLoading extends StatelessWidget {
+  const _QuickEntryStudentLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      label: '正在加载学生列表',
+      child: const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator.adaptive(),
+              SizedBox(height: 14),
+              Text('正在加载学生列表...'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickEntryStudentLoadError extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _QuickEntryStudentLoadError({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 420),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kRed.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: kRed.withValues(alpha: 0.12)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                color: kRed.withValues(alpha: 0.8),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '学生列表加载失败',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: kRed,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '请重新加载后再选择学员记课。',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.tonalIcon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('重新加载'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

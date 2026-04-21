@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,7 @@ import '../../../core/models/student.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../shared/theme.dart';
+import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
@@ -87,6 +90,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
   }
 
   Future<void> _save() async {
+    if (_loading) return;
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
     if (_isEdit && _original == null) {
@@ -180,8 +184,9 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
               onBack: () => context.pop(),
               trailing: _isEdit
                   ? IconButton(
+                      tooltip: '删除学生',
                       icon: const Icon(Icons.delete_outline, color: kRed),
-                      onPressed: _delete,
+                      onPressed: _loading ? null : _delete,
                     )
                   : null,
             ),
@@ -306,9 +311,16 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
                                         child: _StatusOptionCard(
                                           option: option,
                                           selected: _status == option.value,
-                                          onTap: () => setState(
-                                            () => _status = option.value,
-                                          ),
+                                          onTap: () {
+                                            unawaited(
+                                              InteractionFeedback.selection(
+                                                context,
+                                              ),
+                                            );
+                                            setState(
+                                              () => _status = option.value,
+                                            );
+                                          },
                                         ),
                                       ),
                                     )

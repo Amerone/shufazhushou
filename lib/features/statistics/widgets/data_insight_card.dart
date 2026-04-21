@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/database/dao/student_dao.dart' show StudentWithMeta;
 import '../../../core/models/business_data_summary.dart';
@@ -317,6 +318,15 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
             Text(
               '\u672a\u914d\u7f6e\u65f6\u4e0d\u4f1a\u53d1\u8d77 AI \u8bf7\u6c42\uff0c\u8bf7\u5148\u5728\u8bbe\u7f6e\u9875\u5b8c\u6210 AI \u914d\u7f6e\u3002',
               style: theme.textTheme.bodySmall?.copyWith(color: kOrange),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => context.push('/settings/ai'),
+                icon: const Icon(Icons.settings_outlined, size: 18),
+                label: const Text('\u53bb\u914d\u7f6e AI'),
+              ),
             ),
           ],
           if (_errorText != null) ...[

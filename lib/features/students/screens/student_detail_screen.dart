@@ -52,6 +52,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   static const _pageSize = 20;
   bool _hasMore = true;
   bool _loadingMore = false;
+  Object? _attendanceLoadError;
   bool _showScrollToTop = false;
   int _attendanceLoadGeneration = 0;
   final Set<String> _analyzingImageRecordIds = <String>{};
@@ -134,7 +135,14 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       setState(() {
         _records = [..._records, ...batch];
         _hasMore = batch.length == _pageSize;
+        _attendanceLoadError = null;
         _page++;
+      });
+    } catch (error) {
+      if (!mounted || requestGeneration != _attendanceLoadGeneration) return;
+      setState(() {
+        _attendanceLoadError = error;
+        _hasMore = false;
       });
     } finally {
       if (requestGeneration == _attendanceLoadGeneration) {
@@ -166,6 +174,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       _records = [];
       _hasMore = true;
       _loadingMore = false;
+      _attendanceLoadError = null;
     });
     await _loadMore(generation: nextGeneration);
   }
@@ -535,7 +544,16 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             trailing: attendanceCountLabel,
                           ),
                           const SizedBox(height: 10),
-                          if (_records.isEmpty && !_hasMore)
+                          if (_attendanceLoadError != null && _records.isEmpty)
+                            GlassCard(
+                              padding: const EdgeInsets.all(18),
+                              child: EmptyState(
+                                message: '出勤记录加载失败，请稍后重试。',
+                                actionLabel: '重新加载',
+                                onAction: _reloadAttendanceRecords,
+                              ),
+                            )
+                          else if (_records.isEmpty && !_hasMore)
                             GlassCard(
                               padding: const EdgeInsets.all(18),
                               child: EmptyState(
@@ -577,6 +595,30 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                 ),
                               ),
                             ),
+                          if (_attendanceLoadError != null &&
+                              _records.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            GlassCard(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline,
+                                    size: 18,
+                                    color: kOrange,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text('更多出勤记录加载失败，可稍后重试。'),
+                                  ),
+                                  TextButton(
+                                    onPressed: _reloadAttendanceRecords,
+                                    child: const Text('重试'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

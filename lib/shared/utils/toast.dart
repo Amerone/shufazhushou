@@ -5,7 +5,8 @@ import 'interaction_feedback.dart';
 
 class AppToast {
   static void showSuccess(BuildContext context, String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [

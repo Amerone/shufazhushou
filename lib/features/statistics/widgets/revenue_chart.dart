@@ -169,12 +169,24 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
               spacing: 16,
               runSpacing: 8,
               children: [
-                _Legend('应收', kPrimaryBlue, _showReceivable, () {
-                  setState(() => _showReceivable = !_showReceivable);
-                }),
-                _Legend('实收', kGreen, _showReceived, () {
-                  setState(() => _showReceived = !_showReceived);
-                }),
+                _Legend(
+                  '应收',
+                  kPrimaryBlue,
+                  _showReceivable,
+                  _showReceivable && !_showReceived,
+                  () {
+                    setState(() => _showReceivable = !_showReceivable);
+                  },
+                ),
+                _Legend(
+                  '实收',
+                  kGreen,
+                  _showReceived,
+                  _showReceived && !_showReceivable,
+                  () {
+                    setState(() => _showReceived = !_showReceived);
+                  },
+                ),
               ],
             ),
           ],
@@ -228,30 +240,45 @@ class _Legend extends StatelessWidget {
   final String label;
   final Color color;
   final bool active;
+  final bool locked;
   final VoidCallback onTap;
-  const _Legend(this.label, this.color, this.active, this.onTap);
+  const _Legend(this.label, this.color, this.active, this.locked, this.onTap);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 16,
-            height: 3,
-            color: active ? color : kInkSecondary,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: active ? null : kInkSecondary,
+    return Semantics(
+      button: true,
+      selected: active,
+      enabled: !locked,
+      label: '$label${active ? '已显示' : '已隐藏'}',
+      child: Tooltip(
+        message: locked ? '至少保留一条曲线' : '切换$label曲线',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: locked ? null : onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 16,
+                  height: 3,
+                  color: active ? color : kInkSecondary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: active ? null : kInkSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

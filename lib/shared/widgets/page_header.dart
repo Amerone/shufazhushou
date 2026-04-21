@@ -43,14 +43,18 @@ class PageHeader extends StatelessWidget {
                 border: Border.all(color: kInkSecondary.withValues(alpha: 0.2)),
               ),
               child: IconButton(
+                tooltip: '返回',
                 icon: const Icon(Icons.arrow_back_ios_new, size: 18),
                 color: kPrimaryBlue,
                 onPressed: onBack,
                 splashColor: kPrimaryBlue.withValues(alpha: 0.08),
                 highlightColor: Colors.transparent,
                 hoverColor: Colors.transparent,
-                padding: const EdgeInsets.all(8),
-                constraints: const BoxConstraints(),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 44,
+                  height: 44,
+                ),
               ),
             ),
           ],
@@ -61,13 +65,20 @@ class PageHeader extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 6),
-                  Text(subtitle!, style: subtitleStyle),
+                  Text(
+                    subtitle!,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: subtitleStyle,
+                  ),
                 ],
               ],
             ),

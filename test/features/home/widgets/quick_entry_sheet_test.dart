@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,6 +31,75 @@ void main() {
     _FakeStudentNotifier.seededStudents = _seededStudents;
   });
 
+  testWidgets('shows loading state while student list is pending', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+    _PendingStudentNotifier.completer = Completer<List<StudentWithMeta>>();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_PendingStudentNotifier.new),
+          classTemplateProvider.overrideWith(_FakeClassTemplateNotifier.new),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: const Scaffold(body: QuickEntrySheet()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('正在加载学生列表...'), findsOneWidget);
+    expect(
+      tester
+          .widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, '下一步（已选 0 人）'),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    _PendingStudentNotifier.completer.complete(_seededStudents);
+    await _settleUi(tester);
+
+    expect(find.text('Alice'), findsOneWidget);
+  });
+
+  testWidgets('shows retry state when student list fails to load', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_ThrowingStudentNotifier.new),
+          classTemplateProvider.overrideWith(_FakeClassTemplateNotifier.new),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: const Scaffold(body: QuickEntrySheet()),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    expect(find.text('学生列表加载失败'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '重新加载'), findsOneWidget);
+    expect(
+      tester
+          .widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, '下一步（已选 0 人）'),
+          )
+          .onPressed,
+      isNull,
+    );
+  });
+
   testWidgets('restores recent student group and remembered defaults', (
     tester,
   ) async {
@@ -56,7 +127,10 @@ void main() {
     await _settleUi(tester);
 
     expect(find.text('已选 2'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '直接保存（2人 / ¥380）'), findsOneWidget);
+    expect(
+      find.widgetWithText(OutlinedButton, '直接保存（2人 / ¥380）'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('preserves existing feedback and artwork on conflict overwrite', (
@@ -178,6 +252,20 @@ class _FakeStudentNotifier extends StudentNotifier {
 
   @override
   Future<List<StudentWithMeta>> build() async => seededStudents;
+}
+
+class _PendingStudentNotifier extends StudentNotifier {
+  static late Completer<List<StudentWithMeta>> completer;
+
+  @override
+  Future<List<StudentWithMeta>> build() => completer.future;
+}
+
+class _ThrowingStudentNotifier extends StudentNotifier {
+  @override
+  Future<List<StudentWithMeta>> build() async {
+    throw StateError('student list failed');
+  }
 }
 
 class _FakeClassTemplateNotifier extends ClassTemplateNotifier {

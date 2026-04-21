@@ -9,6 +9,7 @@ class AsyncValueWidget<T> extends StatelessWidget {
   final Widget Function(T data) builder;
   final Widget Function()? loadingBuilder;
   final Widget Function(Object error, StackTrace? stackTrace)? errorBuilder;
+  final VoidCallback? onRetry;
 
   const AsyncValueWidget({
     super.key,
@@ -16,6 +17,7 @@ class AsyncValueWidget<T> extends StatelessWidget {
     required this.builder,
     this.loadingBuilder,
     this.errorBuilder,
+    this.onRetry,
   });
 
   @override
@@ -23,7 +25,9 @@ class AsyncValueWidget<T> extends StatelessWidget {
     return value.when(
       data: builder,
       loading: loadingBuilder ?? () => const _DefaultLoading(),
-      error: errorBuilder ?? (error, stackTrace) => _DefaultError(error: error),
+      error:
+          errorBuilder ??
+          (error, stackTrace) => _DefaultError(error: error, onRetry: onRetry),
     );
   }
 }
@@ -32,20 +36,27 @@ class AsyncValueWidget<T> extends StatelessWidget {
 class AsyncValueSliverWidget<T> extends StatelessWidget {
   final AsyncValue<T> value;
   final Widget Function(T data) builder;
+  final VoidCallback? onRetry;
 
   const AsyncValueSliverWidget({
     super.key,
     required this.value,
     required this.builder,
+    this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
     return value.when(
       data: builder,
-      loading: () => const SliverFillRemaining(child: _DefaultLoading()),
-      error: (error, stackTrace) =>
-          SliverFillRemaining(child: _DefaultError(error: error)),
+      loading: () => const SliverFillRemaining(
+        hasScrollBody: false,
+        child: _DefaultLoading(),
+      ),
+      error: (error, stackTrace) => SliverFillRemaining(
+        hasScrollBody: false,
+        child: _DefaultError(error: error, onRetry: onRetry),
+      ),
     );
   }
 }
@@ -66,8 +77,9 @@ class _DefaultLoading extends StatelessWidget {
 
 class _DefaultError extends StatelessWidget {
   final Object error;
+  final VoidCallback? onRetry;
 
-  const _DefaultError({required this.error});
+  const _DefaultError({required this.error, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -96,6 +108,14 @@ class _DefaultError extends StatelessWidget {
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(color: kInkSecondary),
             ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 16),
+              FilledButton.tonalIcon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('重试'),
+              ),
+            ],
           ],
         ),
       ),

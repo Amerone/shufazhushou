@@ -24,6 +24,7 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
   bool _loading = false;
 
   Future<void> _pick({bool clearExistingPreview = false}) async {
+    if (_loading) return;
     setState(() {
       _loading = true;
       if (clearExistingPreview) {
@@ -50,7 +51,7 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
   }
 
   Future<void> _confirm() async {
-    if (_preview == null) return;
+    if (_loading || _preview == null) return;
 
     setState(() => _loading = true);
     try {

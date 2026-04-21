@@ -48,6 +48,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
 
   DateTime _lastUpdatedAt = DateTime.now();
   bool _showScrollToTop = false;
+  bool _exporting = false;
   _StatisticsAnchor? _lastFocusedAnchor;
 
   @override
@@ -103,8 +104,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
   }
 
   Future<void> _exportAttendance() async {
+    if (_exporting) return;
     final range = ref.read(statisticsPeriodProvider);
 
+    setState(() => _exporting = true);
     try {
       await InteractionFeedback.selection(context);
       final records = await ref
@@ -121,11 +124,18 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
       );
 
       if (!mounted) return;
-      await SharePlus.instance.share(ShareParams(files: [XFile(path)]));
+      final shareResult = await SharePlus.instance.share(
+        ShareParams(files: [XFile(path)]),
+      );
+      if (shareResult.status == ShareResultStatus.dismissed) return;
       _markUpdated();
+      if (!mounted) return;
+      AppToast.showSuccess(context, '统计明细已生成，请在系统分享面板中保存。');
     } catch (error) {
       if (!mounted) return;
       AppToast.showError(context, '导出失败：$error');
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
   }
 
@@ -161,13 +171,16 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                             range: range,
                             periodLabel: periodLabel,
                             updatedLabel: updatedLabel,
+                            exporting: _exporting,
                             onExport: _exportAttendance,
                             onPeriodChanged: (period) {
                               ref
-                                  .read(
-                                    statisticsPeriodSelectionProvider.notifier,
-                                  )
-                                  .state = period;
+                                      .read(
+                                        statisticsPeriodSelectionProvider
+                                            .notifier,
+                                      )
+                                      .state =
+                                  period;
                               _markUpdated();
                               setState(() => _lastFocusedAnchor = null);
                               unawaited(_scrollToTop(withFeedback: false));
@@ -241,8 +254,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                           ),
                           const SizedBox(height: 24),
                           _StatisticsSectionBlock(
-                            anchorKey:
-                                _sectionKeys[_StatisticsAnchor.insights],
+                            anchorKey: _sectionKeys[_StatisticsAnchor.insights],
                             title: '经营提醒',
                             child: GlassCard(
                               padding: const EdgeInsets.all(18),
@@ -299,6 +311,7 @@ class _StatisticsOverviewCard extends StatelessWidget {
   final StatisticsRange range;
   final String periodLabel;
   final String updatedLabel;
+  final bool exporting;
   final VoidCallback onExport;
   final ValueChanged<StatisticsPeriod> onPeriodChanged;
 
@@ -306,6 +319,7 @@ class _StatisticsOverviewCard extends StatelessWidget {
     required this.range,
     required this.periodLabel,
     required this.updatedLabel,
+    required this.exporting,
     required this.onExport,
     required this.onPeriodChanged,
   });
@@ -329,10 +343,7 @@ class _StatisticsOverviewCard extends StatelessWidget {
                   color: kPrimaryBlue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(
-                  Icons.bar_chart_rounded,
-                  color: kPrimaryBlue,
-                ),
+                child: const Icon(Icons.bar_chart_rounded, color: kPrimaryBlue),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -356,39 +367,48 @@ class _StatisticsOverviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          SegmentedButton<StatisticsPeriod>(
-            segments: const [
-              ButtonSegment(
-                value: StatisticsPeriod.week,
-                icon: Icon(Icons.view_week_outlined, size: 18),
-                label: Text('本周'),
-              ),
-              ButtonSegment(
-                value: StatisticsPeriod.month,
-                icon: Icon(Icons.calendar_view_month_outlined, size: 18),
-                label: Text('本月'),
-              ),
-              ButtonSegment(
-                value: StatisticsPeriod.year,
-                icon: Icon(Icons.event_available_outlined, size: 18),
-                label: Text('本年'),
-              ),
-            ],
-            selected: {range.period},
-            showSelectedIcon: false,
-            onSelectionChanged: (selection) {
-              final period = selection.first;
-              if (period == range.period) return;
-              onPeriodChanged(period);
-            },
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<StatisticsPeriod>(
+              segments: const [
+                ButtonSegment(
+                  value: StatisticsPeriod.week,
+                  icon: Icon(Icons.view_week_outlined, size: 18),
+                  label: Text('本周'),
+                ),
+                ButtonSegment(
+                  value: StatisticsPeriod.month,
+                  icon: Icon(Icons.calendar_view_month_outlined, size: 18),
+                  label: Text('本月'),
+                ),
+                ButtonSegment(
+                  value: StatisticsPeriod.year,
+                  icon: Icon(Icons.event_available_outlined, size: 18),
+                  label: Text('本年'),
+                ),
+              ],
+              selected: {range.period},
+              showSelectedIcon: false,
+              onSelectionChanged: (selection) {
+                final period = selection.first;
+                if (period == range.period) return;
+                onPeriodChanged(period);
+              },
+            ),
           ),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: onExport,
-              icon: const Icon(Icons.ios_share_outlined),
-              label: const Text('导出当前周期明细'),
+              onPressed: exporting ? null : onExport,
+              icon: exporting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.ios_share_outlined),
+              label: Text(exporting ? '正在准备导出...' : '导出当前周期明细'),
             ),
           ),
         ],
@@ -499,29 +519,33 @@ class _StatisticsQuickNavChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foreground = selected ? Colors.white : item.color;
-    return Material(
-      color: selected
-          ? item.color
-          : Colors.white.withValues(alpha: 0.66),
-      borderRadius: BorderRadius.circular(999),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(item.icon, size: 16, color: foreground),
-              const SizedBox(width: 6),
-              Text(
-                item.label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: foreground,
-                  fontWeight: FontWeight.w700,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '跳转到${item.label}',
+      child: Material(
+        color: selected ? item.color : Colors.white.withValues(alpha: 0.66),
+        borderRadius: BorderRadius.circular(999),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(item.icon, size: 16, color: foreground),
+                const SizedBox(width: 6),
+                Text(
+                  item.label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: foreground,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

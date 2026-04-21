@@ -26,6 +26,15 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   Timer? _queryDebounce;
 
   @override
+  void initState() {
+    super.initState();
+    final initialQuery = ref.read(studentListQueryProvider).text;
+    if (initialQuery.isNotEmpty) {
+      _searchController.text = initialQuery;
+    }
+  }
+
+  @override
   void dispose() {
     _queryDebounce?.cancel();
     _searchController.dispose();
@@ -86,7 +95,11 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                 child: asyncStudents.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (error, _) => Center(child: Text('加载失败：$error')),
+                  error: (error, _) => _StudentListLoadError(
+                    onRetry: () {
+                      ref.invalidate(studentProvider);
+                    },
+                  ),
                   data: (_) {
                     final viewModel = ref.watch(studentListViewModelProvider);
                     final query = viewModel.query;
@@ -195,6 +208,29 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
         final item = filtered[index ~/ 2];
         return _StudentCard(meta: item, displayNames: displayNames);
       }, childCount: filtered.isEmpty ? 0 : filtered.length * 2 - 1),
+    );
+  }
+}
+
+class _StudentListLoadError extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _StudentListLoadError({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: GlassCard(
+          padding: const EdgeInsets.all(18),
+          child: EmptyState(
+            message: '学员档案加载失败，请稍后重试。',
+            actionLabel: '重新加载',
+            onAction: onRetry,
+          ),
+        ),
+      ),
     );
   }
 }

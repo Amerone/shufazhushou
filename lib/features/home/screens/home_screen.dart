@@ -36,12 +36,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _attendanceSectionKey = GlobalKey();
 
-  bool _isTeacherProfileReady(Map<String, String> settings) {
+  int _teacherProfileReadyCount(Map<String, String> settings) {
     final teacherName = settings['teacher_name']?.trim() ?? '';
     final institutionName = settings['institution_name']?.trim() ?? '';
-    return (teacherName.isNotEmpty && teacherName != kDefaultTeacherName) ||
-        (institutionName.isNotEmpty &&
-            institutionName != kDefaultInstitutionName);
+    return [
+      teacherName.isNotEmpty && teacherName != kDefaultTeacherName,
+      institutionName.isNotEmpty && institutionName != kDefaultInstitutionName,
+    ].where((item) => item).length;
   }
 
   @override
@@ -120,12 +121,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final studentSummary = ref.watch(studentRosterSummaryProvider);
+    final studentsAsync = ref.watch(studentProvider);
+    final studentSummary = StudentRosterSummary.fromStudents(
+      studentsAsync.valueOrNull ?? const <StudentWithMeta>[],
+    );
     final settings = ref.watch(settingsProvider).valueOrNull ?? const {};
     final today = DateTime.now();
 
     final studentCount = studentSummary.count;
     final hasStudents = studentSummary.hasStudents;
+    final studentLoading = studentsAsync.isLoading && !hasStudents;
+    final studentLoadFailed = studentsAsync.hasError && !hasStudents;
     final selectedDate = ref.watch(selectedDateProvider);
     final selectedMonth = ref.watch(selectedMonthProvider);
     final dayCount = hasStudents
@@ -152,7 +158,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final templates = hasStudents
         ? ref.watch(classTemplateProvider).valueOrNull ?? const []
         : const [];
-    final teacherReady = _isTeacherProfileReady(settings);
+    final teacherProfileReadyCount = _teacherProfileReadyCount(settings);
     final recentSelectedIds = parseQuickEntryRecentStudentIds(
       settings,
     ).intersection(studentSummary.ids);
@@ -162,7 +168,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final recentStatus = settings[quickEntryDefaultStatusSettingKey]?.trim();
     final showQuickLaunchPanel =
         hasStudents && (recentSelectedIds.isNotEmpty || templates.isNotEmpty);
-    final showInitialSetupBanner = !hasStudents;
+    final showInitialSetupBanner =
+        !hasStudents && !studentLoading && !studentLoadFailed;
     final recentTimeLabel =
         isQuickEntryValidTimeValue(recentStartTime) &&
             isQuickEntryValidTimeValue(recentEndTime)
@@ -184,7 +191,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final sectionTitle = isToday
         ? '\u4eca\u65e5\u51fa\u52e4\u540d\u5355'
         : '$dateLabel \u51fa\u52e4\u540d\u5355';
-    final String? headerSubtitle = hasStudents
+    final String? headerSubtitle = studentLoadFailed
+        ? '学生档案暂时无法读取，请重试。'
+        : studentLoading
+        ? '正在读取本地学生档案。'
+        : hasStudents
         ? null
         : '\u5148\u65b0\u589e\u6216\u5bfc\u5165\u5b66\u751f';
 
@@ -202,7 +213,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Column(
             children: [
               PageHeader(
-                title: hasStudents
+                title: studentLoading
+                    ? '正在加载'
+                    : hasStudents || studentLoadFailed
                     ? '\u4eca\u65e5\u5de5\u4f5c\u53f0'
                     : '\u5f00\u59cb\u4f7f\u7528',
                 subtitle: headerSubtitle,
@@ -223,9 +236,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   edgeOffset: 20,
                   displacement: 28,
                   onRefresh: () async {
+                    final hasLoadedStudents =
+                        ref.read(studentProvider).valueOrNull?.isNotEmpty ??
+                        false;
                     await Future.wait([
-                      ref.read(attendanceProvider.notifier).reload(),
                       ref.read(studentProvider.notifier).reload(),
+                      if (hasLoadedStudents)
+                        ref.read(attendanceProvider.notifier).reload(),
                     ]);
                   },
                   child: CustomScrollView(
@@ -247,6 +264,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 studentCount: studentCount,
                                 isToday: isToday,
                                 hasStudents: hasStudents,
+                                isLoading: studentLoading,
+                                hasLoadError: studentLoadFailed,
                                 onQuickEntry: () => _openQuickEntrySheet(),
                                 onOpenStudents: () async {
                                   await InteractionFeedback.pageTurn(context);
@@ -258,6 +277,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 onOpenPaymentEntry: _openPaymentEntry,
                                 onCreateStudent: _openCreateStudent,
                                 onImportStudents: _openImportStudents,
+                                onRetryStudents: () =>
+                                    ref.invalidate(studentProvider),
                               ),
                               if (hasStudents && pendingTaskCount > 0) ...[
                                 const SizedBox(height: 16),
@@ -309,7 +330,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               if (showInitialSetupBanner) ...[
                                 const SizedBox(height: 16),
                                 _InitialSetupBanner(
-                                  teacherReady: teacherReady,
+                                  readyCount: teacherProfileReadyCount,
                                   onOpenSetup: () async {
                                     await InteractionFeedback.pageTurn(context);
                                     if (!context.mounted) return;
@@ -321,47 +342,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                       ),
-                      SliverPadding(
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          hasStudents ? 28 : 24,
-                          20,
-                          0,
-                        ),
-                        sliver: SliverToBoxAdapter(
-                          child: KeyedSubtree(
-                            key: _attendanceSectionKey,
-                            child: _SectionTitleRow(
-                              title: sectionTitle,
-                              countText: '$dayCount \u6761',
-                              color: kSealRed,
+                      if (hasStudents) ...[
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+                          sliver: SliverToBoxAdapter(
+                            child: KeyedSubtree(
+                              key: _attendanceSectionKey,
+                              child: _SectionTitleRow(
+                                title: sectionTitle,
+                                countText: '$dayCount \u6761',
+                                color: kSealRed,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SliverPadding(
-                        padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
-                        sliver: SliverToBoxAdapter(
-                          child: GlassCard(
-                            padding: EdgeInsets.fromLTRB(20, 16, 20, 18),
-                            child: AttendanceList(),
+                        const SliverPadding(
+                          padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
+                          sliver: SliverToBoxAdapter(
+                            child: GlassCard(
+                              padding: EdgeInsets.fromLTRB(20, 16, 20, 18),
+                              child: AttendanceList(),
+                            ),
                           ),
                         ),
-                      ),
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                        sliver: SliverToBoxAdapter(
-                          child: _SectionTitleRow(
-                            title: '\u672c\u6708\u8bfe\u5386',
-                            countText: '$monthCount \u6b21',
-                            color: kPrimaryBlue,
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                          sliver: SliverToBoxAdapter(
+                            child: _SectionTitleRow(
+                              title: '\u672c\u6708\u8bfe\u5386',
+                              countText: '$monthCount \u6b21',
+                              color: kPrimaryBlue,
+                            ),
                           ),
                         ),
-                      ),
-                      const SliverPadding(
-                        padding: EdgeInsets.fromLTRB(20, 12, 20, 120),
-                        sliver: SliverToBoxAdapter(child: AttendanceCalendar()),
-                      ),
+                        const SliverPadding(
+                          padding: EdgeInsets.fromLTRB(20, 12, 20, 120),
+                          sliver: SliverToBoxAdapter(
+                            child: AttendanceCalendar(),
+                          ),
+                        ),
+                      ] else
+                        const SliverToBoxAdapter(child: SizedBox(height: 120)),
                     ],
                   ),
                 ),
@@ -370,14 +391,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButton: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewPaddingOf(context).bottom + 80,
-        ),
-        child: hasStudents
-            ? _QuickEntryAction(onPressed: _openQuickEntrySheet)
-            : _SetupAction(onPressed: _openCreateStudent),
-      ),
+      floatingActionButton: studentLoading || studentLoadFailed
+          ? null
+          : Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewPaddingOf(context).bottom + 80,
+              ),
+              child: hasStudents
+                  ? _QuickEntryAction(onPressed: _openQuickEntrySheet)
+                  : _SetupAction(onPressed: _openCreateStudent),
+            ),
     );
   }
 }
@@ -391,12 +414,15 @@ class _HomeFocusCard extends StatelessWidget {
   final int studentCount;
   final bool isToday;
   final bool hasStudents;
+  final bool isLoading;
+  final bool hasLoadError;
   final VoidCallback onQuickEntry;
   final VoidCallback onOpenStudents;
   final VoidCallback onOpenTodayAttendance;
   final VoidCallback onOpenPaymentEntry;
   final VoidCallback onCreateStudent;
   final VoidCallback onImportStudents;
+  final VoidCallback onRetryStudents;
 
   const _HomeFocusCard({
     required this.monthLabel,
@@ -407,17 +433,77 @@ class _HomeFocusCard extends StatelessWidget {
     required this.studentCount,
     required this.isToday,
     required this.hasStudents,
+    required this.isLoading,
+    required this.hasLoadError,
     required this.onQuickEntry,
     required this.onOpenStudents,
     required this.onOpenTodayAttendance,
     required this.onOpenPaymentEntry,
     required this.onCreateStudent,
     required this.onImportStudents,
+    required this.onRetryStudents,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    if (isLoading || hasLoadError) {
+      return GlassCard(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: (hasLoadError ? kRed : kPrimaryBlue).withValues(
+                  alpha: 0.1,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: hasLoadError
+                  ? const Icon(Icons.error_outline_rounded, color: kRed)
+                  : const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                    ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasLoadError ? '学生档案加载失败' : '正在整理今日工作台',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    hasLoadError
+                        ? '本地数据暂时无法读取，重试后再继续记课或查看出勤。'
+                        : '稍候会显示今日记课、待办和课历入口。',
+                    style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                  ),
+                  if (hasLoadError) ...[
+                    const SizedBox(height: 14),
+                    FilledButton.tonalIcon(
+                      onPressed: onRetryStudents,
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('重新加载'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final pendingCount = taskCount;
     final statusText = !hasStudents
         ? '\u5148\u5efa\u7acb\u5b66\u751f\u6863\u6848'
@@ -725,40 +811,10 @@ class _QuickLaunchPanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: kPrimaryBlue.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.history_outlined,
-                      color: kPrimaryBlue,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '\u6309\u6700\u8fd1\u73ed\u7ea7\u8bb0\u8bfe',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton.tonal(
-                    onPressed: onOpenRecentGroup,
-                    child: const Text('\u53bb\u8bb0\u8bfe'),
-                  ),
-                ],
+              child: _RecentGroupShortcut(
+                recentGroupCount: recentGroupCount,
+                recentTimeLabel: recentTimeLabel,
+                onPressed: onOpenRecentGroup!,
               ),
             ),
           ],
@@ -841,19 +897,89 @@ class _QuickLaunchPanel extends StatelessWidget {
   }
 }
 
+class _RecentGroupShortcut extends StatelessWidget {
+  final int recentGroupCount;
+  final String? recentTimeLabel;
+  final VoidCallback onPressed;
+
+  const _RecentGroupShortcut({
+    required this.recentGroupCount,
+    required this.recentTimeLabel,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final title = Text(
+      '\u6309\u6700\u8fd1\u73ed\u7ea7\u8bb0\u8bfe',
+      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+    );
+    final detail = Text(
+      ['$recentGroupCount \u4eba', ?recentTimeLabel].join(' \u00b7 '),
+      style: theme.textTheme.bodySmall?.copyWith(color: kInkSecondary),
+    );
+    final icon = Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: kPrimaryBlue.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Icon(Icons.history_outlined, color: kPrimaryBlue),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        final info = Row(
+          children: [
+            icon,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [title, const SizedBox(height: 4), detail],
+              ),
+            ),
+          ],
+        );
+        final action = FilledButton.tonal(
+          onPressed: onPressed,
+          child: const Text('\u53bb\u8bb0\u8bfe'),
+        );
+
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [info, const SizedBox(height: 12), action],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: info),
+            const SizedBox(width: 12),
+            action,
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _InitialSetupBanner extends StatelessWidget {
-  final bool teacherReady;
+  final int readyCount;
   final VoidCallback onOpenSetup;
 
   const _InitialSetupBanner({
-    required this.teacherReady,
+    required this.readyCount,
     required this.onOpenSetup,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final readyCount = [teacherReady].where((item) => item).length;
 
     return GlassCard(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),

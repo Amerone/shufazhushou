@@ -33,6 +33,7 @@ class SignatureScreen extends ConsumerWidget {
             Expanded(
               child: AsyncValueWidget<Map<String, String>>(
                 value: settingsAsync,
+                onRetry: () => ref.invalidate(settingsProvider),
                 builder: (settings) {
                   final path = settings['signature_path'];
                   final hasFile =
@@ -486,16 +487,22 @@ class SignatureScreen extends ConsumerWidget {
     WidgetRef ref,
     ImageSource source,
   ) async {
-    final picker = ImagePicker();
-    final img = await picker.pickImage(source: source);
-    if (img == null) return;
+    try {
+      final picker = ImagePicker();
+      final img = await picker.pickImage(source: source);
+      if (img == null) return;
 
-    final dir = await getApplicationDocumentsDirectory();
-    final dest = p.join(dir.path, 'signature.jpg');
-    await File(img.path).copy(dest);
+      final dir = await getApplicationDocumentsDirectory();
+      final dest = p.join(dir.path, 'signature.jpg');
+      await File(img.path).copy(dest);
 
-    await ref.read(settingsProvider.notifier).set('signature_path', dest);
-    if (context.mounted) AppToast.showSuccess(context, '签名已保存');
+      await ref.read(settingsProvider.notifier).set('signature_path', dest);
+      if (context.mounted) AppToast.showSuccess(context, '签名已保存');
+    } catch (error) {
+      if (context.mounted) {
+        AppToast.showError(context, '签名保存失败：$error');
+      }
+    }
   }
 }
 

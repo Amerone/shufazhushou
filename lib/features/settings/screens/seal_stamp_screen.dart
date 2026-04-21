@@ -7,6 +7,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
+import '../../../shared/widgets/async_value_widget.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
@@ -23,6 +24,7 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
   TextEditingController? _textCtrl;
   SealConfig _config = const SealConfig();
   bool _initialized = false;
+  bool _saving = false;
 
   static const _fontOptions = {
     'xiaozhuan': '小篆',
@@ -58,7 +60,9 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     FocusScope.of(context).unfocus();
+    setState(() => _saving = true);
     try {
       await ref.read(settingsProvider.notifier).setAll({
         'seal_text': _config.text,
@@ -69,6 +73,8 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
       if (mounted) AppToast.showSuccess(context, '印章设置已保存');
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -148,10 +154,10 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
               onBack: () => context.pop(),
             ),
             Expanded(
-              child: settingsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('$e')),
-                data: (settings) {
+              child: AsyncValueWidget<Map<String, String>>(
+                value: settingsAsync,
+                onRetry: () => ref.invalidate(settingsProvider),
+                builder: (settings) {
                   _initFromSettings(settings);
                   return ListView(
                     keyboardDismissBehavior:
@@ -327,9 +333,9 @@ class _SealStampScreenState extends ConsumerState<SealStampScreen> {
                                   vertical: 16,
                                 ),
                               ),
-                              onPressed: _save,
+                              onPressed: _saving ? null : _save,
                               icon: const Icon(Icons.save_outlined),
-                              label: const Text('保存设置'),
+                              label: Text(_saving ? '保存中...' : '保存设置'),
                             ),
                           ],
                         ),

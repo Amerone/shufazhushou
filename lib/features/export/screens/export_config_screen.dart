@@ -329,6 +329,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                                   ),
                                 ),
                                 child: IconButton(
+                                  tooltip: '返回',
                                   onPressed: () =>
                                       Navigator.of(previewCtx).pop(),
                                   icon: const Icon(
@@ -336,8 +337,11 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                                     size: 18,
                                   ),
                                   color: kPrimaryBlue,
-                                  padding: const EdgeInsets.all(8),
-                                  constraints: const BoxConstraints(),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 44,
+                                    height: 44,
+                                  ),
                                 ),
                               );
 
@@ -1194,7 +1198,7 @@ class _ParentSnapshotCard extends StatelessWidget {
               border: Border.all(color: kRed.withValues(alpha: 0.12)),
             ),
             child: Text(
-              '摘要加载失败：${snapshot.error}',
+              '家长端摘要加载失败，可直接继续导出，或稍后重试。',
               style: theme.textTheme.bodySmall?.copyWith(color: kRed),
             ),
           );

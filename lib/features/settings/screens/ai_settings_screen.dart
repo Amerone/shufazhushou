@@ -42,6 +42,7 @@ class AiSettingsScreen extends ConsumerWidget {
             Expanded(
               child: AsyncValueWidget<Map<String, String>>(
                 value: settingsAsync,
+                onRetry: () => ref.invalidate(settingsProvider),
                 builder: (settings) => ListView(
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                   children: [
@@ -266,7 +267,7 @@ class AiSettingsScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
+    ).whenComplete(controller.dispose);
   }
 
   static String? _validateSetting(
@@ -384,10 +385,16 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
   }
 
   Future<void> _pickImage() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image == null) return;
-    _imageSourceController.text = image.path;
-    setState(() {});
+    try {
+      final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+      _imageSourceController.text = image.path;
+      setState(() {});
+    } catch (error) {
+      if (mounted) {
+        AppToast.showError(context, '图片选择失败：$error');
+      }
+    }
   }
 
   Future<void> _runAnalysis() async {

@@ -255,6 +255,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
   }
 
   Future<void> _handleShareBackup(BackupRecord record) async {
+    if (_submitting) return;
     if (!await File(record.path).exists()) {
       if (!mounted) return;
       AppToast.showError(context, '备份文件不存在，请重新生成。');
@@ -401,6 +402,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             Expanded(
               child: AsyncValueWidget<Map<String, String>>(
                 value: settingsAsync,
+                onRetry: () => ref.invalidate(settingsProvider),
                 builder: (settings) {
                   final lastBackupMs = int.tryParse(
                     settings['last_backup_at'] ?? '',
@@ -422,6 +424,35 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                       return ListView(
                         padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                         children: [
+                          if (snapshot.hasError)
+                            GlassCard(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.all(18),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    color: kRed,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      '备份列表加载失败，请稍后重试。',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(color: kRed),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        setState(_refreshBackupState),
+                                    child: const Text('重试'),
+                                  ),
+                                ],
+                              ),
+                            ),
                           if (isOverdue)
                             GlassCard(
                               margin: const EdgeInsets.only(bottom: 16),

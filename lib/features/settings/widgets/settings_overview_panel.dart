@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../shared/theme.dart';
+import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/widgets/glass_card.dart';
 
 class SettingsOverviewPanel extends StatelessWidget {
@@ -381,7 +384,11 @@ class SettingsShortcutCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
+        onTap: () {
+          unawaited(InteractionFeedback.selection(context));
+          onTap();
+        },
         child: Ink(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(

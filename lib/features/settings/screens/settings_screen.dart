@@ -88,6 +88,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Expanded(
               child: AsyncValueWidget<Map<String, String>>(
                 value: settingsAsync,
+                onRetry: () => ref.invalidate(settingsProvider),
                 builder: (settings) {
                   final lastBackupMs = int.tryParse(
                     settings['last_backup_at'] ?? '',

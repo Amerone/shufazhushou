@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../utils/interaction_feedback.dart';
 
 /// Apple-style wheel time picker displayed in a bottom sheet.
 /// Returns a [TimeOfDay] or null if cancelled.
@@ -80,7 +82,7 @@ Future<TimeOfDay?> showTimeWheelPicker({
                   initialTime.minute,
                 ),
                 onDateTimeChanged: (dt) {
-                  HapticFeedback.selectionClick();
+                  unawaited(InteractionFeedback.selection(ctx));
                   selected = TimeOfDay(hour: dt.hour, minute: dt.minute);
                 },
               ),

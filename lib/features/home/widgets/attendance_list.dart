@@ -66,9 +66,20 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasStudents = ref.watch(
-      studentProvider.select((async) => async.valueOrNull?.isNotEmpty ?? false),
-    );
+    final studentsAsync = ref.watch(studentProvider);
+    final hasStudents = studentsAsync.valueOrNull?.isNotEmpty ?? false;
+    if (studentsAsync.isLoading && !hasStudents) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(child: CircularProgressIndicator.adaptive()),
+      );
+    }
+    if (studentsAsync.hasError && !hasStudents) {
+      return _AttendanceLoadError(
+        message: '学生档案加载失败，请重新加载后查看出勤。',
+        onRetry: () => ref.invalidate(studentProvider),
+      );
+    }
     if (!hasStudents) {
       return const EmptyState(message: '当日暂无出勤记录');
     }
@@ -82,7 +93,10 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
         padding: EdgeInsets.symmetric(vertical: 32),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Center(child: Text('加载失败: $e')),
+      error: (e, _) => _AttendanceLoadError(
+        message: '出勤记录加载失败，请稍后重试。',
+        onRetry: () => ref.invalidate(selectedDateAttendanceProvider),
+      ),
       data: (records) {
         if (records.isEmpty) {
           return Column(
@@ -526,6 +540,55 @@ class _RecordActionButton extends StatelessWidget {
         color: kRed,
         visualDensity: VisualDensity.compact,
         style: IconButton.styleFrom(overlayColor: kRed.withValues(alpha: 0.12)),
+      ),
+    );
+  }
+}
+
+class _AttendanceLoadError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _AttendanceLoadError({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Center(
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 420),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kRed.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: kRed.withValues(alpha: 0.12)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, color: kRed),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: kRed,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.tonalIcon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('重新加载'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

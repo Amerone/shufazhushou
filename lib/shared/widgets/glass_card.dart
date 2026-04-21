@@ -85,6 +85,7 @@ class GlassCard extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             borderRadius: radius,
+            mouseCursor: SystemMouseCursors.click,
             overlayColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.pressed)) {
                 return kPrimaryBlue.withValues(alpha: 0.06);
