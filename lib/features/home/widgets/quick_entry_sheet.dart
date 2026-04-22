@@ -251,6 +251,92 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     return amount.toStringAsFixed(2);
   }
 
+  Future<void> _pickDate() async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (d == null || !mounted) return;
+    await InteractionFeedback.selection(context);
+    if (!mounted) return;
+    setState(() => _date = d);
+  }
+
+  Future<void> _pickStartTime() async {
+    final t = await showTimeWheelPicker(
+      context: context,
+      initialTime: parseTime(_startTime),
+      label: '开始时间',
+    );
+    if (t == null || !mounted) return;
+    await InteractionFeedback.selection(context);
+    if (!mounted) return;
+    setState(() {
+      _markDefaultsCustomized();
+      _startTime = formatTime(t);
+    });
+  }
+
+  Future<void> _pickEndTime() async {
+    final t = await showTimeWheelPicker(
+      context: context,
+      initialTime: parseTime(_endTime),
+      label: '结束时间',
+    );
+    if (t == null || !mounted) return;
+    await InteractionFeedback.selection(context);
+    if (!mounted) return;
+    setState(() {
+      _markDefaultsCustomized();
+      _endTime = formatTime(t);
+    });
+  }
+
+  Widget _buildPickerField({
+    required String label,
+    required String semanticsLabel,
+    required String semanticsHint,
+    required String value,
+    required Future<void> Function() onTap,
+    IconData? trailingIcon,
+  }) {
+    void handleTap() => unawaited(onTap());
+
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      hint: semanticsHint,
+      value: value,
+      onTap: handleTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: handleTap,
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: label,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.56),
+            ),
+            child: trailingIcon == null
+                ? Text(value)
+                : Row(
+                    children: [
+                      Expanded(child: Text(value)),
+                      Icon(trailingIcon, size: 18),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (_saving) return;
     if (_endTime.compareTo(_startTime) <= 0) {
@@ -1194,96 +1280,31 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           ),
           const SizedBox(height: 16),
         ],
-        InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            final d = await showDatePicker(
-              context: context,
-              initialDate: _date,
-              firstDate: DateTime(2020),
-              lastDate: DateTime.now().add(const Duration(days: 365)),
-            );
-            if (d == null || !mounted) return;
-            await InteractionFeedback.selection(context);
-            if (!mounted) return;
-            setState(() => _date = d);
-          },
-          child: InputDecorator(
-            decoration: InputDecoration(
-              labelText: '上课日期',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.56),
-            ),
-            child: Row(
-              children: [
-                Expanded(child: Text(_dateStr())),
-                const Icon(Icons.calendar_today_outlined, size: 18),
-              ],
-            ),
-          ),
+        _buildPickerField(
+          label: '上课日期',
+          semanticsLabel: '上课日期选择器',
+          semanticsHint: '轻触选择上课日期',
+          value: _dateStr(),
+          trailingIcon: Icons.calendar_today_outlined,
+          onTap: _pickDate,
         ),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 340;
-            final startPicker = InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () async {
-                final t = await showTimeWheelPicker(
-                  context: context,
-                  initialTime: parseTime(_startTime),
-                  label: '开始时间',
-                );
-                if (t == null || !context.mounted) return;
-                await InteractionFeedback.selection(context);
-                if (!mounted) return;
-                setState(() {
-                  _markDefaultsCustomized();
-                  _startTime = formatTime(t);
-                });
-              },
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  labelText: '开始时间',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.56),
-                ),
-                child: Text(_startTime),
-              ),
+            final startPicker = _buildPickerField(
+              label: '开始时间',
+              semanticsLabel: '开始时间选择器',
+              semanticsHint: '轻触选择开始时间',
+              value: _startTime,
+              onTap: _pickStartTime,
             );
-            final endPicker = InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () async {
-                final t = await showTimeWheelPicker(
-                  context: context,
-                  initialTime: parseTime(_endTime),
-                  label: '结束时间',
-                );
-                if (t == null || !context.mounted) return;
-                await InteractionFeedback.selection(context);
-                if (!mounted) return;
-                setState(() {
-                  _markDefaultsCustomized();
-                  _endTime = formatTime(t);
-                });
-              },
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  labelText: '结束时间',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.56),
-                ),
-                child: Text(_endTime),
-              ),
+            final endPicker = _buildPickerField(
+              label: '结束时间',
+              semanticsLabel: '结束时间选择器',
+              semanticsHint: '轻触选择结束时间',
+              value: _endTime,
+              onTap: _pickEndTime,
             );
 
             if (compact) {

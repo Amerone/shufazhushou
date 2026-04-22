@@ -230,6 +230,49 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
     }
   }
 
+  Widget _buildPickerField({
+    required String label,
+    required String semanticsLabel,
+    required String semanticsHint,
+    required String value,
+    required Future<void> Function() onTap,
+    IconData? trailingIcon,
+  }) {
+    void handleTap() => unawaited(onTap());
+
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      hint: semanticsHint,
+      value: value,
+      onTap: handleTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: handleTap,
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: label,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.5),
+            ),
+            child: trailingIcon == null
+                ? Text(value)
+                : Row(
+                    children: [
+                      Expanded(child: Text(value)),
+                      Icon(trailingIcon, size: 18),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -342,8 +385,12 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              InkWell(
-                borderRadius: BorderRadius.circular(12),
+              _buildPickerField(
+                label: '日期',
+                semanticsLabel: '日期选择器',
+                semanticsHint: '轻触选择日期',
+                value: _dateStr(),
+                trailingIcon: Icons.calendar_today_outlined,
                 onTap: () async {
                   final d = await showDatePicker(
                     context: context,
@@ -356,29 +403,16 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                   if (!context.mounted) return;
                   setState(() => _date = d);
                 },
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: '日期',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.5),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(_dateStr())),
-                      const Icon(Icons.calendar_today_outlined, size: 18),
-                    ],
-                  ),
-                ),
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
+                    child: _buildPickerField(
+                      label: '开始时间',
+                      semanticsLabel: '开始时间选择器',
+                      semanticsHint: '轻触选择开始时间',
+                      value: _startTime,
                       onTap: () async {
                         final picked = await showTimeWheelPicker(
                           context: context,
@@ -392,23 +426,15 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                           _startTime = formatTime(picked);
                         });
                       },
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: '开始时间',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white.withValues(alpha: 0.5),
-                        ),
-                        child: Text(_startTime),
-                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
+                    child: _buildPickerField(
+                      label: '结束时间',
+                      semanticsLabel: '结束时间选择器',
+                      semanticsHint: '轻触选择结束时间',
+                      value: _endTime,
                       onTap: () async {
                         final picked = await showTimeWheelPicker(
                           context: context,
@@ -422,17 +448,6 @@ class _AttendanceEditSheetState extends ConsumerState<AttendanceEditSheet> {
                           _endTime = formatTime(picked);
                         });
                       },
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: '结束时间',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white.withValues(alpha: 0.5),
-                        ),
-                        child: Text(_endTime),
-                      ),
                     ),
                   ),
                 ],

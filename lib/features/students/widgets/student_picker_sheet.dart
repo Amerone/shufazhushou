@@ -411,17 +411,14 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                                     ),
                                   ],
                                 );
-                                final action = TextButton.icon(
-                                  onPressed: selectStudent,
-                                  icon: const Icon(
-                                    Icons.arrow_outward_outlined,
-                                  ),
-                                  label: Text(widget.actionLabel),
+                                final action = _StudentPickerVisualAction(
+                                  label: widget.actionLabel,
                                 );
 
                                 return Semantics(
+                                  container: true,
                                   button: true,
-                                  label: '$displayName，${widget.actionLabel}',
+                                  label: '$displayName ${widget.actionLabel}',
                                   onTap: selectStudent,
                                   child: ExcludeSemantics(
                                     child: Material(
@@ -538,6 +535,36 @@ class _StudentMetaChip extends StatelessWidget {
                 color: color,
                 fontWeight: FontWeight.w700,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StudentPickerVisualAction extends StatelessWidget {
+  final String label;
+
+  const _StudentPickerVisualAction({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final foreground = theme.colorScheme.primary;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.arrow_outward_outlined, size: 18, color: foreground),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

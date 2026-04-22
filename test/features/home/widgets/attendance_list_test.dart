@@ -1,5 +1,10 @@
+import 'dart:ui' show SemanticsAction;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart'
+    show DebugSemanticsDumpOrder, PipelineOwner;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/semantics.dart' show SemanticsNode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moyun/core/database/dao/student_dao.dart';
@@ -73,18 +78,30 @@ void main() {
   testWidgets('attendance card shows direct payment and profile actions', (
     tester,
   ) async {
-    _FakeStudentNotifier.seededStudents = [_seededStudent];
-    _selectedDateAttendanceRecords = [_seededAttendance];
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      _FakeStudentNotifier.seededStudents = [_seededStudent];
+      _selectedDateAttendanceRecords = [_seededAttendance];
 
-    await _pumpAttendanceList(tester);
+      await _pumpAttendanceList(tester);
 
-    expect(find.text('作品分析'), findsOneWidget);
-    expect(find.text('记录缴费'), findsOneWidget);
-    expect(find.text('学生档案'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel(RegExp('王小楷.*09:00到10:00.*轻触编辑')),
-      findsOneWidget,
-    );
+      expect(find.text('作品分析'), findsOneWidget);
+      expect(find.text('记录缴费'), findsOneWidget);
+      expect(find.text('学生档案'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp('王小楷.*09:00到10:00.*轻触编辑')),
+        findsOneWidget,
+      );
+      _expectTappableButtonSemantics(
+        tester,
+        find.bySemanticsLabel(RegExp('王小楷.*09:00到10:00.*轻触编辑')),
+      );
+      for (final label in ['作品分析', '记录缴费', '学生档案', '删除记录']) {
+        _expectTappableButtonSemanticsLabel(tester, label);
+      }
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('attendance card shows uploaded artwork preview', (tester) async {
@@ -171,6 +188,54 @@ Future<void> _pumpAttendanceList(WidgetTester tester) async {
     ),
   );
   await _settleUi(tester);
+}
+
+void _expectTappableButtonSemantics(WidgetTester tester, Finder finder) {
+  expect(finder, findsOneWidget);
+  final semanticsData = tester.getSemantics(finder).getSemanticsData();
+  expect(semanticsData.flagsCollection.isButton, isTrue);
+  expect(semanticsData.hasAction(SemanticsAction.tap), isTrue);
+}
+
+void _expectTappableButtonSemanticsLabel(WidgetTester tester, Pattern label) {
+  final semanticsData = _semanticsNodeWithLabel(
+    tester,
+    label,
+  ).getSemanticsData();
+  expect(semanticsData.flagsCollection.isButton, isTrue);
+  expect(semanticsData.hasAction(SemanticsAction.tap), isTrue);
+}
+
+SemanticsNode _semanticsNodeWithLabel(WidgetTester tester, Pattern label) {
+  final matches = <SemanticsNode>[];
+
+  void visit(SemanticsNode node) {
+    final nodeLabel = node.getSemanticsData().label;
+    if (label.allMatches(nodeLabel).isNotEmpty) {
+      matches.add(node);
+    }
+    for (final child in node.debugListChildrenInOrder(
+      DebugSemanticsDumpOrder.traversalOrder,
+    )) {
+      visit(child);
+    }
+  }
+
+  void visitOwner(PipelineOwner owner) {
+    final root = owner.semanticsOwner?.rootSemanticsNode;
+    if (root != null) {
+      visit(root);
+    }
+    owner.visitChildren(visitOwner);
+  }
+
+  visitOwner(tester.binding.rootPipelineOwner);
+  expect(
+    matches,
+    hasLength(1),
+    reason: 'Expected one semantics node matching "$label".',
+  );
+  return matches.single;
 }
 
 class _FakeSettingsNotifier extends SettingsNotifier {

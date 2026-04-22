@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -173,6 +174,61 @@ void main() {
       find.widgetWithText(OutlinedButton, '直接保存（2人 / ¥380）'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('date and time pickers expose selector semantics', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+    final semantics = tester.ensureSemantics();
+
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+            studentProvider.overrideWith(_FakeStudentNotifier.new),
+            classTemplateProvider.overrideWith(_FakeClassTemplateNotifier.new),
+            selectedDateProvider.overrideWith((ref) => DateTime(2026, 4, 17)),
+          ],
+          child: MaterialApp(
+            theme: buildAppTheme(),
+            home: const Scaffold(
+              body: QuickEntrySheet(
+                initialSelectedIds: {'student-1'},
+                initialStartTime: '09:15',
+                initialEndTime: '10:45',
+              ),
+            ),
+          ),
+        ),
+      );
+      await _settleUi(tester);
+
+      await tester.tap(find.textContaining('下一步'));
+      await _settleUi(tester);
+
+      _expectPickerSemantics(
+        tester,
+        label: '上课日期选择器',
+        hint: '轻触选择上课日期',
+        value: '2026-04-17',
+      );
+      _expectPickerSemantics(
+        tester,
+        label: '开始时间选择器',
+        hint: '轻触选择开始时间',
+        value: '09:15',
+      );
+      _expectPickerSemantics(
+        tester,
+        label: '结束时间选择器',
+        hint: '轻触选择结束时间',
+        value: '10:45',
+      );
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets('preserves existing feedback and artwork on conflict overwrite', (
@@ -417,4 +473,19 @@ void _setLargeViewport(WidgetTester tester) {
 Future<void> _settleUi(WidgetTester tester) async {
   await tester.pump();
   await tester.pumpAndSettle();
+}
+
+void _expectPickerSemantics(
+  WidgetTester tester, {
+  required String label,
+  required String hint,
+  required String value,
+}) {
+  final node = tester.getSemantics(find.bySemanticsLabel(label));
+
+  expect(node.label, label);
+  expect(node.hint, hint);
+  expect(node.value, value);
+  expect(node.flagsCollection.isButton, isTrue);
+  expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
 }

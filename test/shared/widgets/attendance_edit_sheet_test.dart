@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moyun/core/database/database_helper.dart';
@@ -43,6 +44,60 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('本次扣费 ¥0'), findsOneWidget);
+  });
+
+  testWidgets('attendance edit sheet exposes picker semantics', (tester) async {
+    _setLargeViewport(tester);
+    final semantics = tester.ensureSemantics();
+    final record = Attendance(
+      id: 'attendance-1',
+      studentId: 'student-1',
+      date: '2026-04-03',
+      startTime: '09:00',
+      endTime: '10:00',
+      status: 'present',
+      priceSnapshot: 180,
+      feeAmount: 180,
+      createdAt: 1,
+      updatedAt: 1,
+    );
+
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildAppTheme(),
+            home: Scaffold(body: AttendanceEditSheet(record: record)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      _expectPickerSemantics(
+        tester,
+        label: '日期选择器',
+        hint: '轻触选择日期',
+        value: '2026-04-03',
+      );
+      _expectPickerSemantics(
+        tester,
+        label: '开始时间选择器',
+        hint: '轻触选择开始时间',
+        value: '09:00',
+      );
+      _expectPickerSemantics(
+        tester,
+        label: '结束时间选择器',
+        hint: '轻触选择结束时间',
+        value: '10:00',
+      );
+
+      expect(find.bySemanticsLabel('日期'), findsNothing);
+      expect(find.bySemanticsLabel('开始时间'), findsNothing);
+      expect(find.bySemanticsLabel('结束时间'), findsNothing);
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets('attendance edit sheet exposes artwork analysis action', (
@@ -144,6 +199,21 @@ void main() {
     expect(savedRecord!.homePracticeNote, 'AI 练习建议');
     expect(savedRecord.artworkImagePath, 'artworks/attendance-1.png');
   });
+}
+
+void _expectPickerSemantics(
+  WidgetTester tester, {
+  required String label,
+  required String hint,
+  required String value,
+}) {
+  final node = tester.getSemantics(find.bySemanticsLabel(label));
+
+  expect(node.label, label);
+  expect(node.hint, hint);
+  expect(node.value, value);
+  expect(node.flagsCollection.isButton, isTrue);
+  expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
 }
 
 void _setLargeViewport(WidgetTester tester) {

@@ -317,6 +317,7 @@ class _BrushNavItem extends StatelessWidget {
       button: true,
       selected: selected,
       label: data.label,
+      hint: selected ? '当前页面' : '切换到${data.label}',
       onTap: handleTap,
       child: ExcludeSemantics(
         child: Material(
@@ -401,6 +402,7 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: '墨韵',
+      debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       routerConfig: _router,
       locale: const Locale('zh', 'CN'),

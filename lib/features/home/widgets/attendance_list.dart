@@ -140,6 +140,19 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
             final durationLabel = _durationLabel(r.startTime, r.endTime);
             final studentName = nameMap[r.studentId] ?? r.studentId;
             final analyzingImage = _analyzingImageRecordIds.contains(r.id);
+            void openEditSheet() {
+              unawaited(InteractionFeedback.selection(context));
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (_) => AttendanceEditSheet(
+                  record: r,
+                  onAnalyzeArtwork: () =>
+                      _analyzeAttendanceImage(r, studentName),
+                ),
+              );
+            }
 
             return RepaintBoundary(
               child: Container(
@@ -156,10 +169,14 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
                   ],
                 ),
                 child: Semantics(
+                  container: true,
+                  explicitChildNodes: true,
                   button: true,
+                  onTap: openEditSheet,
                   label:
                       '$studentName，$status，${r.startTime}到${r.endTime}，$durationLabel，费用${r.feeAmount.toStringAsFixed(0)}元，轻触编辑',
                   child: InkWell(
+                    excludeFromSemantics: true,
                     borderRadius: BorderRadius.circular(20),
                     overlayColor: WidgetStateProperty.resolveWith((states) {
                       if (states.contains(WidgetState.pressed)) {
@@ -170,19 +187,7 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
                       }
                       return null;
                     }),
-                    onTap: () {
-                      unawaited(InteractionFeedback.selection(context));
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        useSafeArea: true,
-                        builder: (_) => AttendanceEditSheet(
-                          record: r,
-                          onAnalyzeArtwork: () =>
-                              _analyzeAttendanceImage(r, studentName),
-                        ),
-                      );
-                    },
+                    onTap: openEditSheet,
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: LayoutBuilder(
@@ -551,7 +556,7 @@ class _RecordActionButton extends StatelessWidget {
       child: IconButton(
         tooltip: '删除记录',
         onPressed: onPressed,
-        icon: const Icon(Icons.delete_outline),
+        icon: const Icon(Icons.delete_outline, semanticLabel: '删除记录'),
         color: kRed,
         constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
         style: IconButton.styleFrom(overlayColor: kRed.withValues(alpha: 0.12)),

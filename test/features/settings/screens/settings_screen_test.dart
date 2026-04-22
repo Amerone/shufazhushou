@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +20,9 @@ void main() {
       InteractionFeedback.hapticsEnabledKey: 'false',
       InteractionFeedback.soundEnabledKey: 'false',
     };
+    _FakeSettingsNotifier.pendingSave = null;
+    _FakeSettingsNotifier.saveError = null;
+    _FakeSettingsNotifier.setCallCount = 0;
   });
 
   testWidgets('settings screen renders overview progress and shortcuts', (
@@ -69,6 +74,77 @@ void main() {
     expect(find.text('生成测试数据'), findsOneWidget);
     expect(find.text('清空全部数据'), findsOneWidget);
   });
+
+  testWidgets('text edit save is disabled while saving', (tester) async {
+    _setLargeViewport(tester);
+    final saveCompleter = Completer<void>();
+    _FakeSettingsNotifier.pendingSave = saveCompleter;
+
+    await _pumpScreen(tester);
+    await _openTeacherNameSheet(tester);
+    await tester.enterText(find.byType(TextField), '李老师');
+
+    await tester.tap(find.text('保存修改'));
+    await tester.pump();
+
+    expect(_FakeSettingsNotifier.setCallCount, 1);
+    expect(find.text('保存中...'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(
+      tester
+          .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, '保存中...'))
+          .onPressed,
+      isNull,
+    );
+
+    await tester.tap(find.text('保存中...'));
+    await tester.pump();
+
+    expect(_FakeSettingsNotifier.setCallCount, 1);
+
+    saveCompleter.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('保存中...'), findsNothing);
+    expect(_FakeSettingsNotifier.seededSettings['teacher_name'], '李老师');
+  });
+
+  testWidgets('text edit save failure keeps input and shows error', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+    _FakeSettingsNotifier.saveError = Exception('boom');
+
+    await _pumpScreen(tester);
+    await _openTeacherNameSheet(tester);
+    await tester.enterText(find.byType(TextField), '李老师');
+
+    await tester.tap(find.text('保存修改'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('保存失败'), findsOneWidget);
+    expect(find.text('保存修改'), findsOneWidget);
+    expect(
+      tester
+          .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, '保存修改'))
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller?.text,
+      '李老师',
+    );
+    expect(_FakeSettingsNotifier.seededSettings['teacher_name'], '王老师');
+  });
+}
+
+Future<void> _openTeacherNameSheet(WidgetTester tester) async {
+  final teacherTile = find
+      .ancestor(of: find.text('教师姓名'), matching: find.byType(InkWell))
+      .first;
+  await tester.tap(teacherTile);
+  await tester.pumpAndSettle();
+  expect(find.byType(TextField), findsOneWidget);
 }
 
 Future<void> _pumpScreen(WidgetTester tester) async {
@@ -101,12 +177,22 @@ void _setLargeViewport(WidgetTester tester) {
 
 class _FakeSettingsNotifier extends SettingsNotifier {
   static Map<String, String> seededSettings = const {};
+  static Completer<void>? pendingSave;
+  static Object? saveError;
+  static int setCallCount = 0;
 
   @override
   Future<Map<String, String>> build() async => seededSettings;
 
   @override
   Future<void> set(String key, String value) async {
+    setCallCount++;
+    if (pendingSave case final completer?) {
+      await completer.future;
+    }
+    if (saveError case final error?) {
+      throw error;
+    }
     seededSettings = {...seededSettings, key: value};
     state = AsyncData(seededSettings);
   }

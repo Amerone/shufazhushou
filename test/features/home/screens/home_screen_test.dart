@@ -118,6 +118,69 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
   });
 
+  testWidgets('student load failure keeps retry and student entry actions', (
+    tester,
+  ) async {
+    _setLargeHomeViewport(tester);
+    _FakeSettingsNotifier.seededSettings = const {
+      InteractionFeedback.hapticsEnabledKey: 'false',
+      InteractionFeedback.soundEnabledKey: 'false',
+    };
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_ThrowingStudentNotifier.new),
+          attendanceProvider.overrideWith(_ThrowingAttendanceNotifier.new),
+          selectedDateAttendanceProvider.overrideWith(
+            (ref) => throw StateError('selected attendance should not load'),
+          ),
+          classTemplateProvider.overrideWith(
+            _ThrowingClassTemplateNotifier.new,
+          ),
+          homeWorkbenchProvider.overrideWith(
+            (ref) => throw StateError('workbench should not load'),
+          ),
+        ],
+        child: MaterialApp.router(
+          theme: buildAppTheme(),
+          routerConfig: GoRouter(
+            initialLocation: '/',
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (context, state) => const HomeScreen(),
+              ),
+              GoRoute(
+                path: '/students',
+                builder: (context, state) =>
+                    const Scaffold(body: Center(child: Text('student list'))),
+              ),
+              GoRoute(
+                path: '/students/create',
+                builder: (context, state) =>
+                    const Scaffold(body: Center(child: Text('create student'))),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    expect(find.text('学生档案加载失败'), findsOneWidget);
+    expect(find.text('重试'), findsOneWidget);
+    expect(find.text('新增学生'), findsOneWidget);
+    expect(find.text('学生档案'), findsOneWidget);
+    expect(find.textContaining('should not load'), findsNothing);
+
+    await tester.tap(find.widgetWithText(FilledButton, '新增学生'));
+    await _settleUi(tester);
+
+    expect(find.text('create student'), findsOneWidget);
+  });
+
   testWidgets(
     'home shows quick entry shortcuts for recent group and template',
     (tester) async {
@@ -286,6 +349,13 @@ class _FakeStudentNotifier extends StudentNotifier {
 
   @override
   Future<List<StudentWithMeta>> build() async => seededStudents;
+}
+
+class _ThrowingStudentNotifier extends StudentNotifier {
+  @override
+  Future<List<StudentWithMeta>> build() async {
+    throw StateError('student list should fail');
+  }
 }
 
 class _EmptyAttendanceNotifier extends MonthAttendanceNotifier {

@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moyun/core/database/dao/student_dao.dart';
 import 'package:moyun/core/models/student.dart';
+import 'package:moyun/core/providers/settings_provider.dart';
 import 'package:moyun/core/providers/student_provider.dart';
 import 'package:moyun/features/students/widgets/student_picker_sheet.dart';
 import 'package:moyun/shared/theme.dart';
+import 'package:moyun/shared/utils/interaction_feedback.dart';
 
 void main() {
   testWidgets('student picker surfaces recent attendance students first', (
@@ -55,7 +57,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [studentProvider.overrideWith(_FakeStudentNotifier.new)],
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_FakeStudentNotifier.new),
+        ],
         child: MaterialApp(
           theme: buildAppTheme(),
           home: const Scaffold(
@@ -83,7 +88,98 @@ void main() {
     expect(olderTop, lessThan(neverTop));
   });
 
-  testWidgets('student picker error state exposes retry action', (tester) async {
+  testWidgets('student picker row has one semantic button selection action', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+
+    _FakeStudentNotifier.seededStudents = [
+      StudentWithMeta(
+        const Student(
+          id: 'student-a',
+          name: 'Alice',
+          parentName: 'Parent A',
+          parentPhone: '13900000001',
+          pricePerClass: 180,
+          status: 'active',
+          createdAt: 1,
+          updatedAt: 1,
+        ),
+        null,
+      ),
+    ];
+    StudentWithMeta? selected;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_FakeStudentNotifier.new),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: FilledButton(
+                    onPressed: () {
+                      showModalBottomSheet<StudentWithMeta>(
+                        context: context,
+                        builder: (_) => const StudentPickerSheet(
+                          title: 'Pick student',
+                          subtitle: 'Choose one student',
+                          actionLabel: 'Select',
+                        ),
+                      ).then((value) => selected = value);
+                    },
+                    child: const Text('Open picker'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open picker'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(TextButton, 'Select'), findsNothing);
+    expect(find.text('Select'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Alice Select')),
+      matchesSemantics(
+        label: 'Alice Select',
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+    expect(find.bySemanticsLabel('Select'), findsNothing);
+    semantics.dispose();
+
+    final studentRow = find.ancestor(
+      of: find.text('Alice'),
+      matching: find.byType(InkWell),
+    );
+    expect(studentRow, findsOneWidget);
+    final rowInkWell = tester.widget<InkWell>(studentRow);
+    expect(rowInkWell.onTap, isNotNull);
+    await tester.runAsync(() async {
+      rowInkWell.onTap!();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pumpAndSettle();
+    await tester.pump();
+
+    expect(find.text('Pick student'), findsNothing);
+    expect(selected?.student.id, 'student-a');
+  });
+
+  testWidgets('student picker error state exposes retry action', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [studentProvider.overrideWith(_ThrowingStudentNotifier.new)],
@@ -112,6 +208,14 @@ class _FakeStudentNotifier extends StudentNotifier {
 
   @override
   Future<List<StudentWithMeta>> build() async => seededStudents;
+}
+
+class _FakeSettingsNotifier extends SettingsNotifier {
+  @override
+  Future<Map<String, String>> build() async => const {
+    InteractionFeedback.hapticsEnabledKey: 'false',
+    InteractionFeedback.soundEnabledKey: 'false',
+  };
 }
 
 class _ThrowingStudentNotifier extends StudentNotifier {

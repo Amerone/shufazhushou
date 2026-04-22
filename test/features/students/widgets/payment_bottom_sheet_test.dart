@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moyun/core/database/dao/attendance_dao.dart';
@@ -77,6 +78,43 @@ void main() {
 
     expect(find.textContaining('Alice'), findsOneWidget);
     expect(find.text('1课 ¥180'), findsOneWidget);
+  });
+
+  testWidgets('payment date picker exposes accessible semantics', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [settingsProvider.overrideWith(_FakeSettingsNotifier.new)],
+          child: MaterialApp(
+            theme: buildAppTheme(),
+            home: const Scaffold(
+              body: PaymentBottomSheet(
+                studentId: 'student-1',
+                studentName: 'Alice',
+                pricePerClass: 180,
+              ),
+            ),
+          ),
+        ),
+      );
+      await _settleUi(tester);
+
+      final node = tester.getSemantics(find.bySemanticsLabel('缴费日期选择器'));
+
+      expect(node.label, '缴费日期选择器');
+      expect(node.hint, '轻触选择缴费日期');
+      expect(node.value, matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));
+      expect(node.flagsCollection.isButton, isTrue);
+      expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+      expect(find.text(node.value), findsOneWidget);
+      expect(find.bySemanticsLabel(node.value), findsNothing);
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets(

@@ -501,10 +501,69 @@ class _HomeFocusCard extends StatelessWidget {
                   ),
                   if (hasLoadError) ...[
                     const SizedBox(height: 14),
-                    FilledButton.tonalIcon(
-                      onPressed: onRetryStudents,
-                      icon: const Icon(Icons.refresh_rounded, size: 18),
-                      label: const Text('重新加载'),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 520;
+                        final primaryWidth = compact
+                            ? constraints.maxWidth
+                            : (constraints.maxWidth - 12) / 2;
+                        final secondaryWidth = compact
+                            ? constraints.maxWidth
+                            : (constraints.maxWidth - 24) / 3;
+
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            SizedBox(
+                              width: primaryWidth,
+                              child: FilledButton.icon(
+                                onPressed: onCreateStudent,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: kSealRed,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                ),
+                                icon: const Icon(Icons.person_add_alt_1),
+                                label: const Text('新增学生'),
+                              ),
+                            ),
+                            SizedBox(
+                              width: secondaryWidth,
+                              child: FilledButton.tonalIcon(
+                                onPressed: onRetryStudents,
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.refresh_rounded,
+                                  size: 18,
+                                ),
+                                label: const Text('重试'),
+                              ),
+                            ),
+                            SizedBox(
+                              width: secondaryWidth,
+                              child: OutlinedButton.icon(
+                                onPressed: onOpenStudents,
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.people_alt_outlined,
+                                  size: 18,
+                                ),
+                                label: const Text('学生档案'),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ],

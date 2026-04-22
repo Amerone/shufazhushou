@@ -524,19 +524,26 @@ class _StatisticsQuickNavigator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final item in _items) ...[
-            _StatisticsQuickNavChip(
-              item: item,
-              selected: activeAnchor == item.anchor,
-              onTap: () => onTap(item.anchor),
-            ),
-            const SizedBox(width: 8),
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: '\u7edf\u8ba1\u9875\u5feb\u901f\u8df3\u8f6c',
+      hint:
+          '\u5de6\u53f3\u6ed1\u52a8\u67e5\u770b\u5206\u533a\uff0c\u70b9\u6309\u53ef\u8df3\u8f6c\u5230\u5bf9\u5e94\u7edf\u8ba1\u6a21\u5757',
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final item in _items) ...[
+              _StatisticsQuickNavChip(
+                item: item,
+                selected: activeAnchor == item.anchor,
+                onTap: () => onTap(item.anchor),
+              ),
+              const SizedBox(width: 8),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -571,9 +578,15 @@ class _StatisticsQuickNavChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final foreground = selected ? Colors.white : item.color;
     return Semantics(
+      container: true,
+      excludeSemantics: true,
       button: true,
       selected: selected,
-      label: '跳转到${item.label}',
+      label: '\u8df3\u8f6c\u5230${item.label}',
+      hint: selected
+          ? '\u5f53\u524d\u6240\u5728\u5206\u533a\uff0c\u70b9\u6309\u53ef\u91cd\u65b0\u5b9a\u4f4d\u5230${item.label}'
+          : '\u70b9\u6309\u8df3\u8f6c\u5230${item.label}\u5206\u533a',
+      onTap: onTap,
       child: Material(
         color: selected ? item.color : Colors.white.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(999),

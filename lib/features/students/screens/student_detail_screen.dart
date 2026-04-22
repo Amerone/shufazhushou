@@ -181,6 +181,25 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     ]);
   }
 
+  Future<void> _retryAllTimeFee() async {
+    final params = FeeSummaryParams(widget.studentId);
+    ref.invalidate(feeSummaryProvider(params));
+    try {
+      await ref.read(feeSummaryProvider(params).future);
+    } catch (_) {
+      // The refreshed AsyncValue renders the visible retry card.
+    }
+  }
+
+  Future<void> _retryPayments() async {
+    ref.invalidate(studentPaymentsProvider(widget.studentId));
+    try {
+      await ref.read(studentPaymentsProvider(widget.studentId).future);
+    } catch (_) {
+      // The refreshed AsyncValue renders the visible retry card.
+    }
+  }
+
   Future<void> _reloadAttendanceRecords() async {
     if (!mounted) return;
     final nextGeneration = _attendanceLoadGeneration + 1;
@@ -356,11 +375,15 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     final allTimeFeeAsync = ref.watch(
       feeSummaryProvider(FeeSummaryParams(widget.studentId)),
     );
+    final allTimeFee = allTimeFeeAsync.valueOrNull;
+    final allTimeFeeForOverview = allTimeFee == null
+        ? allTimeFeeAsync
+        : AsyncValue<StudentFeeSummary>.data(allTimeFee);
     final parentDraft = const StudentParentMessageService().build(
       student: student,
       growthSummary: growthSummary,
       artworkTimeline: artworkTimeline,
-      balance: allTimeFeeAsync.valueOrNull?.balance ?? 0,
+      balance: allTimeFee?.balance ?? 0,
       pricePerClass: student.pricePerClass,
     );
     final paymentsAsync = ref.watch(studentPaymentsProvider(widget.studentId));
@@ -417,9 +440,19 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                         from: from,
                         to: to,
                         monthlyFeeAsync: feeAsync,
-                        allTimeFeeAsync: allTimeFeeAsync,
+                        allTimeFeeAsync: allTimeFeeForOverview,
                       ),
                     ),
+                    if (allTimeFeeAsync.hasError && allTimeFee != null) ...[
+                      const SizedBox(height: 10),
+                      _RefreshErrorCard(
+                        title: '账本刷新失败',
+                        message: '当前费用概览和沟通摘要可能是上次加载的数据。',
+                        errorText: _formatError(allTimeFeeAsync.error!),
+                        retryLabel: '重试账本',
+                        onRetry: () => unawaited(_retryAllTimeFee()),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     // 2. 学员信息
                     GlassCard(
@@ -510,27 +543,31 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       onEditStudent: _openEditStudent,
                     ),
                     const SizedBox(height: 22),
-                    allTimeFeeAsync.when(
-                      loading: () => const GlassCard(
+                    if (allTimeFee != null)
+                      StudentGrowthWorkbenchCard(
+                        summary: growthSummary,
+                        balance: allTimeFee.balance,
+                        pricePerClass: student.pricePerClass,
+                        onOpenReport: () => _openExportSheet(
+                          initialTemplate: ExportTemplateId.parentMonthly,
+                        ),
+                      )
+                    else if (allTimeFeeAsync.isLoading)
+                      const GlassCard(
                         padding: EdgeInsets.all(18),
                         child: SizedBox(
                           height: 72,
                           child: Center(child: CircularProgressIndicator()),
                         ),
+                      )
+                    else if (allTimeFeeAsync.hasError)
+                      _RefreshErrorCard(
+                        title: '学员账本加载失败',
+                        message: '无法刷新学员账本，当前页面的费用信息可能不完整。',
+                        errorText: _formatError(allTimeFeeAsync.error!),
+                        retryLabel: '重试账本',
+                        onRetry: () => unawaited(_retryAllTimeFee()),
                       ),
-                      error: (error, _) => GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: Text('学员账本加载失败：${_formatError(error)}'),
-                      ),
-                      data: (allFee) => StudentGrowthWorkbenchCard(
-                        summary: growthSummary,
-                        balance: allFee.balance,
-                        pricePerClass: student.pricePerClass,
-                        onOpenReport: () => _openExportSheet(
-                          initialTemplate: ExportTemplateId.parentMonthly,
-                        ),
-                      ),
-                    ),
                     const SizedBox(height: 16),
                     StudentParentMessageCard(
                       draft: parentDraft,
@@ -551,6 +588,18 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             trailing: '${payments.length} \u6761',
                           ),
                           const SizedBox(height: 10),
+                          if (paymentsAsync.hasError) ...[
+                            _RefreshErrorCard(
+                              title: '缴费记录刷新失败',
+                              message: payments.isEmpty
+                                  ? '暂时无法加载缴费记录，当前页面可能只显示旧数据。'
+                                  : '当前缴费记录可能是上次加载的数据。',
+                              errorText: _formatError(paymentsAsync.error!),
+                              retryLabel: '重试缴费',
+                              onRetry: () => unawaited(_retryPayments()),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
                           if (isLoadingPayments)
                             const GlassCard(
                               padding: EdgeInsets.all(18),
@@ -561,7 +610,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                 ),
                               ),
                             )
-                          else if (payments.isEmpty)
+                          else if (payments.isEmpty && !paymentsAsync.hasError)
                             GlassCard(
                               padding: const EdgeInsets.all(18),
                               child: EmptyState(
@@ -920,6 +969,104 @@ class _InfoChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RefreshErrorCard extends StatelessWidget {
+  final String title;
+  final String message;
+  final String errorText;
+  final String retryLabel;
+  final VoidCallback onRetry;
+
+  const _RefreshErrorCard({
+    required this.title,
+    required this.message,
+    required this.errorText,
+    required this.retryLabel,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return GlassCard(
+      padding: const EdgeInsets.all(14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 420;
+          final content = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: kOrange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.sync_problem_outlined,
+                  size: 18,
+                  color: kOrange,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(message, style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      errorText,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: kInkSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+          final action = TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_outlined, size: 18),
+            label: Text(retryLabel),
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                content,
+                const SizedBox(height: 8),
+                Align(alignment: Alignment.centerRight, child: action),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: content),
+              const SizedBox(width: 8),
+              action,
+            ],
+          );
+        },
       ),
     );
   }

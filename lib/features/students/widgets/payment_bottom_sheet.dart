@@ -84,6 +84,17 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
     return text.isEmpty ? '请稍后重试。' : text;
   }
 
+  Future<void> _pickDate() async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (d == null || !mounted) return;
+    setState(() => _date = d);
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_saving) return;
@@ -332,33 +343,29 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
                 const SizedBox(height: 12),
                 Semantics(
                   button: true,
-                  label: '选择缴费日期，当前 ${formatDate(_date)}',
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () async {
-                      final d = await showDatePicker(
-                        context: context,
-                        initialDate: _date,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                      );
-                      if (d == null || !mounted) return;
-                      setState(() => _date = d);
-                    },
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        labelText: '缴费日期',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  label: '缴费日期选择器',
+                  hint: '轻触选择缴费日期',
+                  value: formatDate(_date),
+                  onTap: () => unawaited(_pickDate()),
+                  child: ExcludeSemantics(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => unawaited(_pickDate()),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: '缴费日期',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white.withValues(alpha: 0.5),
                         ),
-                        filled: true,
-                        fillColor: Colors.white.withValues(alpha: 0.5),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(child: Text(formatDate(_date))),
-                          const Icon(Icons.calendar_today_outlined, size: 18),
-                        ],
+                        child: Row(
+                          children: [
+                            Expanded(child: Text(formatDate(_date))),
+                            const Icon(Icons.calendar_today_outlined, size: 18),
+                          ],
+                        ),
                       ),
                     ),
                   ),
