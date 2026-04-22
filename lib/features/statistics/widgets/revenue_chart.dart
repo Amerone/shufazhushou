@@ -22,16 +22,25 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
     final asyncRevenue = ref.watch(revenueProvider);
 
     return asyncRevenue.when(
-      loading: () => const SizedBox(
-        height: 200,
-        child: Center(child: CircularProgressIndicator()),
+      loading: () => Semantics(
+        container: true,
+        liveRegion: true,
+        label: '\u6536\u5165\u8d70\u52bf\u52a0\u8f7d\u4e2d',
+        child: SizedBox(
+          height: 200,
+          child: Center(child: CircularProgressIndicator()),
+        ),
       ),
-      error: (e, _) => SizedBox(
-        height: 200,
-        child: Center(
-          child: StatisticsLoadError(
-            message: buildStatisticsErrorMessage('收入走势', e),
-            onRetry: () => ref.invalidate(revenueProvider),
+      error: (e, _) => Semantics(
+        container: true,
+        liveRegion: true,
+        child: SizedBox(
+          height: 200,
+          child: Center(
+            child: StatisticsLoadError(
+              message: buildStatisticsErrorMessage('收入走势', e),
+              onRetry: () => ref.invalidate(revenueProvider),
+            ),
           ),
         ),
       ),
@@ -42,29 +51,37 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
         }.toList()..sort();
 
         if (months.isEmpty) {
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kInkSecondary.withValues(alpha: 0.08)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.show_chart_outlined,
-                  color: kInkSecondary.withValues(alpha: 0.72),
+          return Semantics(
+            container: true,
+            liveRegion: true,
+            label:
+                '\u5f53\u524d\u5468\u671f\u6682\u65e0\u6536\u5165\u8bb0\u5f55',
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: kInkSecondary.withValues(alpha: 0.08),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '当前周期暂无收入记录',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: kInkSecondary,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.show_chart_outlined,
+                    color: kInkSecondary.withValues(alpha: 0.72),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    '当前周期暂无收入记录',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: kInkSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -124,97 +141,102 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
               ],
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              height: 220,
-              child: LineChart(
-                LineChartData(
-                  lineTouchData: LineTouchData(
-                    enabled: true,
-                    touchTooltipData: LineTouchTooltipData(
-                      fitInsideHorizontally: true,
-                      fitInsideVertically: true,
-                      getTooltipItems: (spots) => spots.map((spot) {
-                        final label = chartSeries[spot.barIndex].label;
-                        return LineTooltipItem(
-                          '$label ¥${spot.y.toStringAsFixed(0)}',
-                          theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ) ??
-                              const TextStyle(color: Colors.white),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  minY: 0,
-                  lineBarsData: [
-                    for (final series in chartSeries)
-                      LineChartBarData(
-                        spots: series.spots,
-                        color: series.color,
-                        isCurved: true,
-                        barWidth: 3,
-                        belowBarData: BarAreaData(
-                          show: true,
-                          color: series.color.withValues(alpha: 0.08),
-                        ),
-                        dotData: const FlDotData(show: false),
+            Semantics(
+              container: true,
+              label:
+                  '\u6536\u5165\u8d70\u52bf\u56fe\uff0c\u5c55\u793a\u5f53\u524d\u5468\u671f\u7684\u5e94\u6536\u548c\u5b9e\u6536\u6708\u5ea6\u8d8b\u52bf',
+              child: SizedBox(
+                height: 220,
+                child: LineChart(
+                  LineChartData(
+                    lineTouchData: LineTouchData(
+                      enabled: true,
+                      touchTooltipData: LineTouchTooltipData(
+                        fitInsideHorizontally: true,
+                        fitInsideVertically: true,
+                        getTooltipItems: (spots) => spots.map((spot) {
+                          final label = chartSeries[spot.barIndex].label;
+                          return LineTooltipItem(
+                            '$label ¥${spot.y.toStringAsFixed(0)}',
+                            theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ) ??
+                                const TextStyle(color: Colors.white),
+                          );
+                        }).toList(),
                       ),
-                  ],
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: months.length > 6 ? 2 : 1,
-                        getTitlesWidget: (v, _) {
-                          final i = v.toInt();
-                          if (i < 0 || i >= months.length) {
-                            return const SizedBox();
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              months[i].substring(5),
+                    ),
+                    minY: 0,
+                    lineBarsData: [
+                      for (final series in chartSeries)
+                        LineChartBarData(
+                          spots: series.spots,
+                          color: series.color,
+                          isCurved: true,
+                          barWidth: 3,
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: series.color.withValues(alpha: 0.08),
+                          ),
+                          dotData: const FlDotData(show: false),
+                        ),
+                    ],
+                    titlesData: FlTitlesData(
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          interval: months.length > 6 ? 2 : 1,
+                          getTitlesWidget: (v, _) {
+                            final i = v.toInt();
+                            if (i < 0 || i >= months.length) {
+                              return const SizedBox();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                months[i].substring(5),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 10,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 42,
+                          getTitlesWidget: (value, _) {
+                            if (value == 0) return const SizedBox();
+                            return Text(
+                              _compactMoney(value),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 fontSize: 10,
+                                color: kInkSecondary,
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
+                      ),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
                       ),
                     ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 42,
-                        getTitlesWidget: (value, _) {
-                          if (value == 0) return const SizedBox();
-                          return Text(
-                            _compactMoney(value),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 10,
-                              color: kInkSecondary,
-                            ),
-                          );
-                        },
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      getDrawingHorizontalLine: (_) => FlLine(
+                        color: kInkSecondary.withValues(alpha: 0.12),
+                        strokeWidth: 1,
                       ),
                     ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
+                    borderData: FlBorderData(show: false),
                   ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    getDrawingHorizontalLine: (_) => FlLine(
-                      color: kInkSecondary.withValues(alpha: 0.12),
-                      strokeWidth: 1,
-                    ),
-                  ),
-                  borderData: FlBorderData(show: false),
                 ),
               ),
             ),
@@ -327,12 +349,17 @@ class _RevenueSummary extends StatelessWidget {
         children: [
           Text(label, style: theme.textTheme.bodySmall),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: color,
-              fontFamily: 'NotoSansSC',
-              fontWeight: FontWeight.w700,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: color,
+                fontFamily: 'NotoSansSC',
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -357,14 +384,18 @@ class _Legend extends StatelessWidget {
       button: true,
       selected: active,
       enabled: !locked,
+      hint: locked
+          ? '\u81f3\u5c11\u4fdd\u7559\u4e00\u6761\u6536\u5165\u66f2\u7ebf'
+          : '\u70b9\u6309\u5207\u6362$label\u66f2\u7ebf',
+      onTap: locked ? null : onTap,
       label: '$label${active ? '已显示' : '已隐藏'}',
       child: Tooltip(
         message: locked ? '至少保留一条曲线' : '切换$label曲线',
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: locked ? null : onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/theme.dart';
 import '../../../shared/widgets/glass_card.dart';
 
 class StudentPrimaryActionsCard extends StatelessWidget {
@@ -25,14 +26,24 @@ class StudentPrimaryActionsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('常用操作', style: theme.textTheme.titleMedium),
+          Text(
+            '快捷操作',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text('把最常用的缴费和出勤放前面，常看但不高频的功能放后面。', style: theme.textTheme.bodySmall),
+          Text(
+            '优先处理缴费和出勤，导出与编辑放在次级入口。',
+            style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+          ),
           const SizedBox(height: 14),
           LayoutBuilder(
             builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final primaryButtonWidth = width < 420 ? width : (width - 10) / 2;
+              final compact = constraints.maxWidth < 420;
+              final primaryButtonWidth = compact
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 10) / 2;
 
               return Wrap(
                 spacing: 10,
@@ -40,9 +51,13 @@ class StudentPrimaryActionsCard extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: primaryButtonWidth,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
                       ),
                       onPressed: onOpenPayment,
                       icon: const Icon(Icons.payments_outlined),
@@ -53,7 +68,11 @@ class StudentPrimaryActionsCard extends StatelessWidget {
                     width: primaryButtonWidth,
                     child: FilledButton.tonalIcon(
                       style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        minimumSize: const Size.fromHeight(48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
                       ),
                       onPressed: onOpenAttendance,
                       icon: const Icon(Icons.fact_check_outlined),
@@ -67,8 +86,10 @@ class StudentPrimaryActionsCard extends StatelessWidget {
           const SizedBox(height: 10),
           LayoutBuilder(
             builder: (context, constraints) {
-              final compact = constraints.maxWidth < 340;
-              final actionWidth = compact ? constraints.maxWidth : null;
+              final compact = constraints.maxWidth < 360;
+              final actionWidth = compact
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 8) / 2;
 
               return Wrap(
                 spacing: 8,
@@ -76,17 +97,25 @@ class StudentPrimaryActionsCard extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: actionWidth,
-                    child: TextButton.icon(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kInkSecondary,
+                        minimumSize: const Size.fromHeight(44),
+                      ),
                       onPressed: onOpenExport,
-                      icon: const Icon(Icons.description_outlined),
+                      icon: const Icon(Icons.description_outlined, size: 18),
                       label: const Text('导出报告'),
                     ),
                   ),
                   SizedBox(
                     width: actionWidth,
-                    child: TextButton.icon(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kInkSecondary,
+                        minimumSize: const Size.fromHeight(44),
+                      ),
                       onPressed: onEditStudent,
-                      icon: const Icon(Icons.edit_note_outlined),
+                      icon: const Icon(Icons.edit_note_outlined, size: 18),
                       label: const Text('编辑档案'),
                     ),
                   ),

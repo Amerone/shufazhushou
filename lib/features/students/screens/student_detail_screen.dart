@@ -420,6 +420,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                 context.pop();
               },
               trailing: IconButton(
+                tooltip: '编辑档案',
                 icon: const Icon(Icons.edit_outlined),
                 onPressed: _openEditStudent,
               ),
@@ -432,6 +433,15 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                   children: [
+                    _StudentDetailAnchorBar(
+                      onOpenFinance: () =>
+                          _scrollToSection(_StudentDetailAnchor.finance),
+                      onOpenPayments: () =>
+                          _scrollToSection(_StudentDetailAnchor.payments),
+                      onOpenAttendance: () =>
+                          _scrollToSection(_StudentDetailAnchor.attendance),
+                    ),
+                    const SizedBox(height: 12),
                     // 1. 财务总览
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.finance],
@@ -795,6 +805,91 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   }
 }
 
+class _StudentDetailAnchorBar extends StatelessWidget {
+  final VoidCallback onOpenFinance;
+  final VoidCallback onOpenPayments;
+  final VoidCallback onOpenAttendance;
+
+  const _StudentDetailAnchorBar({
+    required this.onOpenFinance,
+    required this.onOpenPayments,
+    required this.onOpenAttendance,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '学生档案快捷导航',
+      child: GlassCard(
+        padding: const EdgeInsets.all(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 420;
+            final buttonWidth = compact
+                ? constraints.maxWidth
+                : (constraints.maxWidth - 16) / 3;
+
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _StudentDetailAnchorButton(
+                  width: buttonWidth,
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: '费用',
+                  onPressed: onOpenFinance,
+                ),
+                _StudentDetailAnchorButton(
+                  width: buttonWidth,
+                  icon: Icons.payments_outlined,
+                  label: '缴费',
+                  onPressed: onOpenPayments,
+                ),
+                _StudentDetailAnchorButton(
+                  width: buttonWidth,
+                  icon: Icons.fact_check_outlined,
+                  label: '出勤',
+                  onPressed: onOpenAttendance,
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentDetailAnchorButton extends StatelessWidget {
+  final double width;
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  const _StudentDetailAnchorButton({
+    required this.width,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(44),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        ),
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+    );
+  }
+}
+
 class _StudentSectionBlock extends StatelessWidget {
   final Key? anchorKey;
   final Widget child;
@@ -825,43 +920,87 @@ class _SectionHeader extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 420;
-        final contentWidth = compact
-            ? constraints.maxWidth
-            : constraints.maxWidth - 96;
-
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: contentWidth,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.titleMedium),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle!,
-                      style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: kInkSecondary.withValues(alpha: 0.12),
+        final titleBlock = Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              child: Text(trailing, style: theme.textTheme.bodySmall),
+              if (subtitle != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  subtitle!,
+                  style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                ),
+              ],
+            ],
+          ),
+        );
+        final trailingBadge = Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
+          ),
+          child: Text(
+            trailing,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-          ],
+          ),
+        );
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.42),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 4,
+                height: subtitle == null ? 26 : 44,
+                decoration: BoxDecoration(
+                  color: kPrimaryBlue.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (compact)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [titleBlock]),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: trailingBadge,
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                titleBlock,
+                const SizedBox(width: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 150),
+                  child: trailingBadge,
+                ),
+              ],
+            ],
+          ),
         );
       },
     );
@@ -960,7 +1099,10 @@ class _InfoChip extends StatelessWidget {
           const SizedBox(width: 6),
           ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(context).width - 128,
+              maxWidth: (MediaQuery.sizeOf(context).width - 148).clamp(
+                80.0,
+                360.0,
+              ),
             ),
             child: Text(
               label,
@@ -1043,6 +1185,7 @@ class _RefreshErrorCard extends StatelessWidget {
             ],
           );
           final action = TextButton.icon(
+            style: TextButton.styleFrom(minimumSize: const Size(88, 44)),
             onPressed: onRetry,
             icon: const Icon(Icons.refresh_outlined, size: 18),
             label: Text(retryLabel),
@@ -1196,6 +1339,7 @@ class _DangerActionButton extends StatelessWidget {
               )
             : const Icon(Icons.delete_outline),
         color: kRed,
+        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
         visualDensity: VisualDensity.compact,
       ),
     );

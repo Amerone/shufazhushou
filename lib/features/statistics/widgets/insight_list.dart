@@ -128,7 +128,15 @@ class InsightList extends ConsumerWidget {
     final asyncInsights = ref.watch(insightProvider);
 
     return asyncInsights.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => Semantics(
+        container: true,
+        liveRegion: true,
+        label: '\u7ecf\u8425\u63d0\u9192\u52a0\u8f7d\u4e2d',
+        child: SizedBox(
+          height: 140,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
       error: (e, _) => StatisticsLoadError(
         message: buildStatisticsErrorMessage('经营提醒', e),
         onRetry: () => ref
@@ -137,18 +145,24 @@ class InsightList extends ConsumerWidget {
       ),
       data: (insights) {
         if (insights.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.52),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Center(
-              child: Text(
-                '笔墨安然，暂无提醒',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontFamily: 'serif',
-                  letterSpacing: 1.2,
+          return Semantics(
+            container: true,
+            liveRegion: true,
+            label:
+                '\u6682\u65e0\u7ecf\u8425\u63d0\u9192\uff0c\u5f53\u524d\u9700\u5173\u6ce8\u4e8b\u9879\u5df2\u6e05\u7a7a',
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.52),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Center(
+                child: Text(
+                  '笔墨安然，暂无提醒',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'serif',
+                    letterSpacing: 1.2,
+                  ),
                 ),
               ),
             ),
@@ -416,7 +430,11 @@ class _InsightActions extends StatelessWidget {
           onPressed: onDismissTap,
           style: TextButton.styleFrom(foregroundColor: kInkSecondary),
           icon: const Icon(Icons.visibility_off_outlined, size: 18),
-          label: Text(snoozeLabel),
+          label: Text(
+            snoozeLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         );
 
         if (compact) {
@@ -427,7 +445,11 @@ class _InsightActions extends StatelessWidget {
                 FilledButton.tonalIcon(
                   onPressed: onPrimaryTap,
                   icon: const Icon(Icons.arrow_outward_outlined, size: 18),
-                  label: Text(primaryLabel!),
+                  label: Text(
+                    primaryLabel!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               if (primaryLabel != null && onPrimaryTap != null)
                 const SizedBox(height: 8),
@@ -439,13 +461,24 @@ class _InsightActions extends StatelessWidget {
         return Row(
           children: [
             if (primaryLabel != null && onPrimaryTap != null)
-              FilledButton.tonalIcon(
-                onPressed: onPrimaryTap,
-                icon: const Icon(Icons.arrow_outward_outlined, size: 18),
-                label: Text(primaryLabel!),
+              Flexible(
+                child: FilledButton.tonalIcon(
+                  onPressed: onPrimaryTap,
+                  icon: const Icon(Icons.arrow_outward_outlined, size: 18),
+                  label: Text(
+                    primaryLabel!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ),
             const Spacer(),
-            dismissButton,
+            Flexible(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: dismissButton,
+              ),
+            ),
           ],
         );
       },

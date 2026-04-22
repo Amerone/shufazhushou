@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
@@ -150,13 +151,19 @@ class _ScaffoldWithNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final compactWidth = MediaQuery.sizeOf(context).width < 360;
 
     return Scaffold(
       extendBody: true,
       body: _ShellBodyMotion(index: shell.currentIndex, child: shell),
       bottomNavigationBar: SafeArea(
         top: false,
-        minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        minimum: EdgeInsets.fromLTRB(
+          compactWidth ? 8 : 12,
+          0,
+          compactWidth ? 8 : 12,
+          10,
+        ),
         child: _BrushNavigationBar(
           currentIndex: shell.currentIndex,
           onSelect: shell.goBranch,
@@ -259,34 +266,51 @@ class _BrushNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: Colors.white.withValues(alpha: 0.86),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.84)),
-        boxShadow: [
-          BoxShadow(
-            color: shadowColor.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: Row(
-          children: List.generate(_items.length, (index) {
-            final item = _items[index];
-            return Expanded(
-              child: _BrushNavItem(
-                data: item,
-                selected: currentIndex == index,
-                onTap: () => onSelect(index),
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact =
+            constraints.maxWidth < 340 ||
+            (constraints.maxWidth < 380 && textScale > 1.15);
+
+        return Semantics(
+          container: true,
+          explicitChildNodes: true,
+          label: '主导航',
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              color: Colors.white.withValues(alpha: 0.86),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.84)),
+              boxShadow: [
+                BoxShadow(
+                  color: shadowColor.withValues(alpha: 0.06),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(compact ? 6 : 8),
+              child: Row(
+                children: List.generate(_items.length, (index) {
+                  final item = _items[index];
+                  return Expanded(
+                    child: _BrushNavItem(
+                      data: item,
+                      selected: currentIndex == index,
+                      compact: compact,
+                      sortOrder: index.toDouble(),
+                      onTap: () => onSelect(index),
+                    ),
+                  );
+                }),
               ),
-            );
-          }),
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -294,11 +318,15 @@ class _BrushNavigationBar extends StatelessWidget {
 class _BrushNavItem extends StatelessWidget {
   final _NavItemData data;
   final bool selected;
+  final bool compact;
+  final double sortOrder;
   final VoidCallback onTap;
 
   const _BrushNavItem({
     required this.data,
     required this.selected,
+    required this.compact,
+    required this.sortOrder,
     required this.onTap,
   });
 
@@ -319,6 +347,7 @@ class _BrushNavItem extends StatelessWidget {
       label: data.label,
       hint: selected ? '当前页面' : '切换到${data.label}',
       onTap: handleTap,
+      sortKey: OrdinalSortKey(sortOrder),
       child: ExcludeSemantics(
         child: Material(
           color: Colors.transparent,
@@ -334,46 +363,58 @@ class _BrushNavItem extends StatelessWidget {
               return null;
             }),
             onTap: handleTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: selected
-                    ? kPrimaryBlue.withValues(alpha: 0.08)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    selected ? data.selectedIcon : data.icon,
-                    size: 22,
-                    color: color,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    data.label,
-                    style: theme.textTheme.bodySmall?.copyWith(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 56, minHeight: 64),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? 6 : 10,
+                  vertical: compact ? 6 : 8,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? kPrimaryBlue.withValues(alpha: 0.08)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      selected ? data.selectedIcon : data.icon,
+                      size: compact ? 21 : 22,
                       color: color,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    width: selected ? 26 : 8,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? kSealRed.withValues(alpha: 0.9)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(999),
+                    const SizedBox(height: 4),
+                    Text(
+                      data.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: color,
+                        fontWeight: selected
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      width: selected ? 26 : 8,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? kSealRed.withValues(alpha: 0.9)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

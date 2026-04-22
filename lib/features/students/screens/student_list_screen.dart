@@ -115,7 +115,8 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                               searchController: _searchController,
                               activeCount: viewModel.activeCount,
                               suspendedCount: viewModel.suspendedCount,
-                              resultSummary: viewModel.resultSummary,
+                              filteredCount: viewModel.filtered.length,
+                              totalCount: viewModel.totalCount,
                               onQueryChanged: _updateQuery,
                               onClearQuery: _clearQuery,
                               onResetFilters: _resetFilters,
@@ -240,7 +241,8 @@ class _StudentListToolbar extends StatelessWidget {
   final TextEditingController searchController;
   final int activeCount;
   final int suspendedCount;
-  final String resultSummary;
+  final int filteredCount;
+  final int totalCount;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClearQuery;
   final VoidCallback onResetFilters;
@@ -251,7 +253,8 @@ class _StudentListToolbar extends StatelessWidget {
     required this.searchController,
     required this.activeCount,
     required this.suspendedCount,
-    required this.resultSummary,
+    required this.filteredCount,
+    required this.totalCount,
     required this.onQueryChanged,
     required this.onClearQuery,
     required this.onResetFilters,
@@ -260,6 +263,10 @@ class _StudentListToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resultSummary = query.hasActiveFilter
+        ? '当前显示 $filteredCount / $totalCount 位学生'
+        : '共 $totalCount 位学生';
+
     return GlassCard(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -279,6 +286,9 @@ class _StudentListToolbar extends StatelessWidget {
                   SizedBox(
                     width: buttonWidth,
                     child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
                       onPressed: () {
                         unawaited(InteractionFeedback.selection(context));
                         context.push('/students/create');
@@ -290,6 +300,9 @@ class _StudentListToolbar extends StatelessWidget {
                   SizedBox(
                     width: buttonWidth,
                     child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
                       onPressed: () {
                         unawaited(InteractionFeedback.selection(context));
                         context.push('/students/import');
@@ -315,11 +328,21 @@ class _StudentListToolbar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
+          Text(
+            '查找学生',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: kInkSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
           TextField(
             controller: searchController,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               hintText: '搜索姓名、家长姓名或电话',
+              helperText: '支持姓名、家长姓名、手机号关键词',
+              helperMaxLines: 2,
               prefixIcon: const Icon(Icons.search),
               suffixIcon: query.text.isEmpty
                   ? null
@@ -401,6 +424,7 @@ class _StudentListToolbar extends StatelessWidget {
                     unawaited(InteractionFeedback.selection(context));
                     onResetFilters();
                   },
+                  style: TextButton.styleFrom(minimumSize: const Size(88, 44)),
                   child: const Text('重置筛选'),
                 );
 
@@ -542,6 +566,10 @@ class _StudentCard extends StatelessWidget {
                     },
                     icon: const Icon(Icons.edit_outlined, size: 18),
                     color: accentColor,
+                    constraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 44,
+                    ),
                     visualDensity: VisualDensity.compact,
                   ),
                 );
@@ -618,6 +646,9 @@ class _StudentCard extends StatelessWidget {
                       SizedBox(
                         width: actionWidth,
                         child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                          ),
                           onPressed: () async {
                             await InteractionFeedback.selection(context);
                             if (!context.mounted) return;
@@ -635,6 +666,9 @@ class _StudentCard extends StatelessWidget {
                       SizedBox(
                         width: actionWidth,
                         child: FilledButton.tonalIcon(
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                          ),
                           onPressed: () {
                             unawaited(InteractionFeedback.pageTurn(context));
                             context.push('/students/${student.id}');
@@ -692,7 +726,7 @@ class _StudentInfoChip extends StatelessWidget {
       builder: (context, constraints) {
         final availableWidth = constraints.hasBoundedWidth
             ? constraints.maxWidth
-            : MediaQuery.sizeOf(context).width;
+            : MediaQuery.sizeOf(context).width - 104;
         final maxLabelWidth = (availableWidth - 48)
             .clamp(0.0, double.infinity)
             .toDouble();

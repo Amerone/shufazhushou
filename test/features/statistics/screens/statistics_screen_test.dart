@@ -19,6 +19,38 @@ import 'package:moyun/shared/theme.dart';
 import 'package:moyun/shared/utils/interaction_feedback.dart';
 
 void main() {
+  testWidgets('period and export controls expose stateful semantics', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      await _pumpStatisticsScreen(tester);
+
+      final periodControl = find.bySemanticsLabel('\u7edf\u8ba1\u5468\u671f');
+      expect(periodControl, findsOneWidget);
+      final periodNode = tester.getSemantics(periodControl);
+      expect(periodNode.value, '\u672c\u6708');
+      expect(
+        periodNode.hint,
+        '\u5de6\u53f3\u6ed1\u52a8\u67e5\u770b\u5468\u671f\u9009\u9879\uff0c\u70b9\u6309\u53ef\u5207\u6362\u7edf\u8ba1\u8303\u56f4',
+      );
+
+      final exportAction = find.bySemanticsLabel(
+        '\u5bfc\u51fa\u5f53\u524d\u5468\u671f\u660e\u7ec6',
+      );
+      expect(exportAction, findsOneWidget);
+      final exportNode = tester.getSemantics(exportAction);
+      expect(exportNode.flagsCollection.isButton, isTrue);
+      expect(exportNode.value, '\u672c\u6708');
+      expect(
+        exportNode.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+    } finally {
+      semantics.dispose();
+    }
+  });
+
   testWidgets('quick navigator exposes concise jump semantics', (tester) async {
     tester.view.physicalSize = const Size(1200, 2200);
     tester.view.devicePixelRatio = 1;
@@ -41,6 +73,7 @@ void main() {
         '\u8df3\u8f6c\u5230\u6307\u6807',
       );
       expect(metricsChip, findsOneWidget);
+      expect(tester.getSize(metricsChip).height, greaterThanOrEqualTo(44));
 
       var metricsNode = tester.getSemantics(metricsChip);
       expect(metricsNode.flagsCollection.isButton, isTrue);

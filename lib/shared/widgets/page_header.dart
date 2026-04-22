@@ -22,6 +22,7 @@ class PageHeader extends StatelessWidget {
     final horizontalPadding = MediaQuery.sizeOf(context).width < 360
         ? 18.0
         : 24.0;
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
     final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
       color: kInkSecondary.withValues(alpha: 0.9),
       height: 1.45,
@@ -36,7 +37,17 @@ class PageHeader extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = trailing != null && constraints.maxWidth < 340;
+          final hasBack = onBack != null;
+          final hasTrailing = trailing != null;
+          final compact =
+              hasTrailing &&
+              (constraints.maxWidth < 360 ||
+                  (hasBack && constraints.maxWidth < 380) ||
+                  (textScale > 1.2 && constraints.maxWidth < 480));
+          final maxInlineTrailingWidth =
+              (constraints.maxWidth * (hasBack ? 0.34 : 0.42))
+                  .clamp(72.0, 180.0)
+                  .toDouble();
           final titleBlock = Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,13 +76,28 @@ class PageHeader extends StatelessWidget {
               ],
             ),
           );
+          Widget trailingSlot({required bool belowTitle}) {
+            return Align(
+              alignment: belowTitle
+                  ? Alignment.centerRight
+                  : Alignment.topRight,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: belowTitle
+                      ? constraints.maxWidth
+                      : maxInlineTrailingWidth,
+                ),
+                child: trailing!,
+              ),
+            );
+          }
 
           final headerRow = Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (onBack != null) ...[
                 Container(
-                  margin: const EdgeInsets.only(right: 16, top: 6),
+                  margin: EdgeInsets.only(right: compact ? 12 : 16, top: 6),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(12),
@@ -96,10 +122,10 @@ class PageHeader extends StatelessWidget {
                 ),
               ],
               titleBlock,
-              if (trailing != null && !compact)
+              if (hasTrailing && !compact)
                 Padding(
                   padding: const EdgeInsets.only(left: 12, top: 2),
-                  child: trailing,
+                  child: trailingSlot(belowTitle: false),
                 ),
             ],
           );
@@ -111,7 +137,7 @@ class PageHeader extends StatelessWidget {
             children: [
               headerRow,
               const SizedBox(height: 12),
-              Align(alignment: Alignment.centerLeft, child: trailing!),
+              trailingSlot(belowTitle: true),
             ],
           );
         },

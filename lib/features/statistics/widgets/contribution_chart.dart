@@ -30,7 +30,15 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
     final displayNames = ref.watch(studentDisplayNameMapProvider);
 
     return asyncContribution.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => Semantics(
+        container: true,
+        liveRegion: true,
+        label: '\u5b66\u751f\u8d21\u732e\u52a0\u8f7d\u4e2d',
+        child: SizedBox(
+          height: 160,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
       error: (e, _) => StatisticsLoadError(
         message: buildStatisticsErrorMessage('学生贡献', e),
         onRetry: () => ref.invalidate(contributionProvider),
@@ -38,7 +46,13 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
       data: (list) {
         final topEntries = _rankContributions(list, byFee: _byFee);
         if (topEntries.isEmpty) {
-          return const EmptyState(message: '\u6682\u65e0\u6570\u636e');
+          return const EmptyState(
+            message:
+                '\u5f53\u524d\u5468\u671f\u6682\u65e0\u5b66\u751f\u8d21\u732e\u6570\u636e',
+            icon: Icons.groups_2_outlined,
+            semanticLabel:
+                '\u5f53\u524d\u5468\u671f\u6682\u65e0\u5b66\u751f\u8d21\u732e\u6570\u636e',
+          );
         }
 
         return Column(
@@ -51,14 +65,25 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
                   _byFee ? '按金额查看前 10 名学员贡献' : '按课次查看前 10 名学员贡献',
                   style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
                 );
-                final selector = SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: true, label: Text('金额')),
-                    ButtonSegment(value: false, label: Text('节数')),
-                  ],
-                  selected: {_byFee},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (s) => setState(() => _byFee = s.first),
+                final selector = Semantics(
+                  container: true,
+                  label: '\u8d21\u732e\u6392\u540d\u7ef4\u5ea6',
+                  value: _byFee ? '\u6309\u91d1\u989d' : '\u6309\u8bfe\u6b21',
+                  hint:
+                      '\u70b9\u6309\u53ef\u5207\u6362\u5b66\u751f\u8d21\u732e\u6392\u540d\u7ef4\u5ea6',
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(value: true, label: Text('金额')),
+                        ButtonSegment(value: false, label: Text('节数')),
+                      ],
+                      selected: {_byFee},
+                      showSelectedIcon: false,
+                      onSelectionChanged: (s) =>
+                          setState(() => _byFee = s.first),
+                    ),
+                  ),
                 );
 
                 if (compact) {
@@ -101,7 +126,8 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
                 ),
                 child: Semantics(
                   button: true,
-                  label: '查看$studentName档案，排名第${entry.rank}，贡献$metricLabel',
+                  label:
+                      '\u67e5\u770b$studentName\u6863\u6848\uff0c\u6392\u540d\u7b2c${entry.rank}\uff0c\u8d21\u732e$metricLabel',
                   child: Material(
                     color: Colors.transparent,
                     borderRadius: BorderRadius.circular(18),
@@ -155,13 +181,17 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        metricLabel,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              color: accentColor,
-                                              fontWeight: FontWeight.w700,
-                                            ),
+                                      Flexible(
+                                        child: Text(
+                                          metricLabel,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: accentColor,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -340,48 +370,67 @@ class StatusPieChart extends ConsumerWidget {
     final selected = ref.watch(statusFilterProvider);
 
     return asyncDistribution.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => Semantics(
+        container: true,
+        liveRegion: true,
+        label: '\u72b6\u6001\u5206\u5e03\u52a0\u8f7d\u4e2d',
+        child: SizedBox(
+          height: 160,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
       error: (e, _) => StatisticsLoadError(
         message: buildStatisticsErrorMessage('状态分布', e),
         onRetry: () => ref.invalidate(statusDistributionProvider),
       ),
       data: (list) {
         if (list.isEmpty) {
-          return const EmptyState(message: '\u6682\u65e0\u6570\u636e');
+          return const EmptyState(
+            message:
+                '\u5f53\u524d\u5468\u671f\u6682\u65e0\u51fa\u52e4\u72b6\u6001\u5206\u5e03',
+            icon: Icons.pie_chart_outline_rounded,
+            semanticLabel:
+                '\u5f53\u524d\u5468\u671f\u6682\u65e0\u51fa\u52e4\u72b6\u6001\u5206\u5e03',
+          );
         }
 
-        return SizedBox(
-          height: 200,
-          child: PieChart(
-            PieChartData(
-              sectionsSpace: 2,
-              centerSpaceRadius: 40,
-              pieTouchData: PieTouchData(
-                touchCallback: (event, response) {
-                  if (!event.isInterestedForInteractions) return;
-                  final idx = response?.touchedSection?.touchedSectionIndex;
-                  if (idx == null || idx < 0 || idx >= list.length) return;
-                  final status = list[idx]['status'] as String;
-                  ref.read(statusFilterProvider.notifier).state =
-                      selected == status ? null : status;
-                },
-              ),
-              sections: list.asMap().entries.map((e) {
-                final status = e.value['status'] as String;
-                final count = (e.value['count'] as num?) ?? 0;
-                final isSelected = selected == status;
+        return Semantics(
+          container: true,
+          label:
+              '\u72b6\u6001\u5206\u5e03\u997c\u56fe\uff0c\u70b9\u6309\u6247\u533a\u53ef\u7b5b\u9009\u5bf9\u5e94\u51fa\u52e4\u8bb0\u5f55',
+          child: SizedBox(
+            height: 200,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 40,
+                pieTouchData: PieTouchData(
+                  touchCallback: (event, response) {
+                    if (!event.isInterestedForInteractions) return;
+                    final idx = response?.touchedSection?.touchedSectionIndex;
+                    if (idx == null || idx < 0 || idx >= list.length) return;
+                    final status = list[idx]['status'] as String;
+                    ref.read(statusFilterProvider.notifier).state =
+                        selected == status ? null : status;
+                  },
+                ),
+                sections: list.asMap().entries.map((e) {
+                  final status = e.value['status'] as String;
+                  final count = (e.value['count'] as num?) ?? 0;
+                  final isSelected = selected == status;
 
-                return PieChartSectionData(
-                  value: count.toDouble(),
-                  color: statusColor(status),
-                  title: '${statusLabel(status)}\n$count',
-                  radius: isSelected ? 70 : 60,
-                  titleStyle: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.white,
-                  ),
-                );
-              }).toList(),
+                  return PieChartSectionData(
+                    value: count.toDouble(),
+                    color: statusColor(status),
+                    title: '${statusLabel(status)}\n$count',
+                    radius: isSelected ? 70 : 60,
+                    titleStyle: const TextStyle(
+                      fontSize: 10,
+                      color: Colors.white,
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ),
         );
@@ -403,7 +452,12 @@ class StatusFilteredList extends ConsumerWidget {
     final asyncRecords = ref.watch(filteredAttendanceProvider);
 
     return asyncRecords.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => Semantics(
+        container: true,
+        liveRegion: true,
+        label: '\u72b6\u6001\u8bb0\u5f55\u52a0\u8f7d\u4e2d',
+        child: Center(child: CircularProgressIndicator()),
+      ),
       error: (e, _) => StatisticsLoadError(
         message: buildStatisticsErrorMessage('状态记录', e),
         onRetry: () => ref.invalidate(filteredAttendanceProvider),

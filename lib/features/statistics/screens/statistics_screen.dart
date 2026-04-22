@@ -192,14 +192,18 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
       ignoring: !_showScrollToTop,
       child: Padding(
         padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
-        child: FloatingActionButton.small(
-          heroTag: 'statistics-scroll-top',
-          onPressed: _scrollToTop,
-          tooltip: '回到顶部',
-          backgroundColor: Colors.white.withValues(alpha: 0.92),
-          foregroundColor: kPrimaryBlue,
-          elevation: 0,
-          child: const Icon(Icons.vertical_align_top_outlined),
+        child: Semantics(
+          button: true,
+          label: '\u8fd4\u56de\u7edf\u8ba1\u9875\u9876\u90e8',
+          child: FloatingActionButton.small(
+            heroTag: 'statistics-scroll-top',
+            onPressed: _scrollToTop,
+            tooltip: '回到顶部',
+            backgroundColor: Colors.white.withValues(alpha: 0.92),
+            foregroundColor: kPrimaryBlue,
+            elevation: 0,
+            child: const Icon(Icons.vertical_align_top_outlined),
+          ),
         ),
       ),
     );
@@ -418,48 +422,71 @@ class _StatisticsOverviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SegmentedButton<StatisticsPeriod>(
-              segments: const [
-                ButtonSegment(
-                  value: StatisticsPeriod.week,
-                  icon: Icon(Icons.view_week_outlined, size: 18),
-                  label: Text('本周'),
+          Semantics(
+            container: true,
+            label: '\u7edf\u8ba1\u5468\u671f',
+            value: _periodSemanticsValue(range.period),
+            hint:
+                '\u5de6\u53f3\u6ed1\u52a8\u67e5\u770b\u5468\u671f\u9009\u9879\uff0c\u70b9\u6309\u53ef\u5207\u6362\u7edf\u8ba1\u8303\u56f4',
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: SegmentedButton<StatisticsPeriod>(
+                  segments: const [
+                    ButtonSegment(
+                      value: StatisticsPeriod.week,
+                      icon: Icon(Icons.view_week_outlined, size: 18),
+                      label: Text('本周'),
+                    ),
+                    ButtonSegment(
+                      value: StatisticsPeriod.month,
+                      icon: Icon(Icons.calendar_view_month_outlined, size: 18),
+                      label: Text('本月'),
+                    ),
+                    ButtonSegment(
+                      value: StatisticsPeriod.year,
+                      icon: Icon(Icons.event_available_outlined, size: 18),
+                      label: Text('本年'),
+                    ),
+                  ],
+                  selected: {range.period},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (selection) {
+                    final period = selection.first;
+                    if (period == range.period) return;
+                    onPeriodChanged(period);
+                  },
                 ),
-                ButtonSegment(
-                  value: StatisticsPeriod.month,
-                  icon: Icon(Icons.calendar_view_month_outlined, size: 18),
-                  label: Text('本月'),
-                ),
-                ButtonSegment(
-                  value: StatisticsPeriod.year,
-                  icon: Icon(Icons.event_available_outlined, size: 18),
-                  label: Text('本年'),
-                ),
-              ],
-              selected: {range.period},
-              showSelectedIcon: false,
-              onSelectionChanged: (selection) {
-                final period = selection.first;
-                if (period == range.period) return;
-                onPeriodChanged(period);
-              },
+              ),
             ),
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: exporting ? null : onExport,
-              icon: exporting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.ios_share_outlined),
-              label: Text(exporting ? '正在准备导出...' : '导出当前周期明细'),
+          Semantics(
+            container: true,
+            button: true,
+            enabled: !exporting,
+            liveRegion: true,
+            label: exporting
+                ? '\u6b63\u5728\u51c6\u5907\u5bfc\u51fa\u5f53\u524d\u5468\u671f\u660e\u7ec6'
+                : '\u5bfc\u51fa\u5f53\u524d\u5468\u671f\u660e\u7ec6',
+            value: _periodSemanticsValue(range.period),
+            onTap: exporting ? null : onExport,
+            child: ExcludeSemantics(
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: exporting ? null : onExport,
+                  icon: exporting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.ios_share_outlined),
+                  label: Text(exporting ? '正在准备导出...' : '导出当前周期明细'),
+                ),
+              ),
             ),
           ),
         ],
@@ -587,28 +614,31 @@ class _StatisticsQuickNavChip extends StatelessWidget {
           ? '\u5f53\u524d\u6240\u5728\u5206\u533a\uff0c\u70b9\u6309\u53ef\u91cd\u65b0\u5b9a\u4f4d\u5230${item.label}'
           : '\u70b9\u6309\u8df3\u8f6c\u5230${item.label}\u5206\u533a',
       onTap: onTap,
-      child: Material(
-        color: selected ? item.color : Colors.white.withValues(alpha: 0.66),
-        borderRadius: BorderRadius.circular(999),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          mouseCursor: SystemMouseCursors.click,
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(item.icon, size: 16, color: foreground),
-                const SizedBox(width: 6),
-                Text(
-                  item.label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: foreground,
-                    fontWeight: FontWeight.w700,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Material(
+          color: selected ? item.color : Colors.white.withValues(alpha: 0.66),
+          borderRadius: BorderRadius.circular(999),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(item.icon, size: 16, color: foreground),
+                  const SizedBox(width: 6),
+                  Text(
+                    item.label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -635,9 +665,15 @@ class _StatisticsSectionBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-            child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          Semantics(
+            header: true,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
           ),
           child,
         ],
@@ -654,6 +690,17 @@ String _periodLabel(StatisticsPeriod period) {
       return '本月';
     case StatisticsPeriod.year:
       return '本年';
+  }
+}
+
+String _periodSemanticsValue(StatisticsPeriod period) {
+  switch (period) {
+    case StatisticsPeriod.week:
+      return '\u672c\u5468';
+    case StatisticsPeriod.month:
+      return '\u672c\u6708';
+    case StatisticsPeriod.year:
+      return '\u672c\u5e74';
   }
 }
 

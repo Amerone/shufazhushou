@@ -305,23 +305,37 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
             },
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.tonalIcon(
-              onPressed: canRun ? _runAnalysis : null,
-              icon: _analyzing
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.insights_outlined),
-              label: Text(
-                _analyzing
-                    ? '\u5206\u6790\u4e2d...'
-                    : service == null
-                    ? '\u5148\u5b8c\u6210 AI \u914d\u7f6e'
-                    : '\u83b7\u53d6\u6570\u636e\u6d1e\u5bdf',
+          Semantics(
+            container: true,
+            button: true,
+            enabled: canRun,
+            liveRegion: true,
+            label: _analyzing
+                ? '\u0041\u0049 \u7ecf\u8425\u6d1e\u5bdf\u5206\u6790\u4e2d'
+                : service == null
+                ? '\u5148\u5b8c\u6210 \u0041\u0049 \u914d\u7f6e'
+                : '\u83b7\u53d6\u6570\u636e\u6d1e\u5bdf',
+            onTap: canRun ? _runAnalysis : null,
+            child: ExcludeSemantics(
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: canRun ? _runAnalysis : null,
+                  icon: _analyzing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.insights_outlined),
+                  label: Text(
+                    _analyzing
+                        ? '\u5206\u6790\u4e2d...'
+                        : service == null
+                        ? '\u5148\u5b8c\u6210 AI \u914d\u7f6e'
+                        : '\u83b7\u53d6\u6570\u636e\u6d1e\u5bdf',
+                  ),
+                ),
               ),
             ),
           ),

@@ -34,7 +34,15 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
     21,
     22,
   ];
-  static const _days = ['一', '二', '三', '四', '五', '六', '日'];
+  static const _days = [
+    '\u4e00',
+    '\u4e8c',
+    '\u4e09',
+    '\u56db',
+    '\u4e94',
+    '\u516d',
+    '\u65e5',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -42,14 +50,28 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
     final asyncHeatmap = ref.watch(heatmapProvider);
 
     return asyncHeatmap.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => Semantics(
+        container: true,
+        liveRegion: true,
+        label: '\u4e0a\u8bfe\u70ed\u529b\u52a0\u8f7d\u4e2d',
+        child: SizedBox(
+          height: 160,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
       error: (e, _) => StatisticsLoadError(
         message: buildStatisticsErrorMessage('上课热力', e),
         onRetry: () => ref.invalidate(heatmapProvider),
       ),
       data: (data) {
         if (data.isEmpty) {
-          return const EmptyState(message: '当前周期暂无上课时段数据');
+          return const EmptyState(
+            message:
+                '\u5f53\u524d\u5468\u671f\u6682\u65e0\u4e0a\u8bfe\u65f6\u6bb5\u6570\u636e',
+            icon: Icons.grid_view_outlined,
+            semanticLabel:
+                '\u5f53\u524d\u5468\u671f\u6682\u65e0\u4e0a\u8bfe\u65f6\u6bb5\u6570\u636e',
+          );
         }
 
         final map = <String, int>{};
@@ -68,7 +90,8 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _tooltip ?? '点击任一色块可查看对应星期和小时的人次分布。',
+              _tooltip ??
+                  '\u70b9\u51fb\u4efb\u4e00\u8272\u5757\u53ef\u67e5\u770b\u5bf9\u5e94\u661f\u671f\u548c\u5c0f\u65f6\u7684\u4eba\u6b21\u5206\u5e03\u3002',
               style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
             ),
             const SizedBox(height: 10),
@@ -92,7 +115,7 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                       const SizedBox(height: 24),
                       ..._hours.map(
                         (h) => SizedBox(
-                          height: 32,
+                          height: 44,
                           child: Text(
                             '$h',
                             style: theme.textTheme.bodySmall?.copyWith(
@@ -110,7 +133,7 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                         children: [
                           SizedBox(
                             height: 24,
-                            width: 36,
+                            width: 48,
                             child: Center(
                               child: Text(
                                 _days[dayIdx],
@@ -126,7 +149,7 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                                 ? 0.05
                                 : count / maxCount;
                             final cellLabel =
-                                '周${_days[dayIdx]} $h:00，$count 人次';
+                                '\u5468${_days[dayIdx]} $h:00\uff0c$count \u4eba\u6b21';
                             void selectCell() {
                               setState(() => _tooltip = cellLabel);
                             }
@@ -146,15 +169,17 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                                     child: InkWell(
                                       mouseCursor: SystemMouseCursors.click,
                                       onTap: selectCell,
-                                      child: Ink(
-                                        width: 36,
-                                        height: 28,
-                                        decoration: BoxDecoration(
-                                          color: kPrimaryBlue.withValues(
-                                            alpha: opacity,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
+                                      child: SizedBox(
+                                        width: 44,
+                                        height: 40,
+                                        child: Ink(
+                                          decoration: BoxDecoration(
+                                            color: kPrimaryBlue.withValues(
+                                              alpha: opacity,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                           ),
                                         ),
                                       ),

@@ -40,6 +40,9 @@ void main() {
     );
     await _settleUi(tester);
 
+    expect(find.widgetWithText(OutlinedButton, '费用'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '缴费'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '出勤'), findsOneWidget);
     expect(find.text('学员账本加载失败'), findsOneWidget);
     expect(find.text('重试账本'), findsOneWidget);
     expect(find.textContaining('可能'), findsAtLeastNWidgets(1));

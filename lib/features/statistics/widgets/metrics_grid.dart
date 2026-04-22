@@ -12,9 +12,14 @@ class MetricsGrid extends ConsumerWidget {
     final asyncMetrics = ref.watch(metricsProvider);
 
     return asyncMetrics.when(
-      loading: () => const SizedBox(
-        height: 120,
-        child: Center(child: CircularProgressIndicator()),
+      loading: () => Semantics(
+        container: true,
+        liveRegion: true,
+        label: '\u6838\u5fc3\u6307\u6807\u52a0\u8f7d\u4e2d',
+        child: SizedBox(
+          height: 120,
+          child: Center(child: CircularProgressIndicator()),
+        ),
       ),
       error: (e, _) => StatisticsLoadError(
         message: buildStatisticsErrorMessage('核心指标', e),
@@ -105,38 +110,48 @@ class _MetricCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: data.color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: data.color.withValues(alpha: 0.12)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(12),
+    return Semantics(
+      container: true,
+      label: '${data.label} ${data.value}',
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 132),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: data.color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: data.color.withValues(alpha: 0.12)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(data.icon, color: data.color, size: 20),
             ),
-            child: Icon(data.icon, color: data.color, size: 20),
-          ),
-          const SizedBox(height: 14),
-          Text(data.label, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 6),
-          Text(
-            data.value,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontFamily: 'NotoSansSC',
-              fontSize: 20,
-              color: data.color,
-              fontWeight: FontWeight.w700,
+            const SizedBox(height: 14),
+            Text(data.label, style: theme.textTheme.bodySmall),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                data.value,
+                maxLines: 1,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontFamily: 'NotoSansSC',
+                  fontSize: 20,
+                  color: data.color,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

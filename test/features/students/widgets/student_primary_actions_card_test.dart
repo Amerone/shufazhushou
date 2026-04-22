@@ -44,4 +44,41 @@ void main() {
     expect(exportTapped, isTrue);
     expect(editTapped, isTrue);
   });
+
+  testWidgets('keeps actions usable on a narrow screen with larger text', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(340, 640);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(1.3)),
+          child: child ?? const SizedBox.shrink(),
+        ),
+        home: Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(16),
+            child: StudentPrimaryActionsCard(
+              onOpenPayment: () {},
+              onOpenAttendance: () {},
+              onOpenExport: () {},
+              onEditStudent: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('新增缴费'), findsOneWidget);
+    expect(find.text('查看出勤'), findsOneWidget);
+    expect(find.text('导出报告'), findsOneWidget);
+    expect(find.text('编辑档案'), findsOneWidget);
+  });
 }
