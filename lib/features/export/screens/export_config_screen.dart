@@ -1491,25 +1491,37 @@ class _DateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
+    return Semantics(
+      button: true,
+      label: '$label，当前 $value',
+      hint: '选择日期',
       onTap: onTap,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.5),
-        ),
-        child: Row(
-          children: [
-            Expanded(child: Text(value, style: const TextStyle(fontSize: 16))),
-            const Icon(
-              Icons.calendar_month_outlined,
-              size: 18,
-              color: kInkSecondary,
+      child: ExcludeSemantics(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: label,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.5),
             ),
-          ],
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(value, style: const TextStyle(fontSize: 16)),
+                ),
+                const Icon(
+                  Icons.calendar_month_outlined,
+                  size: 18,
+                  color: kInkSecondary,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

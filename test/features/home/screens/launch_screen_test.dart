@@ -11,6 +11,10 @@ import 'package:moyun/shared/theme.dart';
 import 'package:moyun/shared/utils/interaction_feedback.dart';
 
 void main() {
+  setUp(() {
+    _FakeSettingsNotifier.seededSettings = _defaultSettings;
+  });
+
   testWidgets('tap skip opens setup when there are no students', (
     tester,
   ) async {
@@ -38,6 +42,11 @@ void main() {
     expect(find.text('setup'), findsNothing);
   });
 }
+
+const _defaultSettings = {
+  InteractionFeedback.hapticsEnabledKey: 'false',
+  InteractionFeedback.soundEnabledKey: 'false',
+};
 
 final _seededStudent = StudentWithMeta(
   const Student(
@@ -88,11 +97,16 @@ Future<void> _pumpLaunchScreen(WidgetTester tester) async {
 }
 
 class _FakeSettingsNotifier extends SettingsNotifier {
+  static Map<String, String> seededSettings = _defaultSettings;
+
   @override
-  Future<Map<String, String>> build() async => const {
-    InteractionFeedback.hapticsEnabledKey: 'false',
-    InteractionFeedback.soundEnabledKey: 'false',
-  };
+  Future<Map<String, String>> build() async => seededSettings;
+
+  @override
+  Future<void> set(String key, String value) async {
+    seededSettings = {...seededSettings, key: value};
+    state = AsyncData(seededSettings);
+  }
 }
 
 class _FakeStudentNotifier extends StudentNotifier {

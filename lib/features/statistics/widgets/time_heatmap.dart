@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/heatmap_provider.dart';
 import '../../../shared/theme.dart';
+import 'statistics_load_error.dart';
 
 class TimeHeatmap extends ConsumerStatefulWidget {
   const TimeHeatmap({super.key});
@@ -41,7 +42,10 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
 
     return asyncHeatmap.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text('加载失败: $e'),
+      error: (e, _) => StatisticsLoadError(
+        message: buildStatisticsErrorMessage('上课热力', e),
+        onRetry: () => ref.invalidate(heatmapProvider),
+      ),
       data: (data) {
         final map = <String, int>{};
         var maxCount = 1;
@@ -80,10 +84,10 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                 children: [
                   Column(
                     children: [
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       ..._hours.map(
                         (h) => SizedBox(
-                          height: 20,
+                          height: 32,
                           child: Text(
                             '$h',
                             style: theme.textTheme.bodySmall?.copyWith(
@@ -100,8 +104,8 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                       return Column(
                         children: [
                           SizedBox(
-                            height: 20,
-                            width: 28,
+                            height: 24,
+                            width: 36,
                             child: Center(
                               child: Text(
                                 _days[dayIdx],
@@ -116,21 +120,41 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                             final opacity = count == 0
                                 ? 0.05
                                 : count / maxCount;
+                            final cellLabel =
+                                '周${_days[dayIdx]} $h:00，$count 人次';
+                            void selectCell() {
+                              setState(() => _tooltip = cellLabel);
+                            }
 
-                            return GestureDetector(
-                              onTap: () => setState(
-                                () => _tooltip =
-                                    '周${_days[dayIdx]} $h:00  $count 人次',
-                              ),
-                              child: Container(
-                                width: 28,
-                                height: 20,
-                                margin: const EdgeInsets.all(1),
-                                decoration: BoxDecoration(
-                                  color: kPrimaryBlue.withValues(
-                                    alpha: opacity,
+                            return Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: Tooltip(
+                                message: cellLabel,
+                                child: Semantics(
+                                  button: true,
+                                  label: cellLabel,
+                                  onTap: selectCell,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: InkWell(
+                                      mouseCursor: SystemMouseCursors.click,
+                                      onTap: selectCell,
+                                      child: Ink(
+                                        width: 36,
+                                        height: 28,
+                                        decoration: BoxDecoration(
+                                          color: kPrimaryBlue.withValues(
+                                            alpha: opacity,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                  borderRadius: BorderRadius.circular(6),
                                 ),
                               ),
                             );

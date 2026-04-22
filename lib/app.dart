@@ -213,6 +213,9 @@ class _ShellBodyMotionState extends State<_ShellBodyMotion>
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) {
+      return widget.child;
+    }
     return FadeTransition(
       opacity: _opacity,
       child: ScaleTransition(scale: _scale, child: widget.child),

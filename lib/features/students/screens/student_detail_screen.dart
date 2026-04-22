@@ -56,10 +56,17 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   bool _showScrollToTop = false;
   int _attendanceLoadGeneration = 0;
   final Set<String> _analyzingImageRecordIds = <String>{};
+  final Set<String> _deletingPaymentIds = <String>{};
   final ScrollController _scrollController = ScrollController();
   final Map<_StudentDetailAnchor, GlobalKey> _sectionKeys = {
     for (final anchor in _StudentDetailAnchor.values) anchor: GlobalKey(),
   };
+  static const List<String> _errorPrefixes = <String>[
+    'Exception: ',
+    'FormatException: ',
+    'StateError: ',
+    'Bad state: ',
+  ];
 
   @override
   void initState() {
@@ -112,6 +119,16 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  String _formatError(Object error) {
+    var text = error.toString().trim();
+    for (final prefix in _errorPrefixes) {
+      if (text.startsWith(prefix)) {
+        text = text.substring(prefix.length).trim();
+      }
+    }
+    return text.isEmpty ? '请稍后重试。' : text;
   }
 
 
@@ -201,6 +218,35 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     ref.invalidate(studentPaymentsProvider(widget.studentId));
   }
 
+  Future<void> _deletePayment(Payment payment) async {
+    if (_deletingPaymentIds.contains(payment.id)) return;
+    final ok = await AppToast.showConfirm(
+      context,
+      '确认删除这笔缴费记录吗？金额为 ¥${payment.amount.toStringAsFixed(2)}。',
+    );
+    if (!ok || !mounted) return;
+
+    setState(() => _deletingPaymentIds.add(payment.id));
+    try {
+      await ref.read(paymentDaoProvider).delete(payment.id);
+      invalidateAfterPaymentChange(ref);
+      ref.invalidate(studentPaymentsProvider(widget.studentId));
+      if (!mounted) return;
+      await InteractionFeedback.seal(context);
+      if (!mounted) return;
+      AppToast.showSuccess(context, '缴费记录已删除');
+    } catch (error) {
+      if (!mounted) return;
+      AppToast.showError(context, '删除缴费记录失败：${_formatError(error)}');
+    } finally {
+      if (mounted) {
+        setState(() => _deletingPaymentIds.remove(payment.id));
+      } else {
+        _deletingPaymentIds.remove(payment.id);
+      }
+    }
+  }
+
   Future<void> _openEditStudent() async {
     await InteractionFeedback.pageTurn(context);
     if (!mounted) return;
@@ -262,8 +308,8 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     final studentAsync = ref.watch(studentByIdAsyncProvider(widget.studentId));
     if (studentAsync.hasError && !studentAsync.hasValue) {
       return _buildMessageState(
-        message: '瀛︾敓妗ｆ鍔犺浇澶辫触锛?{studentAsync.error}',
-        actionLabel: '杩斿洖瀛︾敓鍒楄〃',
+        message: '学生档案加载失败：${_formatError(studentAsync.error!)}',
+        actionLabel: '返回学生列表',
         onAction: () => context.go('/students'),
       );
     }
@@ -346,7 +392,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                   children: [
-                    // 1. 閻犳劕婀遍弫銈咁潡閸屾繍娼?
+                    // 1. 财务总览
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.finance],
                       child: StudentFinanceOverviewCard(
@@ -358,7 +404,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // 2. 閻庢冻濡囬弫鎾舵導閸曨剚鐏愬☉鎾冲閸ㄦ岸姊归崹顔荤矗濞达絾绮岃ぐ?
+                    // 2. 学员信息
                     GlassCard(
                       padding: const EdgeInsets.all(18),
                       child: Row(
@@ -455,7 +501,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                       error: (error, _) => GlassCard(
                         padding: const EdgeInsets.all(18),
-                        child: Text('闁告梻濮惧ù鍥箣閹扮増姣愬☉鎾冲閻繝鏌呭顓熷枀閻熸洑绀侀妵鎴犳嫻閵夘垳绐?error'),
+                        child: Text('学员账本加载失败：${_formatError(error)}'),
                       ),
                       data: (allFee) => StudentGrowthWorkbenchCard(
                         summary: growthSummary,
@@ -476,7 +522,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     const SizedBox(height: 16),
                     StudentArtworkTimelineCard(entries: artworkTimeline),
                     const SizedBox(height: 22),
-                    // 3. 缂傚倻顥愰崹鍌滄媼閺夎法绉?
+                    // 3. 缴费记录
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.payments],
                       child: Column(
@@ -514,17 +560,10 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                 ),
                                 child: _PaymentCard(
                                   payment: payment,
-                                  onDelete: () async {
-                                    final ok = await AppToast.showConfirm(
-                                      context,
-                                      '\u786e\u8ba4\u5220\u9664\u8fd9\u7b14\u7f34\u8d39\u8bb0\u5f55\u5417\uff1f\u91d1\u989d\u4e3a \u00a5${payment.amount.toStringAsFixed(2)}\u3002',
-                                    );
-                                    if (!ok) return;
-                                    await ref
-                                        .read(paymentDaoProvider)
-                                        .delete(payment.id);
-                                    invalidateAfterPaymentChange(ref);
-                                                                  },
+                                  deleting: _deletingPaymentIds.contains(
+                                    payment.id,
+                                  ),
+                                  onDelete: () => _deletePayment(payment),
                                 ),
                               ),
                             ),
@@ -532,7 +571,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    // 4. 闁告垵鎼€氱喓鎷嬮弶璺ㄧЭ
+                    // 4. 出勤记录
                     _StudentSectionBlock(
                       anchorKey: _sectionKeys[_StudentDetailAnchor.attendance],
                       child: Column(
@@ -623,7 +662,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    // 5. AI 闁告帒妫欓悗钘夘啅閵夈儱寰?
+                    // 5. AI 分析工具
                     GlassCard(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Theme(
@@ -871,9 +910,14 @@ class _InfoChip extends StatelessWidget {
 
 class _PaymentCard extends StatelessWidget {
   final Payment payment;
+  final bool deleting;
   final VoidCallback onDelete;
 
-  const _PaymentCard({required this.payment, required this.onDelete});
+  const _PaymentCard({
+    required this.payment,
+    required this.deleting,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -886,6 +930,7 @@ class _PaymentCard extends StatelessWidget {
           final compact = constraints.maxWidth < 420;
           final deleteAction = _DangerActionButton(
             tooltip: '\u5220\u9664\u7f34\u8d39\u8bb0\u5f55',
+            loading: deleting,
             onPressed: onDelete,
           );
           return Row(
@@ -959,9 +1004,14 @@ class _PaymentCard extends StatelessWidget {
 
 class _DangerActionButton extends StatelessWidget {
   final String tooltip;
+  final bool loading;
   final VoidCallback onPressed;
 
-  const _DangerActionButton({required this.tooltip, required this.onPressed});
+  const _DangerActionButton({
+    required this.tooltip,
+    required this.loading,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -972,8 +1022,14 @@ class _DangerActionButton extends StatelessWidget {
       ),
       child: IconButton(
         tooltip: tooltip,
-        onPressed: onPressed,
-        icon: const Icon(Icons.delete_outline),
+        onPressed: loading ? null : onPressed,
+        icon: loading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.delete_outline),
         color: kRed,
         visualDensity: VisualDensity.compact,
       ),

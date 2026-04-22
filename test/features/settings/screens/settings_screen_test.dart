@@ -45,16 +45,24 @@ void main() {
     expect(find.text('开发者工具'), findsNothing);
 
     final versionLabel = find.textContaining('版本 1.2.3').last;
-    await tester.ensureVisible(versionLabel);
+    await tester.scrollUntilVisible(versionLabel, 400);
+    await Scrollable.ensureVisible(
+      tester.element(versionLabel),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
+    final versionTile = find
+        .ancestor(of: versionLabel, matching: find.byType(InkWell))
+        .last;
 
     for (var i = 0; i < 4; i++) {
-      await tester.tap(versionLabel);
+      await tester.tap(versionTile);
       await tester.pump();
     }
 
     expect(find.text('开发者工具'), findsNothing);
 
-    await tester.tap(versionLabel);
+    await tester.tap(versionTile);
     await tester.pumpAndSettle();
 
     expect(find.text('开发者工具'), findsOneWidget);

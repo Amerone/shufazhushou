@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +15,7 @@ import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
 import '../../students/widgets/student_action_launcher.dart';
+import 'statistics_load_error.dart';
 
 class InsightList extends ConsumerWidget {
   const InsightList({super.key});
@@ -85,6 +88,22 @@ class InsightList extends ConsumerWidget {
     }
   }
 
+  Future<void> _restoreDismissedInsight(
+    BuildContext context,
+    WidgetRef ref,
+    String insightType,
+    String? studentId,
+  ) async {
+    await ref
+        .read(dismissedInsightDaoProvider)
+        .deleteByStudentAndType(insightType, studentId);
+    ref.invalidate(insightProvider);
+    ref.invalidate(homeWorkbenchProvider);
+
+    if (!context.mounted) return;
+    AppToast.showSuccess(context, '已恢复提醒');
+  }
+
   String? _primaryLabelFor(Insight insight) {
     if (insight.studentId == null) return null;
 
@@ -110,7 +129,12 @@ class InsightList extends ConsumerWidget {
 
     return asyncInsights.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text('加载失败: $e'),
+      error: (e, _) => StatisticsLoadError(
+        message: buildStatisticsErrorMessage('经营提醒', e),
+        onRetry: () => ref
+          ..invalidate(insightProvider)
+          ..invalidate(homeWorkbenchProvider),
+      ),
       data: (insights) {
         if (insights.isEmpty) {
           return Container(
@@ -156,150 +180,162 @@ class InsightList extends ConsumerWidget {
                   border: Border.all(color: color.withValues(alpha: 0.14)),
                 ),
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(icon, color: color, size: 20),
                         ),
-                        child: Icon(icon, color: color, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _InsightMetaChip(
-                                  icon: icon,
-                                  label: typeLabel,
-                                  color: color,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                _InsightMetaChip(
-                                  icon: Icons.flag_outlined,
-                                  label: _typeHint[insight.type] ?? '建议尽快处理',
-                                  color: kPrimaryBlue,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              insight.message,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                height: 1.5,
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: kPrimaryBlue.withValues(alpha: 0.06),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
                                 children: [
-                                  const Icon(
-                                    Icons.lightbulb_outline,
-                                    size: 16,
-                                    color: kPrimaryBlue,
+                                  _InsightMetaChip(
+                                    icon: icon,
+                                    label: typeLabel,
+                                    color: color,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      insight.suggestion,
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: kInkSecondary,
-                                            height: 1.4,
-                                          ),
-                                    ),
+                                  _InsightMetaChip(
+                                    icon: Icons.flag_outlined,
+                                    label: _typeHint[insight.type] ?? '建议尽快处理',
+                                    color: kPrimaryBlue,
                                   ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '计算逻辑：${insight.calcLogic}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: kInkSecondary,
-                                height: 1.35,
+                              const SizedBox(height: 10),
+                              Text(
+                                insight.message,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  height: 1.5,
+                                ),
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _InsightMetaChip(
-                                  icon: Icons.update_outlined,
-                                  label: '数据截至 ${insight.dataFreshness}',
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: kPrimaryBlue.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.lightbulb_outline,
+                                      size: 16,
+                                      color: kPrimaryBlue,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        insight.suggestion,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: kInkSecondary,
+                                              height: 1.4,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '计算逻辑：${insight.calcLogic}',
+                                style: theme.textTheme.bodySmall?.copyWith(
                                   color: kInkSecondary,
+                                  height: 1.35,
                                 ),
-                                _InsightMetaChip(
-                                  icon: Icons.visibility_off_outlined,
-                                  label: '$snoozeDays 天后自动恢复',
-                                  color: kOrange,
-                                ),
-                              ],
-                            ),
-                          ],
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _InsightMetaChip(
+                                    icon: Icons.update_outlined,
+                                    label: '数据截至 ${insight.dataFreshness}',
+                                    color: kInkSecondary,
+                                  ),
+                                  _InsightMetaChip(
+                                    icon: Icons.visibility_off_outlined,
+                                    label: '$snoozeDays 天后自动恢复',
+                                    color: kOrange,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  _InsightActions(
-                    primaryLabel: _primaryLabelFor(insight),
-                    onPrimaryTap: insight.studentId == null
-                        ? null
-                        : () => _handlePrimaryAction(context, insight),
-                    onDismissTap: () async {
-                      await ref
-                          .read(dismissedInsightDaoProvider)
-                          .insert(
-                            DismissedInsight(
-                              id: const Uuid().v4(),
-                              insightType: insight.type.name,
-                              studentId: insight.studentId,
-                              dismissedAt:
-                                  DateTime.now().millisecondsSinceEpoch,
-                            ),
-                          );
-                      if (context.mounted) {
-                        AppToast.showSuccess(
-                          context,
-                          '$typeLabel已暂停 $snoozeDays 天',
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _InsightActions(
+                      primaryLabel: _primaryLabelFor(insight),
+                      onPrimaryTap: insight.studentId == null
+                          ? null
+                          : () => _handlePrimaryAction(context, insight),
+                      onDismissTap: () async {
+                        final dismissedDao = ref.read(
+                          dismissedInsightDaoProvider,
                         );
-                      }
-                      ref.invalidate(insightProvider);
-                      ref.invalidate(homeWorkbenchProvider);
-                    },
-                    snoozeLabel: '稍后 $snoozeDays 天提醒',
-                  ),
-                ],
+                        final insightType = insight.type.name;
+                        await dismissedDao.insert(
+                          DismissedInsight(
+                            id: const Uuid().v4(),
+                            insightType: insightType,
+                            studentId: insight.studentId,
+                            dismissedAt: DateTime.now().millisecondsSinceEpoch,
+                          ),
+                        );
+                        if (context.mounted) {
+                          AppToast.showSuccessWithAction(
+                            context,
+                            '$typeLabel已暂停 $snoozeDays 天',
+                            actionLabel: '撤销',
+                            onAction: () {
+                              unawaited(
+                                _restoreDismissedInsight(
+                                  context,
+                                  ref,
+                                  insightType,
+                                  insight.studentId,
+                                ),
+                              );
+                            },
+                          );
+                        }
+                        ref.invalidate(insightProvider);
+                        ref.invalidate(homeWorkbenchProvider);
+                      },
+                      snoozeLabel: '稍后 $snoozeDays 天提醒',
+                    ),
+                  ],
                 ),
               ),
             );

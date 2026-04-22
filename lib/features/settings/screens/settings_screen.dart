@@ -105,6 +105,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           kBackupWarningDays;
                   final teacherName =
                       settings['teacher_name'] ?? kDefaultTeacherName;
+                  final institutionName =
+                      settings['institution_name'] ?? kDefaultInstitutionName;
                   final watermarkEnabled =
                       settings['default_watermark_enabled'] != 'false';
                   final hapticsEnabled =
@@ -196,6 +198,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               onTap: () => _editTeacherName(
                                 settings['teacher_name'] ?? kDefaultTeacherName,
                               ),
+                            ),
+                            const Divider(height: 1, indent: 16, endIndent: 16),
+                            _SettingsTile(
+                              icon: Icons.business_outlined,
+                              title: '机构名称',
+                              subtitle: institutionName,
+                              trailing: const Icon(
+                                Icons.edit_outlined,
+                                size: 20,
+                              ),
+                              onTap: () =>
+                                  _editInstitutionName(institutionName),
                             ),
                           ],
                         ),
@@ -517,6 +531,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       allowEmpty: false,
       onSave: (value) =>
           ref.read(settingsProvider.notifier).set('teacher_name', value),
+    );
+  }
+
+  void _editInstitutionName(String current) {
+    _showTextEditSheet(
+      title: '机构名称',
+      hintText: '请输入机构名称',
+      initialValue: current,
+      maxLines: 1,
+      allowEmpty: false,
+      onSave: (value) =>
+          ref.read(settingsProvider.notifier).set('institution_name', value),
     );
   }
 

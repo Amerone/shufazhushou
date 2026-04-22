@@ -22,6 +22,7 @@ import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/glass_card.dart';
+import 'statistics_load_error.dart';
 
 class DataInsightCard extends ConsumerStatefulWidget {
   const DataInsightCard({super.key});
@@ -162,7 +163,7 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
     } catch (error) {
       if (!mounted || currentRequestId != _analysisRequestId) return;
       setState(() {
-        _errorText = error.toString();
+        _errorText = formatStatisticsError(error);
         _result = null;
         _analyzedAt = null;
       });
@@ -331,17 +332,11 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
           ],
           if (_errorText != null) ...[
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: kRed.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                _errorText!,
-                style: theme.textTheme.bodySmall?.copyWith(color: kRed),
-              ),
+            StatisticsLoadError(
+              message: 'AI 洞察分析失败：$_errorText',
+              onRetry: () {
+                _runAnalysis();
+              },
             ),
           ],
           if (result != null) ...[

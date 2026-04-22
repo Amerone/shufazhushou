@@ -188,13 +188,23 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
                                 context,
                                 '确认删除此出勤记录？',
                               );
-                              if (!confirm) return;
-                              await ref
-                                  .read(attendanceDaoProvider)
-                                  .delete(r.id);
-                              if (!context.mounted) return;
-                              await InteractionFeedback.seal(context);
-                              invalidateAfterAttendanceChange(ref);
+                              if (!confirm || !context.mounted) return;
+                              try {
+                                await ref
+                                    .read(attendanceDaoProvider)
+                                    .delete(r.id);
+                                invalidateAfterAttendanceChange(ref);
+                                if (!context.mounted) return;
+                                await InteractionFeedback.seal(context);
+                                if (!context.mounted) return;
+                                AppToast.showSuccess(context, '出勤记录已删除');
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                AppToast.showError(
+                                  context,
+                                  '删除出勤记录失败：$error',
+                                );
+                              }
                             },
                           );
 

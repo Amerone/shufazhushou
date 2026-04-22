@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/metrics_provider.dart';
 import '../../../shared/theme.dart';
+import 'statistics_load_error.dart';
 
 class MetricsGrid extends ConsumerWidget {
   const MetricsGrid({super.key});
@@ -11,8 +12,14 @@ class MetricsGrid extends ConsumerWidget {
     final asyncMetrics = ref.watch(metricsProvider);
 
     return asyncMetrics.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text('加载失败: $e'),
+      loading: () => const SizedBox(
+        height: 120,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => StatisticsLoadError(
+        message: buildStatisticsErrorMessage('核心指标', e),
+        onRetry: () => ref.invalidate(metricsProvider),
+      ),
       data: (m) {
         final total = m.presentCount + m.lateCount + m.absentCount;
         final attendRate = total > 0

@@ -82,6 +82,29 @@ void main() {
     expect(recentTop, lessThan(olderTop));
     expect(olderTop, lessThan(neverTop));
   });
+
+  testWidgets('student picker error state exposes retry action', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [studentProvider.overrideWith(_ThrowingStudentNotifier.new)],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: const Scaffold(
+            body: StudentPickerSheet(
+              title: '选择学生',
+              subtitle: '用于记录缴费',
+              actionLabel: '记录缴费',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('加载学生失败'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '重试'), findsOneWidget);
+  });
 }
 
 class _FakeStudentNotifier extends StudentNotifier {
@@ -89,4 +112,11 @@ class _FakeStudentNotifier extends StudentNotifier {
 
   @override
   Future<List<StudentWithMeta>> build() async => seededStudents;
+}
+
+class _ThrowingStudentNotifier extends StudentNotifier {
+  @override
+  Future<List<StudentWithMeta>> build() async {
+    throw StateError('student list failed');
+  }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -77,24 +79,48 @@ class HomeWorkbenchPanel extends ConsumerWidget {
     final snoozeDays = DismissedInsightPolicy.retentionForType(
       dismissType,
     ).inDays;
+    final dismissedDao = ref.read(dismissedInsightDaoProvider);
 
     await InteractionFeedback.selection(context);
-    await ref
-        .read(dismissedInsightDaoProvider)
-        .insert(
-          DismissedInsight(
-            id: const Uuid().v4(),
-            insightType: dismissType,
-            studentId: task.studentId,
-            dismissedAt: DateTime.now().millisecondsSinceEpoch,
-          ),
-        );
+    await dismissedDao.insert(
+      DismissedInsight(
+        id: const Uuid().v4(),
+        insightType: dismissType,
+        studentId: task.studentId,
+        dismissedAt: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
 
     ref.invalidate(homeWorkbenchProvider);
     ref.invalidate(insightProvider);
 
     if (!context.mounted) return;
-    AppToast.showSuccess(context, '${task.title} 已稍后 $snoozeDays 天');
+    AppToast.showSuccessWithAction(
+      context,
+      '${task.title} 已稍后 $snoozeDays 天',
+      actionLabel: '撤销',
+      onAction: () {
+        unawaited(
+          _restoreDismissedTask(context, ref, dismissType, task.studentId),
+        );
+      },
+    );
+  }
+
+  Future<void> _restoreDismissedTask(
+    BuildContext context,
+    WidgetRef ref,
+    String dismissType,
+    String? studentId,
+  ) async {
+    await ref
+        .read(dismissedInsightDaoProvider)
+        .deleteByStudentAndType(dismissType, studentId);
+    ref.invalidate(homeWorkbenchProvider);
+    ref.invalidate(insightProvider);
+
+    if (!context.mounted) return;
+    AppToast.showSuccess(context, '已恢复提醒');
   }
 
   @override

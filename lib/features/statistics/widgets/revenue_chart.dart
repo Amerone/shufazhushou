@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/revenue_provider.dart';
 import '../../../shared/theme.dart';
+import 'statistics_load_error.dart';
 
 class RevenueChart extends ConsumerStatefulWidget {
   const RevenueChart({super.key});
@@ -25,7 +26,15 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
         height: 200,
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Text('加载失败: $e'),
+      error: (e, _) => SizedBox(
+        height: 200,
+        child: Center(
+          child: StatisticsLoadError(
+            message: buildStatisticsErrorMessage('收入走势', e),
+            onRetry: () => ref.invalidate(revenueProvider),
+          ),
+        ),
+      ),
       data: (data) {
         final months = <String>{
           ...data.monthlyReceivable.map((m) => m['month'] as String),

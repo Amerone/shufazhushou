@@ -11,6 +11,7 @@ import '../../../core/providers/student_provider.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/widgets/empty_state.dart';
+import 'statistics_load_error.dart';
 
 class ContributionChart extends ConsumerStatefulWidget {
   const ContributionChart({super.key});
@@ -30,7 +31,10 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
 
     return asyncContribution.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text('加载失败: $e'),
+      error: (e, _) => StatisticsLoadError(
+        message: buildStatisticsErrorMessage('学生贡献', e),
+        onRetry: () => ref.invalidate(contributionProvider),
+      ),
       data: (list) {
         final topEntries = _rankContributions(list, byFee: _byFee);
         if (topEntries.isEmpty) {
@@ -63,103 +67,126 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
             ...topEntries.map((entry) {
               final item = entry.item;
               final accentColor = _byFee ? kPrimaryBlue : kGreen;
+              final studentId = item['studentId'] as String;
+              final studentName =
+                  displayNames[studentId] ?? item['studentName'] as String;
+              final metricLabel = _byFee
+                  ? '¥${entry.value.toStringAsFixed(0)}'
+                  : '${entry.value.toInt()}节';
 
-              return GestureDetector(
-                onTap: () => context.push('/students/${item['studentId']}'),
-                child: Container(
-                  margin: EdgeInsets.only(
-                    bottom: entry.rank == topEntries.length ? 0 : 10,
-                  ),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.56),
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: entry.rank == topEntries.length ? 0 : 10,
+                ),
+                child: Semantics(
+                  button: true,
+                  label: '查看$studentName档案，排名第${entry.rank}，贡献$metricLabel',
+                  child: Material(
+                    color: Colors.transparent,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: accentColor.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        alignment: Alignment.center,
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      mouseCursor: SystemMouseCursors.click,
+                      onTap: () => context.push('/students/$studentId'),
+                      child: Ink(
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: accentColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${entry.rank}',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: accentColor,
-                            fontWeight: FontWeight.w800,
+                          color: Colors.white.withValues(alpha: 0.56),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: accentColor.withValues(alpha: 0.1),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
+                        child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    displayNames[item['studentId']] ??
-                                        item['studentName'] as String,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                            Container(
+                              width: 34,
+                              height: 34,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: accentColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${entry.rank}',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: accentColor,
+                                  fontWeight: FontWeight.w800,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _byFee
-                                      ? '¥${entry.value.toStringAsFixed(0)}'
-                                      : '${entry.value.toInt()}节',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: accentColor,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                            const SizedBox(height: 10),
-                            Stack(
-                              children: [
-                                Container(
-                                  height: 18,
-                                  decoration: BoxDecoration(
-                                    color: kInkSecondary.withValues(
-                                      alpha: 0.14,
-                                    ),
-                                    borderRadius: BorderRadius.circular(999),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          studentName,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        metricLabel,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: accentColor,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                FractionallySizedBox(
-                                  widthFactor: entry.ratio,
-                                  child: _byFee
-                                      ? Container(
-                                          height: 18,
-                                          decoration: BoxDecoration(
-                                            color: accentColor.withValues(
-                                              alpha: 0.72,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              999,
-                                            ),
+                                  const SizedBox(height: 10),
+                                  Stack(
+                                    children: [
+                                      Container(
+                                        height: 18,
+                                        decoration: BoxDecoration(
+                                          color: kInkSecondary.withValues(
+                                            alpha: 0.14,
                                           ),
-                                        )
-                                      : _buildSegmentedBar(item, entry.value),
-                                ),
-                              ],
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                      ),
+                                      FractionallySizedBox(
+                                        widthFactor: entry.ratio,
+                                        child: _byFee
+                                            ? Container(
+                                                height: 18,
+                                                decoration: BoxDecoration(
+                                                  color: accentColor.withValues(
+                                                    alpha: 0.72,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        999,
+                                                      ),
+                                                ),
+                                              )
+                                            : _buildSegmentedBar(
+                                                item,
+                                                entry.value,
+                                              ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               );
@@ -293,7 +320,10 @@ class StatusPieChart extends ConsumerWidget {
 
     return asyncDistribution.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text('加载失败: $e'),
+      error: (e, _) => StatisticsLoadError(
+        message: buildStatisticsErrorMessage('状态分布', e),
+        onRetry: () => ref.invalidate(statusDistributionProvider),
+      ),
       data: (list) {
         if (list.isEmpty) {
           return const EmptyState(message: '\u6682\u65e0\u6570\u636e');
@@ -353,7 +383,10 @@ class StatusFilteredList extends ConsumerWidget {
 
     return asyncRecords.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text('加载失败: $e'),
+      error: (e, _) => StatisticsLoadError(
+        message: buildStatisticsErrorMessage('状态记录', e),
+        onRetry: () => ref.invalidate(filteredAttendanceProvider),
+      ),
       data: (records) {
         if (records.isEmpty) {
           return const EmptyState(message: '\u6682\u65e0\u8bb0\u5f55');

@@ -36,6 +36,12 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
   final _noteCtrl = TextEditingController();
   DateTime _date = DateTime.now();
   bool _saving = false;
+  static const List<String> _errorPrefixes = <String>[
+    'Exception: ',
+    'FormatException: ',
+    'StateError: ',
+    'Bad state: ',
+  ];
 
   @override
   void dispose() {
@@ -57,13 +63,26 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
 
   void _applyQuickAmount(double amount) {
     final value = _formatAmount(amount);
-    _amountCtrl.value = TextEditingValue(
-      text: value,
-      selection: TextSelection.collapsed(offset: value.length),
-    );
+    if (_amountCtrl.text == value) return;
+    setState(() {
+      _amountCtrl.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    });
   }
 
   double? _parsedAmount() => double.tryParse(_amountCtrl.text.trim());
+
+  String _formatError(Object error) {
+    var text = error.toString().trim();
+    for (final prefix in _errorPrefixes) {
+      if (text.startsWith(prefix)) {
+        text = text.substring(prefix.length).trim();
+      }
+    }
+    return text.isEmpty ? '请稍后重试。' : text;
+  }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -92,8 +111,10 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
       if (!mounted) return;
       AppToast.showSuccess(context, '已记录缴费');
       Navigator.of(context).pop();
-    } catch (e) {
-      if (mounted) AppToast.showError(context, e.toString());
+    } catch (error) {
+      if (mounted) {
+        AppToast.showError(context, '保存缴费记录失败：${_formatError(error)}');
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -298,6 +319,8 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _save(),
                   onChanged: (_) => setState(() {}),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return '请输入缴费金额';
@@ -316,7 +339,8 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
                       firstDate: DateTime(2020),
                       lastDate: DateTime.now(),
                     );
-                    if (d != null) setState(() => _date = d);
+                    if (d == null || !mounted) return;
+                    setState(() => _date = d);
                   },
                   child: InputDecorator(
                     decoration: InputDecoration(

@@ -13,6 +13,8 @@ import '../../../shared/theme.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/seal_stamp_widget.dart';
 
+const _launchIntroSeenSettingKey = 'launch_intro_seen';
+
 class LaunchScreen extends ConsumerStatefulWidget {
   const LaunchScreen({super.key});
 
@@ -131,14 +133,35 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
       });
     });
 
+    unawaited(_skipIntroWhenAlreadySeen());
     unawaited(_controller.forward());
   }
 
-  Future<void> _navigateNext() async {
+  Future<void> _skipIntroWhenAlreadySeen() async {
+    final Map<String, String> settings;
+    try {
+      settings = await ref.read(settingsProvider.future);
+    } catch (_) {
+      return;
+    }
+    if (settings[_launchIntroSeenSettingKey] != 'true') return;
+    await _navigateNext(markIntroSeen: false);
+  }
+
+  Future<void> _navigateNext({bool markIntroSeen = true}) async {
     if (_navigating || !mounted) return;
     _navigating = true;
 
     try {
+      if (markIntroSeen) {
+        try {
+          await ref
+              .read(settingsProvider.notifier)
+              .set(_launchIntroSeenSettingKey, 'true');
+        } catch (_) {
+          // Navigation must not depend on whether the optional intro flag saves.
+        }
+      }
       final cachedStudents = ref.read(studentProvider).valueOrNull;
       final hasStudents =
           cachedStudents?.isNotEmpty ??

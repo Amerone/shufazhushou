@@ -60,6 +60,8 @@ String quickEntryStatusLabel(String? status) {
   return status ?? '';
 }
 
+enum _ConflictResolution { overwrite, changeTime, cancel }
+
 class QuickEntrySheet extends ConsumerStatefulWidget {
   final Set<String> initialSelectedIds;
   final String? initialStartTime;
@@ -137,9 +139,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   Future<void> _openStudentRoute(String route) async {
     await InteractionFeedback.pageTurn(context);
     if (!mounted) return;
-    Navigator.of(context).pop();
-    if (!mounted) return;
-    context.push(route);
+    final router = GoRouter.of(context);
+    await Navigator.of(context).maybePop();
+    router.push(route);
   }
 
   String _dateStr() => formatDate(_date);
@@ -217,6 +219,20 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         .toList(growable: false);
   }
 
+  List<String> _selectedStudentNamesFrom(
+    List<StudentWithMeta> students,
+    Map<String, String> displayNames,
+  ) {
+    return _selectedStudentsFrom(students)
+        .map((item) => displayNames[item.student.id] ?? item.student.name)
+        .toList(growable: false);
+  }
+
+  String _studentNamePreview(List<String> names, {int limit = 8}) {
+    if (names.length <= limit) return names.join('、');
+    return '${names.take(limit).join('、')} 等 ${names.length} 人';
+  }
+
   double _estimatedTotalFee(List<StudentWithMeta> selectedStudents) {
     final statusEnum = AttendanceStatus.values.firstWhere(
       (item) => item.name == _status,
@@ -288,11 +304,18 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       ];
 
       if (conflicts.isNotEmpty && mounted) {
-        final ok = await AppToast.showConfirm(
-          context,
-          '以下学生该时段已有记录：${conflicts.join('、')}，是否覆盖？',
+        final resolution = await _showConflictResolutionDialog(
+          selectedStudents: selectedStudents,
+          displayNames: displayNames,
+          conflictRecords: conflictRecords,
         );
-        if (!ok) return;
+        if (resolution != _ConflictResolution.overwrite) {
+          if (resolution == _ConflictResolution.changeTime && mounted) {
+            setState(() => _step = 1);
+            AppToast.showSuccess(context, '已返回时间设置，可调整后重新保存');
+          }
+          return;
+        }
       }
 
       final statusEnum = AttendanceStatus.values.firstWhere(
@@ -376,6 +399,179 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     }
   }
 
+  Future<_ConflictResolution> _showConflictResolutionDialog({
+    required List<StudentWithMeta> selectedStudents,
+    required Map<String, String> displayNames,
+    required Map<String, Attendance> conflictRecords,
+  }) async {
+    final currentSlot = '${_dateStr()} $_startTime-$_endTime';
+    final conflictedStudents = selectedStudents
+        .where((item) => conflictRecords.containsKey(item.student.id))
+        .toList(growable: false);
+
+    final result = await showDialog<_ConflictResolution>(
+      context: context,
+      builder: (dialogCtx) {
+        final theme = Theme.of(dialogCtx);
+        final screenSize = MediaQuery.sizeOf(dialogCtx);
+
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 460,
+              maxHeight: screenSize.height * 0.82,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: kOrange.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.event_busy_rounded,
+                          color: kOrange,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '发现时段冲突',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '本次将保存 $currentSlot。以下学员该时段已有记录，请选择处理方式。',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: kInkSecondary,
+                                height: 1.45,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: conflictedStudents.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (_, index) {
+                        final item = conflictedStudents[index];
+                        final record = conflictRecords[item.student.id]!;
+                        final name =
+                            displayNames[item.student.id] ?? item.student.name;
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: kInkSecondary.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: kInkSecondary.withValues(alpha: 0.12),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.person_outline_rounded,
+                                size: 20,
+                                color: kInkSecondary,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name,
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '已有记录：${record.startTime}-${record.endTime} · ${quickEntryStatusLabel(record.status)}',
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(color: kInkSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '覆盖会保留旧记录中的课堂反馈、课后练习和作品照片，除非本次填写了新的内容。',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: kInkSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(
+                          dialogCtx,
+                        ).pop(_ConflictResolution.cancel),
+                        child: const Text('取消保存'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(
+                          dialogCtx,
+                        ).pop(_ConflictResolution.changeTime),
+                        icon: const Icon(Icons.schedule_rounded, size: 18),
+                        label: const Text('返回改时间'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: () => Navigator.of(
+                          dialogCtx,
+                        ).pop(_ConflictResolution.overwrite),
+                        icon: const Icon(Icons.check_rounded, size: 18),
+                        label: const Text('覆盖并保存'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    return result ?? _ConflictResolution.cancel;
+  }
+
   Future<void> _quickSaveWithDefaults() async {
     if (_saving || _selectedIds.isEmpty) return;
     if (_endTime.compareTo(_startTime) <= 0) {
@@ -390,9 +586,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     }
     final totalFee = _estimatedTotalFee(selectedStudents);
     final statusLabel = quickEntryStatusLabel(_status);
+    final selectedNames = _selectedStudentNamesFrom(
+      students,
+      ref.read(studentDisplayNameMapProvider),
+    );
     final confirmed = await AppToast.showConfirm(
       context,
-      '将直接记课：${_dateStr()} $_startTime-$_endTime，状态“$statusLabel”，共 ${selectedStudents.length} 人，预计扣费 ¥${_formatAmount(totalFee)}。是否继续？',
+      '将直接记课：${_dateStr()} $_startTime-$_endTime，状态“$statusLabel”，共 ${selectedStudents.length} 人，预计扣费 ¥${_formatAmount(totalFee)}。\n学员：${_studentNamePreview(selectedNames)}\n是否继续？',
     );
     if (!confirmed) return;
     await _save();
@@ -853,6 +1053,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   Widget _buildStep1() {
     final theme = Theme.of(context);
     final templates = ref.watch(classTemplateProvider).valueOrNull ?? [];
+    final students = ref.watch(studentProvider).valueOrNull ?? const [];
+    final displayNames = ref.watch(studentDisplayNameMapProvider);
+    final selectedNames = _selectedStudentNamesFrom(students, displayNames);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -888,6 +1091,48 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (selectedNames.isNotEmpty) ...[
+          Text('已选学员', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.54),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final name in selectedNames.take(12))
+                  Chip(
+                    label: Text(name),
+                    backgroundColor: kPrimaryBlue.withValues(alpha: 0.08),
+                    side: BorderSide(
+                      color: kPrimaryBlue.withValues(alpha: 0.12),
+                    ),
+                    labelStyle: theme.textTheme.bodySmall?.copyWith(
+                      color: kPrimaryBlue,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                if (selectedNames.length > 12)
+                  Chip(
+                    label: Text('另 ${selectedNames.length - 12} 人'),
+                    backgroundColor: kSealRed.withValues(alpha: 0.08),
+                    side: BorderSide(color: kSealRed.withValues(alpha: 0.12)),
+                    labelStyle: theme.textTheme.bodySmall?.copyWith(
+                      color: kSealRed,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1386,6 +1631,8 @@ class _ScoreEditor extends StatelessWidget {
             max: 5,
             divisions: 10,
             label: (value ?? 3.0).toStringAsFixed(1),
+            semanticFormatterCallback: (nextValue) =>
+                '$label ${nextValue.toStringAsFixed(1)} 分',
             onChanged: (nextValue) {
               unawaited(InteractionFeedback.selection(context));
               onChanged(nextValue);

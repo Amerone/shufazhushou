@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,6 +34,12 @@ class StudentPickerSheet extends ConsumerStatefulWidget {
 class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  static const List<String> _errorPrefixes = <String>[
+    'Exception: ',
+    'FormatException: ',
+    'StateError: ',
+    'Bad state: ',
+  ];
 
   @override
   void dispose() {
@@ -73,12 +81,22 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
     return '最近上课 ${meta.lastAttendanceDate}';
   }
 
+  String _formatError(Object error) {
+    var text = error.toString().trim();
+    for (final prefix in _errorPrefixes) {
+      if (text.startsWith(prefix)) {
+        text = text.substring(prefix.length).trim();
+      }
+    }
+    return text.isEmpty ? '请稍后重试。' : text;
+  }
+
   Future<void> _openStudentRoute(String route) async {
     await InteractionFeedback.pageTurn(context);
     if (!mounted) return;
-    Navigator.of(context).pop();
-    if (!mounted) return;
-    context.push(route);
+    final router = GoRouter.of(context);
+    await Navigator.of(context).maybePop();
+    router.push(route);
   }
 
   @override
@@ -131,13 +149,16 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
               const SizedBox(height: 20),
               TextField(
                 controller: _searchController,
+                textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: '搜索学生姓名、家长或电话',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _query.isEmpty
                       ? null
                       : IconButton(
+                          tooltip: '清空搜索',
                           onPressed: () {
+                            unawaited(InteractionFeedback.selection(context));
                             setState(() {
                               _searchController.clear();
                               _query = '';
@@ -154,9 +175,38 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                   padding: EdgeInsets.symmetric(vertical: 24),
                   child: Center(child: CircularProgressIndicator()),
                 ),
-                error: (error, _) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text('加载学生失败：$error'),
+                error: (error, _) => Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: kRed.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: kRed.withValues(alpha: 0.12)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '加载学生失败：${_formatError(error)}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: kRed,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.tonalIcon(
+                          onPressed: () {
+                            unawaited(InteractionFeedback.selection(context));
+                            ref.invalidate(studentProvider);
+                          },
+                          icon: const Icon(Icons.refresh_outlined, size: 18),
+                          label: const Text('重试'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 data: (students) {
                   final visibleStudents =

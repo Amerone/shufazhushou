@@ -107,6 +107,12 @@ void main() {
       homeWorkbenchReportReadyDismissType,
     );
     expect(fakeDao.inserted.single.studentId, 'student-3');
+    expect(find.text('撤销'), findsOneWidget);
+
+    tester.widget<SnackBarAction>(find.byType(SnackBarAction)).onPressed();
+    await _settleUi(tester);
+
+    expect(fakeDao.inserted, isEmpty);
   });
 }
 
@@ -138,6 +144,16 @@ class _FakeDismissedInsightDao extends DismissedInsightDao {
     return inserted
         .map((item) => '${item.insightType}:${item.studentId ?? ''}')
         .toSet();
+  }
+
+  @override
+  Future<void> deleteByStudentAndType(
+    String insightType,
+    String? studentId,
+  ) async {
+    inserted.removeWhere(
+      (item) => item.insightType == insightType && item.studentId == studentId,
+    );
   }
 }
 

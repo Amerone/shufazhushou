@@ -300,6 +300,9 @@ class _InkFadePageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
+    if (MediaQuery.of(context).disableAnimations) {
+      return child;
+    }
     final fade = CurvedAnimation(
       parent: animation,
       curve: Curves.easeOutCubic,

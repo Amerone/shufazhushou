@@ -182,6 +182,7 @@ void main() {
       find.byType(TextFormField).first,
     );
     expect(amountField.controller?.text, '200');
+    expect(find.text('结清 ¥0.00'), findsOneWidget);
   });
 }
 

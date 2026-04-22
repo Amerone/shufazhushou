@@ -103,7 +103,7 @@ void main() {
 
     expect(find.text('summary-first'), findsNothing);
     expect(find.text('revenue-first'), findsNothing);
-    expect(find.textContaining('Exception: boom'), findsOneWidget);
+    expect(find.textContaining('AI 洞察分析失败：boom'), findsOneWidget);
   });
 
   testWidgets('drops stale insight result after statistics period changes', (

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moyun/core/database/dao/attendance_dao.dart';
 import 'package:moyun/core/database/dao/student_dao.dart';
 import 'package:moyun/core/database/database_helper.dart';
@@ -100,6 +101,47 @@ void main() {
     );
   });
 
+  testWidgets('empty quick entry state can jump to create student route', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+    _FakeStudentNotifier.seededStudents = const [];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_FakeStudentNotifier.new),
+          classTemplateProvider.overrideWith(_FakeClassTemplateNotifier.new),
+        ],
+        child: MaterialApp.router(
+          theme: buildAppTheme(),
+          routerConfig: GoRouter(
+            initialLocation: '/sheet',
+            routes: [
+              GoRoute(
+                path: '/sheet',
+                builder: (context, state) =>
+                    const Scaffold(body: QuickEntrySheet()),
+              ),
+              GoRoute(
+                path: '/students/create',
+                builder: (context, state) =>
+                    const Scaffold(body: Center(child: Text('route:create'))),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    await tester.tap(find.widgetWithText(FilledButton, '新增学生'));
+    await _settleUi(tester);
+
+    expect(find.text('route:create'), findsOneWidget);
+  });
+
   testWidgets('restores recent student group and remembered defaults', (
     tester,
   ) async {
@@ -181,7 +223,10 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, '确认保存'));
     await _settleUi(tester);
 
-    await tester.tap(find.widgetWithText(TextButton, '确认'));
+    expect(find.text('发现时段冲突'), findsOneWidget);
+    expect(find.textContaining('已有记录：18:00-19:30'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, '覆盖并保存'));
     await _settleUi(tester);
 
     expect(fakeDao.savedConflictIds, {'student-1': 'attendance-old'});
@@ -202,6 +247,57 @@ void main() {
     expect(savedRecord.priceSnapshot, 180);
     expect(savedRecord.feeAmount, 180);
     expect(savedRecord.updatedAt, greaterThan(existingRecord.updatedAt));
+  });
+
+  testWidgets('conflict dialog can return to time settings without saving', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+    final existingRecord = Attendance(
+      id: 'attendance-old',
+      studentId: 'student-1',
+      date: '2026-04-17',
+      startTime: '18:00',
+      endTime: '19:30',
+      status: 'present',
+      priceSnapshot: 180,
+      feeAmount: 180,
+      createdAt: 11,
+      updatedAt: 22,
+    );
+    final fakeDao = _FakeAttendanceDao({'student-1': existingRecord});
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_FakeStudentNotifier.new),
+          classTemplateProvider.overrideWith(_FakeClassTemplateNotifier.new),
+          attendanceDaoProvider.overrideWithValue(fakeDao),
+          selectedDateProvider.overrideWith((ref) => DateTime(2026, 4, 17)),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: const Scaffold(
+            body: QuickEntrySheet(initialSelectedIds: {'student-1'}),
+          ),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    await tester.tap(find.textContaining('下一步'));
+    await _settleUi(tester);
+
+    await tester.tap(find.widgetWithText(ElevatedButton, '确认保存'));
+    await _settleUi(tester);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, '返回改时间'));
+    await _settleUi(tester);
+
+    expect(fakeDao.savedRecords, isEmpty);
+    expect(find.text('已返回时间设置，可调整后重新保存'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, '确认保存'), findsOneWidget);
   });
 }
 

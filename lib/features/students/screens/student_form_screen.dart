@@ -139,7 +139,11 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
       }
 
       invalidateAfterStudentChange(ref);
-      if (mounted) context.pop();
+      if (!mounted) return;
+      await InteractionFeedback.seal(context);
+      if (!mounted) return;
+      AppToast.showSuccess(context, _isEdit ? '学生档案已更新' : '学生档案已创建');
+      context.pop();
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
@@ -159,7 +163,11 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
       await ref.read(studentDaoProvider).delete(widget.studentId!);
       await ref.read(studentProvider.notifier).reload();
       invalidateAfterStudentDelete(ref);
-      if (mounted) context.pop();
+      if (!mounted) return;
+      await InteractionFeedback.seal(context);
+      if (!mounted) return;
+      AppToast.showSuccess(context, '学生档案已删除');
+      context.pop();
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
@@ -447,68 +455,78 @@ class _StatusOptionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: selected
-                ? option.color.withValues(alpha: 0.12)
-                : Colors.white.withValues(alpha: 0.54),
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${option.title}，${option.subtitle}',
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: selected
-                  ? option.color.withValues(alpha: 0.85)
-                  : kInkSecondary.withValues(alpha: 0.14),
-              width: selected ? 1.4 : 1,
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: option.color.withValues(alpha: selected ? 0.2 : 0.12),
-                  borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: selected
+                    ? option.color.withValues(alpha: 0.12)
+                    : Colors.white.withValues(alpha: 0.54),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: selected
+                      ? option.color.withValues(alpha: 0.85)
+                      : kInkSecondary.withValues(alpha: 0.14),
+                  width: selected ? 1.4 : 1,
                 ),
-                child: Icon(option.icon, color: option.color),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: option.color.withValues(
+                        alpha: selected ? 0.2 : 0.12,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(option.icon, color: option.color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            option.title,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: selected ? option.color : null,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                option.title,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: selected ? option.color : null,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (selected)
+                              Icon(
+                                Icons.check_circle,
+                                size: 18,
+                                color: option.color,
+                              ),
+                          ],
                         ),
-                        if (selected)
-                          Icon(
-                            Icons.check_circle,
-                            size: 18,
-                            color: option.color,
-                          ),
+                        const SizedBox(height: 4),
+                        Text(option.subtitle, style: theme.textTheme.bodySmall),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(option.subtitle, style: theme.textTheme.bodySmall),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

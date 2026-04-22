@@ -69,6 +69,59 @@ void main() {
     expect(_FakeHomeWorkbenchProvider.buildCount, 2);
   });
 
+  testWidgets('undo dismissal restores insight list', (tester) async {
+    final fakeDao = _FakeDismissedInsightDao();
+    _DismissCycleNotifier.dao = fakeDao;
+    _FakeHomeWorkbenchProvider.reset();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dismissedInsightDaoProvider.overrideWithValue(fakeDao),
+          insightProvider.overrideWith(_DismissCycleNotifier.new),
+          homeWorkbenchProvider.overrideWith(_FakeHomeWorkbenchProvider.build),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: SafeArea(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      InsightList(),
+                      SizedBox(height: 12),
+                      _HomeWorkbenchProbe(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    await tester.tap(find.textContaining('\u7a0d\u540e'));
+    await _settleUi(tester);
+    expect(
+      find.text('\u7b14\u58a8\u5b89\u7136\uff0c\u6682\u65e0\u63d0\u9192'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('撤销'));
+    await _settleUi(tester);
+
+    expect(fakeDao.inserted, isEmpty);
+    expect(
+      fakeDao.deletedKeys,
+      contains('${InsightType.renewal.name}:student-1'),
+    );
+    expect(find.text('Alex'), findsOneWidget);
+    expect(_FakeHomeWorkbenchProvider.buildCount, 3);
+  });
+
   testWidgets('primary action opens payment sheet for debt insight', (
     tester,
   ) async {
@@ -146,12 +199,24 @@ class _DismissCycleNotifier extends InsightNotifier {
 
 class _FakeDismissedInsightDao extends DismissedInsightDao {
   final List<DismissedInsight> inserted = [];
+  final List<String> deletedKeys = [];
 
   _FakeDismissedInsightDao() : super(DatabaseHelper.instance);
 
   @override
   Future<void> insert(DismissedInsight r) async {
     inserted.add(r);
+  }
+
+  @override
+  Future<void> deleteByStudentAndType(
+    String insightType,
+    String? studentId,
+  ) async {
+    deletedKeys.add('$insightType:${studentId ?? ''}');
+    inserted.removeWhere(
+      (item) => item.insightType == insightType && item.studentId == studentId,
+    );
   }
 }
 

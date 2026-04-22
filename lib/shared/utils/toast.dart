@@ -4,6 +4,23 @@ import '../theme.dart';
 import 'interaction_feedback.dart';
 
 class AppToast {
+  static const List<String> _errorPrefixes = <String>[
+    'Exception: ',
+    'FormatException: ',
+    'StateError: ',
+    'Bad state: ',
+  ];
+
+  static String _normalizeErrorMessage(String msg) {
+    var value = msg.trim();
+    for (final prefix in _errorPrefixes) {
+      if (value.startsWith(prefix)) {
+        value = value.substring(prefix.length).trim();
+      }
+    }
+    return value.isEmpty ? '请稍后重试。' : value;
+  }
+
   static void showSuccess(BuildContext context, String msg) {
     final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
     messenger.showSnackBar(
@@ -24,13 +41,44 @@ class AppToast {
     );
   }
 
+  static void showSuccessWithAction(
+    BuildContext context,
+    String msg, {
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(
+              Icons.check_circle_outline,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(msg)),
+          ],
+        ),
+        backgroundColor: kGreen,
+        action: SnackBarAction(
+          label: actionLabel,
+          textColor: Colors.white,
+          onPressed: onAction,
+        ),
+      ),
+    );
+  }
+
   static void showError(BuildContext context, String msg) {
+    final normalized = _normalizeErrorMessage(msg);
     _showDialog<void>(
       context: context,
       icon: Icons.error_outline,
       accentColor: kRed,
       title: '操作失败',
-      message: msg,
+      message: normalized,
       actions: (dialogCtx) => [
         Expanded(
           child: ElevatedButton(

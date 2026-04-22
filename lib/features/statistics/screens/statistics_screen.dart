@@ -68,8 +68,46 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
   void _handleScroll() {
     if (!_scrollController.hasClients) return;
     final shouldShow = _scrollController.offset > 280;
-    if (shouldShow == _showScrollToTop) return;
-    setState(() => _showScrollToTop = shouldShow);
+    final activeAnchor = _resolveVisibleAnchor();
+    if (shouldShow == _showScrollToTop &&
+        (activeAnchor == null || activeAnchor == _lastFocusedAnchor)) {
+      return;
+    }
+    setState(() {
+      _showScrollToTop = shouldShow;
+      if (activeAnchor != null) {
+        _lastFocusedAnchor = activeAnchor;
+      }
+    });
+  }
+
+  _StatisticsAnchor? _resolveVisibleAnchor() {
+    final targetY = MediaQuery.paddingOf(context).top + 92;
+    _StatisticsAnchor? nearestAbove;
+    var nearestAboveY = double.negativeInfinity;
+    _StatisticsAnchor? nearestBelow;
+    var nearestBelowDistance = double.infinity;
+
+    for (final entry in _sectionKeys.entries) {
+      final sectionContext = entry.value.currentContext;
+      if (sectionContext == null) continue;
+      final renderObject = sectionContext.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.attached) continue;
+
+      final y = renderObject.localToGlobal(Offset.zero).dy;
+      if (y <= targetY && y > nearestAboveY) {
+        nearestAbove = entry.key;
+        nearestAboveY = y;
+      } else if (nearestAbove == null) {
+        final distance = (y - targetY).abs();
+        if (distance < nearestBelowDistance) {
+          nearestBelow = entry.key;
+          nearestBelowDistance = distance;
+        }
+      }
+    }
+
+    return nearestAbove ?? nearestBelow;
   }
 
   void _markUpdated() {

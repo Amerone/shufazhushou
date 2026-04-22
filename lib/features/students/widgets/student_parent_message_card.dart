@@ -335,53 +335,65 @@ class _TemplateChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = selected ? kSealRed : kInkSecondary;
+    final semanticsLabel = recommended ? '$label，推荐话术' : label;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: semanticsLabel,
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? kSealRed.withValues(alpha: 0.1)
-              : Colors.white.withValues(alpha: 0.5),
+      child: ExcludeSemantics(
+        child: InkWell(
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected
-                ? kSealRed.withValues(alpha: 0.26)
-                : kInkSecondary.withValues(alpha: 0.12),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w700,
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: selected
+                  ? kSealRed.withValues(alpha: 0.1)
+                  : Colors.white.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: selected
+                    ? kSealRed.withValues(alpha: 0.26)
+                    : kInkSecondary.withValues(alpha: 0.12),
               ),
             ),
-            if (recommended) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: kGreen.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '荐',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: kGreen,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
+                    color: color,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-            ],
-          ],
+                if (recommended) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: kGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '荐',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: kGreen,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
