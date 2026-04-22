@@ -613,16 +613,24 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
               ),
               Align(
                 alignment: Alignment.centerRight,
-                child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded),
-                  color: kInkSecondary,
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.6),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: kInkSecondary.withValues(alpha: 0.16),
+                child: Semantics(
+                  button: true,
+                  label: '关闭导出配置',
+                  onTap: () => Navigator.of(context).pop(),
+                  child: ExcludeSemantics(
+                    child: IconButton(
+                      tooltip: '关闭导出配置',
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                      color: kInkSecondary,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: kInkSecondary.withValues(alpha: 0.16),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -1219,39 +1227,55 @@ class _ParentSnapshotCard extends StatelessWidget {
       future: future,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.44),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+          return Semantics(
+            container: true,
+            liveRegion: true,
+            label: '正在整理家长首屏摘要，可继续配置导出选项',
+            child: ExcludeSemantics(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.44),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: kInkSecondary.withValues(alpha: 0.12),
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Text('正在整理家长首屏摘要...', style: theme.textTheme.bodySmall),
-              ],
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 12),
+                    Text('正在整理家长首屏摘要...', style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
             ),
           );
         }
 
         if (snapshot.hasError || snapshot.data == null) {
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: kRed.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: kRed.withValues(alpha: 0.12)),
-            ),
-            child: Text(
-              '家长端摘要加载失败，可直接继续导出，或稍后重试。',
-              style: theme.textTheme.bodySmall?.copyWith(color: kRed),
+          return Semantics(
+            container: true,
+            liveRegion: true,
+            label: '家长端摘要加载失败，不影响 PDF 预览、分享 PDF 或导出 Excel，可直接继续导出，或稍后重试',
+            child: ExcludeSemantics(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: kRed.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: kRed.withValues(alpha: 0.12)),
+                ),
+                child: Text(
+                  '家长端摘要加载失败，不影响导出。可直接继续预览、分享 PDF 或导出 Excel，或稍后重试。',
+                  style: theme.textTheme.bodySmall?.copyWith(color: kRed),
+                ),
+              ),
             ),
           );
         }

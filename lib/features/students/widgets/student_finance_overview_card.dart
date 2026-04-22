@@ -12,6 +12,7 @@ class StudentFinanceOverviewCard extends StatelessWidget {
   final String to;
   final AsyncValue<StudentFeeSummary> monthlyFeeAsync;
   final AsyncValue<StudentFeeSummary> allTimeFeeAsync;
+  final VoidCallback? onRetry;
 
   const StudentFinanceOverviewCard({
     super.key,
@@ -20,6 +21,7 @@ class StudentFinanceOverviewCard extends StatelessWidget {
     required this.to,
     required this.monthlyFeeAsync,
     required this.allTimeFeeAsync,
+    this.onRetry,
   });
 
   @override
@@ -33,7 +35,7 @@ class StudentFinanceOverviewCard extends StatelessWidget {
           height: 88,
           child: Center(child: CircularProgressIndicator()),
         ),
-        error: (error, _) => Text('加载费用汇总失败：$error'),
+        error: (error, _) => _FinanceLoadError(error: error, onRetry: onRetry),
         data: (monthlyFee) {
           final monthlyLedger = StudentLedgerView.fromSummary(
             monthlyFee,
@@ -131,6 +133,69 @@ class StudentFinanceOverviewCard extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _FinanceLoadError extends StatelessWidget {
+  final Object error;
+  final VoidCallback? onRetry;
+
+  const _FinanceLoadError({required this.error, this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final message = _friendlyFeeError(error);
+
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '费用汇总加载失败，$message',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExcludeSemantics(
+              child: Icon(
+                Icons.error_outline_rounded,
+                color: theme.colorScheme.error,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '费用汇总加载失败',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: kInkSecondary,
+                    ),
+                  ),
+                  if (onRetry != null) ...[
+                    const SizedBox(height: 10),
+                    FilledButton.tonalIcon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('重试费用'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -283,4 +348,16 @@ Color _ledgerBalanceColor(StudentLedgerView ledger) {
     case LedgerBalanceState.surplus:
       return kGreen;
   }
+}
+
+String _friendlyFeeError(Object error) {
+  var message = error.toString().trim();
+  const prefixes = ['Exception:', 'StateError:', 'Error:'];
+  for (final prefix in prefixes) {
+    if (message.startsWith(prefix)) {
+      message = message.substring(prefix.length).trim();
+      break;
+    }
+  }
+  return message.isEmpty ? '请稍后重试。' : message;
 }

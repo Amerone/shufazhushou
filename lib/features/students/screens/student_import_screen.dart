@@ -12,7 +12,9 @@ import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
 
 class StudentImportScreen extends ConsumerStatefulWidget {
-  const StudentImportScreen({super.key});
+  final ImportPreview? initialPreview;
+
+  const StudentImportScreen({super.key, this.initialPreview});
 
   @override
   ConsumerState<StudentImportScreen> createState() =>
@@ -22,6 +24,12 @@ class StudentImportScreen extends ConsumerStatefulWidget {
 class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
   ImportPreview? _preview;
   bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _preview = widget.initialPreview;
+  }
 
   Future<void> _pick({bool clearExistingPreview = false}) async {
     if (_loading) return;
@@ -81,6 +89,13 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
         ? 0
         : preview.skipped - preview.errors.length;
     final issueCount = preview?.errors.length ?? 0;
+    final confirmDisabledReason = _loading
+        ? '正在处理导入，请稍候'
+        : preview == null
+        ? '请先选择 Excel 文件并查看预览'
+        : preview.toInsert.isEmpty
+        ? '当前没有可导入的学生记录，请重新选择文件或修正 Excel 内容'
+        : null;
     final importState = preview == null
         ? ('等待选择文件', '先选择 Excel 文件，再查看导入预览。', kPrimaryBlue)
         : preview.toInsert.isEmpty
@@ -173,19 +188,47 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                         const SizedBox(height: 16),
                         SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            onPressed: _loading
+                          child: Semantics(
+                            container: true,
+                            button: true,
+                            enabled: !_loading,
+                            label: _loading
+                                ? '正在处理文件'
+                                : '选择 Excel 文件，打开文件选择器并生成导入预览',
+                            onTap: _loading
                                 ? null
                                 : () => _pick(
                                     clearExistingPreview: preview != null,
                                   ),
-                            icon: const Icon(Icons.upload_file_outlined),
-                            label: Text(_loading ? '处理中...' : '选择 Excel 文件'),
+                            child: ExcludeSemantics(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                ),
+                                onPressed: _loading
+                                    ? null
+                                    : () => _pick(
+                                        clearExistingPreview: preview != null,
+                                      ),
+                                icon: const Icon(Icons.upload_file_outlined),
+                                label: Text(
+                                  _loading ? '处理中...' : '选择 Excel 文件',
+                                ),
+                              ),
+                            ),
                           ),
                         ),
+                        if (_loading) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            '正在读取文件并生成预览，请勿重复操作。',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: kInkSecondary,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -404,20 +447,35 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                                   ),
                                   SizedBox(
                                     width: buttonWidth,
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
+                                    child: Semantics(
+                                      container: true,
+                                      button: true,
+                                      enabled: confirmDisabledReason == null,
+                                      label: confirmDisabledReason == null
+                                          ? '确认导入 ${preview.toInsert.length} 位学生'
+                                          : '确认导入不可用，$confirmDisabledReason',
+                                      onTap: confirmDisabledReason == null
+                                          ? _confirm
+                                          : null,
+                                      child: ExcludeSemantics(
+                                        child: ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 16,
+                                            ),
+                                          ),
+                                          onPressed:
+                                              confirmDisabledReason == null
+                                              ? _confirm
+                                              : null,
+                                          icon: const Icon(
+                                            Icons.check_circle_outline,
+                                          ),
+                                          label: Text(
+                                            _loading ? '处理中...' : '确认导入',
+                                          ),
                                         ),
                                       ),
-                                      onPressed:
-                                          _loading || preview.toInsert.isEmpty
-                                          ? null
-                                          : _confirm,
-                                      icon: const Icon(
-                                        Icons.check_circle_outline,
-                                      ),
-                                      label: Text(_loading ? '处理中...' : '确认导入'),
                                     ),
                                   ),
                                 ],
@@ -480,28 +538,39 @@ class _ImportStepChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: const BoxDecoration(
-              color: kPrimaryBlue,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              index,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
+          Semantics(
+            container: true,
+            label: '步骤 $index：$text',
+            child: ExcludeSemantics(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      color: kPrimaryBlue,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      index,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    text,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: kPrimaryBlue,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: kPrimaryBlue,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -710,43 +779,49 @@ class _ImportIssueLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: kOrange.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 22,
-            height: 22,
-            decoration: const BoxDecoration(
-              color: kOrange,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '$index',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
+    return Semantics(
+      container: true,
+      label: '导入问题 $index：$message',
+      child: ExcludeSemantics(
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: kOrange.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: const BoxDecoration(
+                  color: kOrange,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$index',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  message,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: kOrange),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: kOrange),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

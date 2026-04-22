@@ -56,4 +56,67 @@ void main() {
     expect(find.text('期初结转 ¥-50.00'), findsOneWidget);
     expect(find.text('本期变化 ¥-200.00'), findsOneWidget);
   });
+
+  testWidgets('monthly fee failure exposes retry action', (tester) async {
+    final semantics = tester.ensureSemantics();
+    var retryCount = 0;
+
+    const student = Student(
+      id: 'student-1',
+      name: 'Alice',
+      pricePerClass: 100,
+      status: 'active',
+      createdAt: 1,
+      updatedAt: 1,
+    );
+
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildAppTheme(),
+            home: Scaffold(
+              body: StudentFinanceOverviewCard(
+                student: student,
+                from: '2026-04-01',
+                to: '2026-04-30',
+                monthlyFeeAsync: AsyncValue.error(
+                  Exception('数据库暂时不可用'),
+                  StackTrace.empty,
+                ),
+                allTimeFeeAsync: const AsyncData(
+                  StudentFeeSummary(
+                    totalReceivable: 0,
+                    totalReceived: 0,
+                    openingBalance: 0,
+                    periodNetChange: 0,
+                    balance: 0,
+                  ),
+                ),
+                onRetry: () => retryCount++,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              widget.properties.label == '费用汇总加载失败，数据库暂时不可用' &&
+              widget.properties.liveRegion == true,
+        ),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(FilledButton, '重试费用'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, '重试费用'));
+
+      expect(retryCount, 1);
+    } finally {
+      semantics.dispose();
+    }
+  });
 }

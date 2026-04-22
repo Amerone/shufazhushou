@@ -66,10 +66,15 @@ class _DefaultLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: CircularProgressIndicator.adaptive(),
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '正在加载',
+      child: const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator.adaptive(semanticsLabel: '正在加载'),
+        ),
       ),
     );
   }
@@ -84,39 +89,50 @@ class _DefaultError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              size: 48,
-              color: kSealRed.withValues(alpha: 0.7),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '\u52a0\u8f7d\u5931\u8d25',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.error,
+    final message = _friendlyMessage(error);
+
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '加载失败，$message',
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ExcludeSemantics(
+                child: Icon(
+                  Icons.error_outline_rounded,
+                  size: 48,
+                  color: kSealRed.withValues(alpha: 0.7),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _friendlyMessage(error),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(color: kInkSecondary),
-            ),
-            if (onRetry != null) ...[
               const SizedBox(height: 16),
-              FilledButton.tonalIcon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('重试'),
+              Text(
+                '加载失败',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: kInkSecondary,
+                ),
+              ),
+              if (onRetry != null) ...[
+                const SizedBox(height: 16),
+                FilledButton.tonalIcon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('重试'),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -124,12 +140,12 @@ class _DefaultError extends StatelessWidget {
 
   static String _friendlyMessage(Object error) {
     final message = error.toString();
-    if (message.contains('\u6570\u636e\u5e93')) {
-      return '\u6570\u636e\u8bbf\u95ee\u51fa\u73b0\u95ee\u9898\uff0c\u8bf7\u91cd\u8bd5';
+    if (message.contains('数据库')) {
+      return '数据访问出现问题，请重试';
     }
-    if (message.contains('\u7f51\u7edc') || message.contains('Socket')) {
-      return '\u7f51\u7edc\u8fde\u63a5\u5f02\u5e38';
+    if (message.contains('网络') || message.contains('Socket')) {
+      return '网络连接异常';
     }
-    return '\u64cd\u4f5c\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5';
+    return '操作失败，请稍后重试';
   }
 }

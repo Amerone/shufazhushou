@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moyun/core/database/dao/attendance_dao.dart';
@@ -165,9 +166,70 @@ void main() {
     final aiSwitch = tester.widget<Switch>(find.byType(Switch).last);
     expect(aiSwitch.onChanged, isNull);
   });
+
+  testWidgets('close button exposes an accessible label', (tester) async {
+    final semantics = tester.ensureSemantics();
+    const student = Student(
+      id: 'student-3',
+      name: 'Cara',
+      pricePerClass: 180,
+      status: 'active',
+      createdAt: 1,
+      updatedAt: 1,
+    );
+
+    try {
+      await _pumpScreen(tester, student);
+
+      expect(find.byTooltip('关闭导出配置'), findsOneWidget);
+      final closeNode = tester.getSemantics(find.bySemanticsLabel('关闭导出配置'));
+      expect(closeNode.flagsCollection.isButton, isTrue);
+      expect(
+        closeNode.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+    } finally {
+      semantics.dispose();
+    }
+  });
+
+  testWidgets('parent snapshot failure says export can continue', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    const student = Student(
+      id: 'student-4',
+      name: 'Dana',
+      pricePerClass: 180,
+      status: 'active',
+      createdAt: 1,
+      updatedAt: 1,
+    );
+
+    try {
+      await _pumpScreen(tester, student, failParentSnapshot: true);
+
+      expect(
+        find.text('家长端摘要加载失败，不影响导出。可直接继续预览、分享 PDF 或导出 Excel，或稍后重试。'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(
+          '家长端摘要加载失败，不影响 PDF 预览、分享 PDF 或导出 Excel，可直接继续导出，或稍后重试',
+        ),
+        findsOneWidget,
+      );
+    } finally {
+      semantics.dispose();
+    }
+  });
 }
 
-Future<void> _pumpScreen(WidgetTester tester, Student student) async {
+Future<void> _pumpScreen(
+  WidgetTester tester,
+  Student student, {
+  bool failParentSnapshot = false,
+}) async {
   _FakeSettingsNotifier.seededSettings = const {
     'default_message_template': '',
     'default_watermark_enabled': 'true',
@@ -178,7 +240,9 @@ Future<void> _pumpScreen(WidgetTester tester, Student student) async {
     ProviderScope(
       overrides: [
         settingsProvider.overrideWith(_FakeSettingsNotifier.new),
-        attendanceDaoProvider.overrideWithValue(_FakeAttendanceDao()),
+        attendanceDaoProvider.overrideWithValue(
+          _FakeAttendanceDao(shouldFail: failParentSnapshot),
+        ),
         paymentDaoProvider.overrideWithValue(_FakePaymentDao()),
         studentDaoProvider.overrideWithValue(_FakeStudentDao(student)),
         studentProvider.overrideWith(_FakeStudentNotifier.new),
@@ -211,7 +275,10 @@ class _FakeStudentDao extends StudentDao {
 }
 
 class _FakeAttendanceDao extends AttendanceDao {
-  _FakeAttendanceDao() : super(DatabaseHelper.instance);
+  final bool shouldFail;
+
+  _FakeAttendanceDao({this.shouldFail = false})
+    : super(DatabaseHelper.instance);
 
   @override
   Future<List<Attendance>> getByStudentAndDateRange(
@@ -219,6 +286,12 @@ class _FakeAttendanceDao extends AttendanceDao {
     String? from,
     String? to,
   ) async {
+    if (shouldFail) {
+      return Future<List<Attendance>>.delayed(
+        const Duration(milliseconds: 20),
+        () => throw Exception('snapshot unavailable'),
+      );
+    }
     return const [];
   }
 

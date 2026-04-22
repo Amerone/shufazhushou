@@ -24,6 +24,29 @@ class BackupScreen extends ConsumerStatefulWidget {
   ConsumerState<BackupScreen> createState() => _BackupScreenState();
 }
 
+@visibleForTesting
+Widget buildBackupPassphraseVisibilityToggleForTesting({
+  required bool obscure,
+  required String showTooltip,
+  required String hideTooltip,
+  required VoidCallback onPressed,
+}) {
+  return _PassphraseVisibilityToggle(
+    obscure: obscure,
+    showTooltip: showTooltip,
+    hideTooltip: hideTooltip,
+    onPressed: onPressed,
+  );
+}
+
+@visibleForTesting
+Widget buildBackupRestoreActionForTesting({
+  required BackupRecord record,
+  required VoidCallback? onRestore,
+}) {
+  return _BackupRestoreAction(record: record, onRestore: onRestore);
+}
+
 class _BackupScreenState extends ConsumerState<BackupScreen> {
   late Future<List<BackupRecord>> _backupsFuture;
   late Future<String> _backupDirectoryFuture;
@@ -130,17 +153,15 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        suffixIcon: IconButton(
+                        suffixIcon: _PassphraseVisibilityToggle(
+                          obscure: obscurePassphrase,
+                          showTooltip: '显示备份口令',
+                          hideTooltip: '隐藏备份口令',
                           onPressed: () {
                             setSheetState(() {
                               obscurePassphrase = !obscurePassphrase;
                             });
                           },
-                          icon: Icon(
-                            obscurePassphrase
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                          ),
                         ),
                       ),
                       onSubmitted: (_) {
@@ -159,17 +180,15 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          suffixIcon: IconButton(
+                          suffixIcon: _PassphraseVisibilityToggle(
+                            obscure: obscureConfirm,
+                            showTooltip: '显示确认口令',
+                            hideTooltip: '隐藏确认口令',
                             onPressed: () {
                               setSheetState(() {
                                 obscureConfirm = !obscureConfirm;
                               });
                             },
-                            icon: Icon(
-                              obscureConfirm
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                            ),
                           ),
                         ),
                         onSubmitted: (_) => submit(),
@@ -878,6 +897,57 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
+class _PassphraseVisibilityToggle extends StatelessWidget {
+  final bool obscure;
+  final String showTooltip;
+  final String hideTooltip;
+  final VoidCallback onPressed;
+
+  const _PassphraseVisibilityToggle({
+    required this.obscure,
+    required this.showTooltip,
+    required this.hideTooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: obscure ? showTooltip : hideTooltip,
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      onPressed: onPressed,
+      icon: Icon(
+        obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+      ),
+    );
+  }
+}
+
+class _BackupRestoreAction extends StatelessWidget {
+  final BackupRecord record;
+  final VoidCallback? onRestore;
+
+  const _BackupRestoreAction({required this.record, this.onRestore});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '恢复备份 ${record.fileName}',
+      hint: '会先显示确认提示，确认后覆盖当前全部数据',
+      button: true,
+      enabled: onRestore != null,
+      onTap: onRestore,
+      child: ExcludeSemantics(
+        child: OutlinedButton.icon(
+          onPressed: onRestore,
+          icon: const Icon(Icons.restore_outlined),
+          label: const Text('恢复此备份'),
+        ),
+      ),
+    );
+  }
+}
+
 class _BackupRecordCard extends StatelessWidget {
   final BackupRecord record;
   final String sizeLabel;
@@ -939,11 +1009,7 @@ class _BackupRecordCard extends StatelessWidget {
                 icon: const Icon(Icons.share_outlined),
                 label: const Text('加密分享'),
               ),
-              OutlinedButton.icon(
-                onPressed: onRestore,
-                icon: const Icon(Icons.restore_outlined),
-                label: const Text('恢复此备份'),
-              ),
+              _BackupRestoreAction(record: record, onRestore: onRestore),
             ],
           ),
         ],

@@ -441,6 +441,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                         to: to,
                         monthlyFeeAsync: feeAsync,
                         allTimeFeeAsync: allTimeFeeForOverview,
+                        onRetry: () => unawaited(_refresh()),
                       ),
                     ),
                     if (allTimeFeeAsync.hasError && allTimeFee != null) ...[
