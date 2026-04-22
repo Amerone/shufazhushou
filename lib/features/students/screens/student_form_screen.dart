@@ -454,6 +454,9 @@ class _StatusOptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final transitionDuration = MediaQuery.of(context).disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
 
     return Semantics(
       button: true,
@@ -467,7 +470,7 @@ class _StatusOptionCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             onTap: onTap,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration: transitionDuration,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: selected

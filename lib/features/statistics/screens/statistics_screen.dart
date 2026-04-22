@@ -183,6 +183,26 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
     final periodLabel = _periodLabel(range.period);
     final updatedLabel = _formatUpdatedAt(_lastUpdatedAt);
     final viewPaddingBottom = MediaQuery.viewPaddingOf(context).bottom;
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    final horizontalPadding = MediaQuery.sizeOf(context).width < 390
+        ? 16.0
+        : 24.0;
+
+    final scrollToTopAction = IgnorePointer(
+      ignoring: !_showScrollToTop,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
+        child: FloatingActionButton.small(
+          heroTag: 'statistics-scroll-top',
+          onPressed: _scrollToTop,
+          tooltip: '回到顶部',
+          backgroundColor: Colors.white.withValues(alpha: 0.92),
+          foregroundColor: kPrimaryBlue,
+          elevation: 0,
+          child: const Icon(Icons.vertical_align_top_outlined),
+        ),
+      ),
+    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -202,7 +222,12 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        4,
+                        horizontalPadding,
+                        120,
+                      ),
                       sliver: SliverList(
                         delegate: SliverChildListDelegate([
                           _StatisticsOverviewCard(
@@ -317,30 +342,18 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
           ],
         ),
       ),
-      floatingActionButton: AnimatedSlide(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        offset: _showScrollToTop ? Offset.zero : const Offset(0, 1.6),
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 180),
-          opacity: _showScrollToTop ? 1 : 0,
-          child: IgnorePointer(
-            ignoring: !_showScrollToTop,
-            child: Padding(
-              padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
-              child: FloatingActionButton.small(
-                heroTag: 'statistics-scroll-top',
-                onPressed: _scrollToTop,
-                tooltip: '回到顶部',
-                backgroundColor: Colors.white.withValues(alpha: 0.92),
-                foregroundColor: kPrimaryBlue,
-                elevation: 0,
-                child: const Icon(Icons.vertical_align_top_outlined),
+      floatingActionButton: reduceMotion
+          ? Opacity(opacity: _showScrollToTop ? 1 : 0, child: scrollToTopAction)
+          : AnimatedSlide(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              offset: _showScrollToTop ? Offset.zero : const Offset(0, 1.6),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: _showScrollToTop ? 1 : 0,
+                child: scrollToTopAction,
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -28,16 +28,22 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
     final theme = Theme.of(context);
     final selectedDate = ref.watch(selectedDateProvider);
     final summaryByDate = ref.watch(monthAttendanceDaySummaryProvider);
+    if (!_isSameMonth(_focusedDay, selectedDate)) {
+      _focusedDay = selectedDate;
+    }
 
     return GlassCard(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.start,
             children: [
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 220, maxWidth: 420),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -61,7 +67,6 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -93,94 +98,108 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
             ],
           ),
           const SizedBox(height: 14),
-          RepaintBoundary(
-            child: TableCalendar(
-            locale: 'zh_CN',
-            firstDay: DateTime(2020),
-            lastDay: DateTime(2030),
-            focusedDay: _focusedDay,
-            selectedDayPredicate: (d) => isSameDay(d, selectedDate),
-              onDaySelected: (selected, focused) {
-                if (!isSameDay(selected, selectedDate)) {
-                  ref.read(selectedDateProvider.notifier).state = selected;
-                }
-                if (!isSameDay(focused, _focusedDay)) {
-                  setState(() => _focusedDay = focused);
-                }
-              },
-              onPageChanged: (focused) {
-                if (!isSameDay(focused, _focusedDay)) {
-                  setState(() => _focusedDay = focused);
-                }
+          Semantics(
+            label: '出勤月历，选择日期查看当天课堂记录',
+            child: RepaintBoundary(
+              child: TableCalendar(
+                locale: 'zh_CN',
+                firstDay: DateTime(2020),
+                lastDay: DateTime(2030),
+                focusedDay: _focusedDay,
+                selectedDayPredicate: (d) => isSameDay(d, selectedDate),
+                onDaySelected: (selected, focused) {
+                  if (!isSameDay(selected, selectedDate)) {
+                    ref.read(selectedDateProvider.notifier).state = selected;
+                  }
+                  if (!isSameDay(focused, _focusedDay)) {
+                    setState(() => _focusedDay = focused);
+                  }
+                  final selectedMonth = DateTime(selected.year, selected.month);
+                  final currentMonth = ref.read(selectedMonthProvider);
+                  if (!_isSameMonth(selectedMonth, currentMonth)) {
+                    ref.read(selectedMonthProvider.notifier).state =
+                        selectedMonth;
+                  }
+                },
+                onPageChanged: (focused) {
+                  if (!isSameDay(focused, _focusedDay)) {
+                    setState(() => _focusedDay = focused);
+                  }
 
-                final nextMonth = DateTime(focused.year, focused.month);
-                final currentMonth = ref.read(selectedMonthProvider);
-                if (!_isSameMonth(nextMonth, currentMonth)) {
-                  ref.read(selectedMonthProvider.notifier).state = nextMonth;
-                }
-              },
-            headerStyle: HeaderStyle(
-              formatButtonVisible: false,
-              titleCentered: true,
-              titleTextStyle: (theme.textTheme.titleMedium ?? const TextStyle())
-                  .copyWith(fontWeight: FontWeight.w700),
-              leftChevronIcon: const Icon(
-                Icons.chevron_left,
-                color: kInkSecondary,
-              ),
-              rightChevronIcon: const Icon(
-                Icons.chevron_right,
-                color: kInkSecondary,
-              ),
-              headerPadding: const EdgeInsets.only(bottom: 12),
-            ),
-            daysOfWeekStyle: DaysOfWeekStyle(
-              weekdayStyle: (theme.textTheme.bodySmall ?? const TextStyle())
-                  .copyWith(color: kInkSecondary.withValues(alpha: 0.9)),
-              weekendStyle: (theme.textTheme.bodySmall ?? const TextStyle())
-                  .copyWith(color: kRed),
-            ),
-            calendarStyle: CalendarStyle(
-              cellMargin: const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 6,
-              ),
-              defaultTextStyle: theme.textTheme.bodyMedium ?? const TextStyle(),
-              weekendTextStyle:
-                  (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
-                    color: kRed,
+                  final nextMonth = DateTime(focused.year, focused.month);
+                  final currentMonth = ref.read(selectedMonthProvider);
+                  if (!_isSameMonth(nextMonth, currentMonth)) {
+                    ref.read(selectedMonthProvider.notifier).state = nextMonth;
+                  }
+                },
+                headerStyle: HeaderStyle(
+                  formatButtonVisible: false,
+                  titleCentered: true,
+                  titleTextStyle:
+                      (theme.textTheme.titleMedium ?? const TextStyle())
+                          .copyWith(fontWeight: FontWeight.w700),
+                  leftChevronIcon: const Icon(
+                    Icons.chevron_left,
+                    color: kInkSecondary,
                   ),
-              selectedDecoration: BoxDecoration(
-                color: kPrimaryBlue.withValues(alpha: 0.94),
-                border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.18)),
-                shape: BoxShape.circle,
-              ),
-              todayDecoration: BoxDecoration(
-                color: kSealRed.withValues(alpha: 0.14),
-                border: Border.all(color: kSealRed.withValues(alpha: 0.4)),
-                shape: BoxShape.circle,
-              ),
-              markerDecoration: const BoxDecoration(shape: BoxShape.circle),
-              outsideTextStyle: (theme.textTheme.bodySmall ?? const TextStyle())
-                  .copyWith(color: kInkSecondary.withValues(alpha: 0.45)),
-            ),
-            calendarBuilders: CalendarBuilders(
-              markerBuilder: (context, day, events) {
-                final key = formatDate(day);
-                final color = _summaryColor(summaryByDate[key]);
-                if (color == null) return null;
+                  rightChevronIcon: const Icon(
+                    Icons.chevron_right,
+                    color: kInkSecondary,
+                  ),
+                  headerPadding: const EdgeInsets.only(bottom: 12),
+                ),
+                daysOfWeekStyle: DaysOfWeekStyle(
+                  weekdayStyle: (theme.textTheme.bodySmall ?? const TextStyle())
+                      .copyWith(color: kInkSecondary.withValues(alpha: 0.9)),
+                  weekendStyle: (theme.textTheme.bodySmall ?? const TextStyle())
+                      .copyWith(color: kRed),
+                ),
+                calendarStyle: CalendarStyle(
+                  cellMargin: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 6,
+                  ),
+                  defaultTextStyle:
+                      theme.textTheme.bodyMedium ?? const TextStyle(),
+                  weekendTextStyle:
+                      (theme.textTheme.bodyMedium ?? const TextStyle())
+                          .copyWith(color: kRed),
+                  selectedDecoration: BoxDecoration(
+                    color: kPrimaryBlue.withValues(alpha: 0.94),
+                    border: Border.all(
+                      color: kPrimaryBlue.withValues(alpha: 0.18),
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  todayDecoration: BoxDecoration(
+                    color: kSealRed.withValues(alpha: 0.14),
+                    border: Border.all(color: kSealRed.withValues(alpha: 0.4)),
+                    shape: BoxShape.circle,
+                  ),
+                  markerDecoration: const BoxDecoration(shape: BoxShape.circle),
+                  outsideTextStyle:
+                      (theme.textTheme.bodySmall ?? const TextStyle()).copyWith(
+                        color: kInkSecondary.withValues(alpha: 0.45),
+                      ),
+                ),
+                calendarBuilders: CalendarBuilders(
+                  markerBuilder: (context, day, events) {
+                    final key = formatDate(day);
+                    final color = _summaryColor(summaryByDate[key]);
+                    if (color == null) return null;
 
-                return Positioned(
-                  bottom: 7,
-                  child: BrushStrokeDivider(
-                    width: 18,
-                    height: 6,
-                    color: color,
-                    alignment: Alignment.center,
-                  ),
-                );
-              },
-            ),
+                    return Positioned(
+                      bottom: 7,
+                      child: BrushStrokeDivider(
+                        width: 18,
+                        height: 6,
+                        color: color,
+                        alignment: Alignment.center,
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ],

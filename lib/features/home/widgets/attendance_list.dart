@@ -111,6 +111,7 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
                   await showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
+                    useSafeArea: true,
                     builder: (_) => const QuickEntrySheet(),
                   );
                 },
@@ -118,7 +119,11 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
                 label: const Text('立即记课'),
               ),
               const SizedBox(height: 8),
-              Text('记完后，这里会直接出现当天出勤名单。', style: theme.textTheme.bodySmall),
+              Text(
+                '记完后，这里会直接出现当天出勤名单。',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall,
+              ),
             ],
           );
         }
@@ -170,6 +175,7 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
                       showModalBottomSheet(
                         context: context,
                         isScrollControlled: true,
+                        useSafeArea: true,
                         builder: (_) => AttendanceEditSheet(
                           record: r,
                           onAnalyzeArtwork: () =>
@@ -200,10 +206,7 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
                                 AppToast.showSuccess(context, '出勤记录已删除');
                               } catch (error) {
                                 if (!context.mounted) return;
-                                AppToast.showError(
-                                  context,
-                                  '删除出勤记录失败：$error',
-                                );
+                                AppToast.showError(context, '删除出勤记录失败：$error');
                               }
                             },
                           );
@@ -277,6 +280,8 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
                                             children: [
                                               Text(
                                                 studentName,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: theme
                                                     .textTheme
                                                     .titleSmall
@@ -548,7 +553,7 @@ class _RecordActionButton extends StatelessWidget {
         onPressed: onPressed,
         icon: const Icon(Icons.delete_outline),
         color: kRed,
-        visualDensity: VisualDensity.compact,
+        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
         style: IconButton.styleFrom(overlayColor: kRed.withValues(alpha: 0.12)),
       ),
     );

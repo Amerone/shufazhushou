@@ -28,6 +28,9 @@ class AiSettingsScreen extends ConsumerWidget {
     final settingsAsync = ref.watch(settingsProvider);
     final config = ref.watch(qwenVisionConfigProvider);
     final includeStudentName = ref.watch(aiIncludeStudentNameProvider);
+    final horizontalPadding = MediaQuery.sizeOf(context).width < 390
+        ? 16.0
+        : 24.0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -44,7 +47,12 @@ class AiSettingsScreen extends ConsumerWidget {
                 value: settingsAsync,
                 onRetry: () => ref.invalidate(settingsProvider),
                 builder: (settings) => ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    4,
+                    horizontalPadding,
+                    120,
+                  ),
                   children: [
                     GlassCard(
                       padding: const EdgeInsets.all(18),
@@ -536,7 +544,35 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
           ),
           if (_errorText != null) ...[
             const SizedBox(height: 12),
-            Text(_errorText!, style: const TextStyle(color: kSealRed)),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: kSealRed.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: kSealRed.withValues(alpha: 0.12)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: kSealRed,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _errorText!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: kSealRed,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
           if (_result != null) ...[
             const SizedBox(height: 12),

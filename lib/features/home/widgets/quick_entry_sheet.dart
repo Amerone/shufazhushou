@@ -601,7 +601,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bottomPadding = MediaQuery.of(context).padding.bottom + 12;
+    final mediaQuery = MediaQuery.of(context);
+    final bottomPadding =
+        mediaQuery.viewInsets.bottom + mediaQuery.padding.bottom + 12;
+    final horizontalPadding = mediaQuery.size.width < 380 ? 10.0 : 16.0;
+    final stepIndicatorDuration = mediaQuery.disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
@@ -609,7 +615,12 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       maxChildSize: 0.95,
       expand: false,
       builder: (_, controller) => Padding(
-        padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          8,
+          horizontalPadding,
+          bottomPadding,
+        ),
         child: GlassCard(
           padding: const EdgeInsets.only(top: 8),
           child: Column(
@@ -651,7 +662,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   children: List.generate(
                     2,
                     (i) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
+                      duration: stepIndicatorDuration,
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       width: _step == i ? 24 : 8,
                       height: 8,
@@ -851,28 +862,42 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                           ),
                           if (students.isEmpty || _searchQuery.isEmpty) ...[
                             const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () =>
-                                        _openStudentRoute('/students/import'),
-                                    icon: const Icon(
-                                      Icons.upload_file_outlined,
-                                    ),
-                                    label: const Text('批量导入'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: FilledButton.icon(
-                                    onPressed: () =>
-                                        _openStudentRoute('/students/create'),
-                                    icon: const Icon(Icons.person_add_alt_1),
-                                    label: const Text('新增学生'),
-                                  ),
-                                ),
-                              ],
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final compact = constraints.maxWidth < 340;
+                                final importButton = OutlinedButton.icon(
+                                  onPressed: () =>
+                                      _openStudentRoute('/students/import'),
+                                  icon: const Icon(Icons.upload_file_outlined),
+                                  label: const Text('批量导入'),
+                                );
+                                final createButton = FilledButton.icon(
+                                  onPressed: () =>
+                                      _openStudentRoute('/students/create'),
+                                  icon: const Icon(Icons.person_add_alt_1),
+                                  label: const Text('新增学生'),
+                                );
+
+                                if (compact) {
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      importButton,
+                                      const SizedBox(height: 10),
+                                      createButton,
+                                    ],
+                                  );
+                                }
+
+                                return Row(
+                                  children: [
+                                    Expanded(child: importButton),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: createButton),
+                                  ],
+                                );
+                              },
                             ),
                           ],
                         ],
@@ -1035,6 +1060,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   icon: const Icon(Icons.flash_on_outlined),
                   label: Text(
                     '直接保存（${selectedStudents.length}人 / ¥${_formatAmount(estimatedTotalFee)}）',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),
@@ -1198,70 +1226,80 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () async {
-                  final t = await showTimeWheelPicker(
-                    context: context,
-                    initialTime: parseTime(_startTime),
-                    label: '开始时间',
-                  );
-                  if (t == null || !mounted) return;
-                  await InteractionFeedback.selection(context);
-                  if (!mounted) return;
-                  setState(() {
-                    _markDefaultsCustomized();
-                    _startTime = formatTime(t);
-                  });
-                },
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: '开始时间',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.56),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 340;
+            final startPicker = InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () async {
+                final t = await showTimeWheelPicker(
+                  context: context,
+                  initialTime: parseTime(_startTime),
+                  label: '开始时间',
+                );
+                if (t == null || !context.mounted) return;
+                await InteractionFeedback.selection(context);
+                if (!mounted) return;
+                setState(() {
+                  _markDefaultsCustomized();
+                  _startTime = formatTime(t);
+                });
+              },
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: '开始时间',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(_startTime),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.56),
                 ),
+                child: Text(_startTime),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () async {
-                  final t = await showTimeWheelPicker(
-                    context: context,
-                    initialTime: parseTime(_endTime),
-                    label: '结束时间',
-                  );
-                  if (t == null || !mounted) return;
-                  await InteractionFeedback.selection(context);
-                  if (!mounted) return;
-                  setState(() {
-                    _markDefaultsCustomized();
-                    _endTime = formatTime(t);
-                  });
-                },
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: '结束时间',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.56),
+            );
+            final endPicker = InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () async {
+                final t = await showTimeWheelPicker(
+                  context: context,
+                  initialTime: parseTime(_endTime),
+                  label: '结束时间',
+                );
+                if (t == null || !context.mounted) return;
+                await InteractionFeedback.selection(context);
+                if (!mounted) return;
+                setState(() {
+                  _markDefaultsCustomized();
+                  _endTime = formatTime(t);
+                });
+              },
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: '结束时间',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(_endTime),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.56),
                 ),
+                child: Text(_endTime),
               ),
-            ),
-          ],
+            );
+
+            if (compact) {
+              return Column(
+                children: [startPicker, const SizedBox(height: 12), endPicker],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: startPicker),
+                const SizedBox(width: 12),
+                Expanded(child: endPicker),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 16),
         Text('出勤状态', style: theme.textTheme.titleSmall),
@@ -1403,37 +1441,48 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           ),
         ),
         const SizedBox(height: 24),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () {
-                  unawaited(InteractionFeedback.selection(context));
-                  setState(() => _step = 0);
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 340;
+            final backButton = OutlinedButton(
+              onPressed: () {
+                unawaited(InteractionFeedback.selection(context));
+                setState(() => _step = 0);
+              },
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Text('上一步'),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: _saving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+              child: const Text('上一步'),
+            );
+            final saveButton = ElevatedButton(
+              onPressed: _saving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Text(_saving ? '保存中...' : '确认保存'),
               ),
-            ),
-          ],
+              child: Text(_saving ? '保存中...' : '确认保存'),
+            );
+
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [saveButton, const SizedBox(height: 10), backButton],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: backButton),
+                const SizedBox(width: 12),
+                Expanded(child: saveButton),
+              ],
+            );
+          },
         ),
       ],
     );

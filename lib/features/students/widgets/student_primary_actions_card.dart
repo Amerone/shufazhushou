@@ -65,21 +65,34 @@ class StudentPrimaryActionsCard extends StatelessWidget {
             },
           ),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              TextButton.icon(
-                onPressed: onOpenExport,
-                icon: const Icon(Icons.description_outlined),
-                label: const Text('导出报告'),
-              ),
-              TextButton.icon(
-                onPressed: onEditStudent,
-                icon: const Icon(Icons.edit_note_outlined),
-                label: const Text('编辑档案'),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 340;
+              final actionWidth = compact ? constraints.maxWidth : null;
+
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  SizedBox(
+                    width: actionWidth,
+                    child: TextButton.icon(
+                      onPressed: onOpenExport,
+                      icon: const Icon(Icons.description_outlined),
+                      label: const Text('导出报告'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: actionWidth,
+                    child: TextButton.icon(
+                      onPressed: onEditStudent,
+                      icon: const Icon(Icons.edit_note_outlined),
+                      label: const Text('编辑档案'),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

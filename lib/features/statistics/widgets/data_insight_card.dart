@@ -256,42 +256,53 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: kSealRed.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_outlined,
-                  color: kSealRed,
-                  size: 20,
-                ),
-              ),
-              SizedBox(
-                width: 300,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'AI \u7ecf\u8425\u6d1e\u5bdf',
-                      style: theme.textTheme.titleMedium,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 360;
+              final textWidth = compact
+                  ? constraints.maxWidth
+                  : constraints.maxWidth - 54;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: kSealRed.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '\u57fa\u4e8e\u5f53\u524d\u7edf\u8ba1\u5468\u671f\u7684\u6d3b\u8dc3\u5ea6\u3001\u8425\u6536\u4e0e\u63d0\u9192\u751f\u6210\u7ecf\u8425\u5206\u6790\u3002',
-                      style: theme.textTheme.bodySmall,
+                    child: const Icon(
+                      Icons.auto_awesome_outlined,
+                      color: kSealRed,
+                      size: 20,
                     ),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                  SizedBox(
+                    width: textWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI \u7ecf\u8425\u6d1e\u5bdf',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '\u57fa\u4e8e\u5f53\u524d\u7edf\u8ba1\u5468\u671f\u7684\u6d3b\u8dc3\u5ea6\u3001\u8425\u6536\u4e0e\u63d0\u9192\u751f\u6210\u7ecf\u8425\u5206\u6790\u3002',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           SizedBox(

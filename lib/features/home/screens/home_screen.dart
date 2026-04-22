@@ -62,6 +62,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (_) => QuickEntrySheet(
         initialSelectedIds: initialSelectedIds,
         initialStartTime: initialStartTime,
@@ -89,6 +90,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final selectedStudent = await showModalBottomSheet<StudentWithMeta>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (_) => const StudentPickerSheet(
         title: '\u9009\u62e9\u7f34\u8d39\u5b66\u751f',
         subtitle:
@@ -204,6 +206,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       highlightColor: kPrimaryBlue.withValues(alpha: 0.04),
       hoverColor: kPrimaryBlue.withValues(alpha: 0.03),
     );
+    final bottomSystemInset = MediaQuery.viewPaddingOf(context).bottom;
+    const bottomNavigationReserve = 80.0;
+    final fabBottomPadding = bottomSystemInset + bottomNavigationReserve;
+    final scrollEndPadding = fabBottomPadding + 96;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -375,14 +381,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                           ),
                         ),
-                        const SliverPadding(
-                          padding: EdgeInsets.fromLTRB(20, 12, 20, 120),
+                        SliverPadding(
+                          padding: EdgeInsets.fromLTRB(
+                            20,
+                            12,
+                            20,
+                            scrollEndPadding,
+                          ),
                           sliver: SliverToBoxAdapter(
                             child: AttendanceCalendar(),
                           ),
                         ),
                       ] else
-                        const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                        SliverToBoxAdapter(
+                          child: SizedBox(height: scrollEndPadding),
+                        ),
                     ],
                   ),
                 ),
@@ -394,9 +407,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       floatingActionButton: studentLoading || studentLoadFailed
           ? null
           : Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.viewPaddingOf(context).bottom + 80,
-              ),
+              padding: EdgeInsets.only(bottom: fabBottomPadding),
               child: hasStudents
                   ? _QuickEntryAction(onPressed: _openQuickEntrySheet)
                   : _SetupAction(onPressed: _openCreateStudent),
@@ -772,14 +783,15 @@ class _QuickLaunchPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                  '\u5e38\u7528\u8bb0\u8bfe\u6377\u5f84',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+              Text(
+                '\u5e38\u7528\u8bb0\u8bfe\u6377\u5f84',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               Container(
@@ -844,6 +856,8 @@ class _QuickLaunchPanel extends StatelessWidget {
                         child: OutlinedButton(
                           onPressed: shortcut.onTap,
                           style: OutlinedButton.styleFrom(
+                            alignment: Alignment.centerLeft,
+                            minimumSize: const Size.fromHeight(64),
                             padding: const EdgeInsets.all(14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
@@ -986,14 +1000,15 @@ class _InitialSetupBanner extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                  '\u9996\u6b21\u4f7f\u7528\u5efa\u8bae\u5148\u5b8c\u6210\u5f15\u5bfc',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+              Text(
+                '\u9996\u6b21\u4f7f\u7528\u5efa\u8bae\u5148\u5b8c\u6210\u5f15\u5bfc',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               Container(
@@ -1044,32 +1059,46 @@ class _SectionTitleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+    final countBadge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Text(
+        countText,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w800,
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final titleText = Text(
+          title,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
           ),
-          child: Text(
-            countText,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ],
+        );
+
+        if (constraints.maxWidth < 360) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [titleText, const SizedBox(height: 8), countBadge],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: titleText),
+            const SizedBox(width: 12),
+            countBadge,
+          ],
+        );
+      },
     );
   }
 }
@@ -1133,7 +1162,7 @@ class _QuickEntryAction extends StatelessWidget {
         icon: const Icon(Icons.brush_outlined),
         label: const Text(
           '\u7acb\u5373\u8bb0\u8bfe',
-          style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.4),
+          style: TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
     );
@@ -1159,7 +1188,7 @@ class _SetupAction extends StatelessWidget {
       icon: const Icon(Icons.person_add_alt_1),
       label: const Text(
         '\u65b0\u589e\u5b66\u751f',
-        style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.4),
+        style: TextStyle(fontWeight: FontWeight.w700),
       ),
     );
   }

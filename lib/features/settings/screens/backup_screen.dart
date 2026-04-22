@@ -388,6 +388,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
+    final horizontalPadding = MediaQuery.sizeOf(context).width < 390
+        ? 16.0
+        : 24.0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -422,7 +425,12 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                       final backups = snapshot.data ?? const <BackupRecord>[];
 
                       return ListView(
-                        padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          4,
+                          horizontalPadding,
+                          120,
+                        ),
                         children: [
                           if (snapshot.hasError)
                             GlassCard(
@@ -431,10 +439,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(
-                                    Icons.error_outline,
-                                    color: kRed,
-                                  ),
+                                  const Icon(Icons.error_outline, color: kRed),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
@@ -562,7 +567,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                                   builder: (context, constraints) {
                                     final columns = constraints.maxWidth >= 720
                                         ? 4
-                                        : 2;
+                                        : constraints.maxWidth >= 420
+                                        ? 2
+                                        : 1;
                                     final itemWidth =
                                         (constraints.maxWidth -
                                             12 * (columns - 1)) /
@@ -862,6 +869,8 @@ class _MetricCard extends StatelessWidget {
               color: color,
               fontWeight: FontWeight.w800,
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -900,6 +909,8 @@ class _BackupRecordCard extends StatelessWidget {
             style: Theme.of(
               context,
             ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 6),
           Text(
@@ -915,6 +926,8 @@ class _BackupRecordCard extends StatelessWidget {
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: kInkSecondary, height: 1.45),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 12),
           Wrap(

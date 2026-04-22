@@ -42,9 +42,30 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
         }.toList()..sort();
 
         if (months.isEmpty) {
-          return const SizedBox(
-            height: 200,
-            child: Center(child: Text('暂无数据')),
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: kInkSecondary.withValues(alpha: 0.08)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.show_chart_outlined,
+                  color: kInkSecondary.withValues(alpha: 0.72),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '当前周期暂无收入记录',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: kInkSecondary,
+                  ),
+                ),
+              ],
+            ),
           );
         }
 
@@ -68,6 +89,12 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
             .entries
             .map((e) => FlSpot(e.key.toDouble(), receivedMap[e.value] ?? 0))
             .toList();
+        final chartSeries = _buildRevenueSeries(
+          showReceivable: _showReceivable,
+          showReceived: _showReceived,
+          receivableSpots: spots1,
+          receivedSpots: spots2,
+        );
         final totalReceivable = receivableMap.values.fold<double>(
           0,
           (sum, item) => sum + item,
@@ -101,30 +128,35 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
               height: 220,
               child: LineChart(
                 LineChartData(
-                  lineTouchData: const LineTouchData(enabled: true),
+                  lineTouchData: LineTouchData(
+                    enabled: true,
+                    touchTooltipData: LineTouchTooltipData(
+                      fitInsideHorizontally: true,
+                      fitInsideVertically: true,
+                      getTooltipItems: (spots) => spots.map((spot) {
+                        final label = chartSeries[spot.barIndex].label;
+                        return LineTooltipItem(
+                          '$label ¥${spot.y.toStringAsFixed(0)}',
+                          theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ) ??
+                              const TextStyle(color: Colors.white),
+                        );
+                      }).toList(),
+                    ),
+                  ),
                   minY: 0,
                   lineBarsData: [
-                    if (_showReceivable)
+                    for (final series in chartSeries)
                       LineChartBarData(
-                        spots: spots1,
-                        color: kPrimaryBlue,
+                        spots: series.spots,
+                        color: series.color,
                         isCurved: true,
                         barWidth: 3,
                         belowBarData: BarAreaData(
                           show: true,
-                          color: kPrimaryBlue.withValues(alpha: 0.08),
-                        ),
-                        dotData: const FlDotData(show: false),
-                      ),
-                    if (_showReceived)
-                      LineChartBarData(
-                        spots: spots2,
-                        color: kGreen,
-                        isCurved: true,
-                        barWidth: 3,
-                        belowBarData: BarAreaData(
-                          show: true,
-                          color: kGreen.withValues(alpha: 0.08),
+                          color: series.color.withValues(alpha: 0.08),
                         ),
                         dotData: const FlDotData(show: false),
                       ),
@@ -151,8 +183,21 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
                         },
                       ),
                     ),
-                    leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 42,
+                        getTitlesWidget: (value, _) {
+                          if (value == 0) return const SizedBox();
+                          return Text(
+                            _compactMoney(value),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 10,
+                              color: kInkSecondary,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                     topTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false),
@@ -203,6 +248,57 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
       },
     );
   }
+}
+
+class _RevenueSeries {
+  final String label;
+  final Color color;
+  final List<FlSpot> spots;
+
+  const _RevenueSeries({
+    required this.label,
+    required this.color,
+    required this.spots,
+  });
+}
+
+List<_RevenueSeries> _buildRevenueSeries({
+  required bool showReceivable,
+  required bool showReceived,
+  required List<FlSpot> receivableSpots,
+  required List<FlSpot> receivedSpots,
+}) {
+  return [
+    if (showReceivable)
+      _RevenueSeries(label: '应收', color: kPrimaryBlue, spots: receivableSpots),
+    if (showReceived)
+      _RevenueSeries(label: '实收', color: kGreen, spots: receivedSpots),
+  ];
+}
+
+@visibleForTesting
+List<String> revenueChartSeriesLabelsForTesting({
+  required bool showReceivable,
+  required bool showReceived,
+}) {
+  return _buildRevenueSeries(
+    showReceivable: showReceivable,
+    showReceived: showReceived,
+    receivableSpots: const [],
+    receivedSpots: const [],
+  ).map((series) => series.label).toList();
+}
+
+String _compactMoney(double value) {
+  if (value >= 10000) {
+    final wan = value / 10000;
+    return '${wan.toStringAsFixed(wan >= 10 ? 0 : 1)}万';
+  }
+  if (value >= 1000) {
+    final thousand = value / 1000;
+    return '${thousand.toStringAsFixed(thousand >= 10 ? 0 : 1)}k';
+  }
+  return value.toStringAsFixed(0);
 }
 
 class _RevenueSummary extends StatelessWidget {

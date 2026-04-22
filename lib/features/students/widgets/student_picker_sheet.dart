@@ -245,26 +245,40 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                         ),
                         if (_query.isEmpty) ...[
                           const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () =>
-                                      _openStudentRoute('/students/import'),
-                                  icon: const Icon(Icons.upload_file_outlined),
-                                  label: const Text('批量导入'),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: FilledButton.icon(
-                                  onPressed: () =>
-                                      _openStudentRoute('/students/create'),
-                                  icon: const Icon(Icons.person_add_alt_1),
-                                  label: const Text('新增学生'),
-                                ),
-                              ),
-                            ],
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final compact = constraints.maxWidth < 360;
+                              final buttonWidth = compact
+                                  ? constraints.maxWidth
+                                  : (constraints.maxWidth - 12) / 2;
+
+                              return Wrap(
+                                spacing: 12,
+                                runSpacing: 12,
+                                children: [
+                                  SizedBox(
+                                    width: buttonWidth,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () =>
+                                          _openStudentRoute('/students/import'),
+                                      icon: const Icon(
+                                        Icons.upload_file_outlined,
+                                      ),
+                                      label: const Text('批量导入'),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: buttonWidth,
+                                    child: FilledButton.icon(
+                                      onPressed: () =>
+                                          _openStudentRoute('/students/create'),
+                                      icon: const Icon(Icons.person_add_alt_1),
+                                      label: const Text('新增学生'),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ],
@@ -321,126 +335,157 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                                 ? kGreen
                                 : kOrange;
 
-                            return Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(18),
-                                onTap: () async {
-                                  await InteractionFeedback.selection(context);
-                                  if (!context.mounted) return;
-                                  Navigator.of(context).pop(
-                                    StudentWithMeta(
-                                      student,
-                                      meta.lastAttendanceDate,
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(14),
+                            Future<void> selectStudent() async {
+                              await InteractionFeedback.selection(context);
+                              if (!context.mounted) return;
+                              Navigator.of(context).pop(
+                                StudentWithMeta(
+                                  student,
+                                  meta.lastAttendanceDate,
+                                ),
+                              );
+                            }
+
+                            return LayoutBuilder(
+                              builder: (context, constraints) {
+                                final compact = constraints.maxWidth < 420;
+                                final avatar = Container(
+                                  width: 42,
+                                  height: 42,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.56),
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(
-                                      color: statusColor.withValues(
-                                        alpha: 0.12,
-                                      ),
-                                    ),
+                                    color: statusColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 42,
-                                        height: 42,
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withValues(
-                                            alpha: 0.1,
+                                  child: Icon(
+                                    Icons.person_outline,
+                                    color: statusColor,
+                                  ),
+                                );
+                                final studentInfo = Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      displayName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
                                           ),
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          Icons.person_outline,
-                                          color: statusColor,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              displayName,
-                                              style: theme.textTheme.titleSmall
-                                                  ?.copyWith(
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                            ),
-                                            if (detailLine.isNotEmpty) ...[
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                detailLine,
-                                                style:
-                                                    theme.textTheme.bodySmall,
-                                              ),
-                                            ],
-                                            const SizedBox(height: 8),
-                                            Wrap(
-                                              spacing: 8,
-                                              runSpacing: 8,
-                                              children: [
-                                                _StudentMetaChip(
-                                                  icon: Icons.history_outlined,
-                                                  label: _attendanceHint(meta),
-                                                  color:
-                                                      meta.lastAttendanceDate ==
-                                                          null
-                                                      ? kInkSecondary
-                                                      : kSealRed,
-                                                ),
-                                                _StudentMetaChip(
-                                                  icon: Icons.payments_outlined,
-                                                  label:
-                                                      '¥${student.pricePerClass.toStringAsFixed(0)}/节',
-                                                  color: kPrimaryBlue,
-                                                ),
-                                                _StudentMetaChip(
-                                                  icon: Icons.flag_outlined,
-                                                  label:
-                                                      student.status == 'active'
-                                                      ? '在读'
-                                                      : '休学',
-                                                  color: statusColor,
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      TextButton.icon(
-                                        onPressed: () async {
-                                          await InteractionFeedback.selection(
-                                            context,
-                                          );
-                                          if (!context.mounted) return;
-                                          Navigator.of(context).pop(
-                                            StudentWithMeta(
-                                              student,
-                                              meta.lastAttendanceDate,
-                                            ),
-                                          );
-                                        },
-                                        icon: const Icon(
-                                          Icons.arrow_outward_outlined,
-                                        ),
-                                        label: Text(widget.actionLabel),
+                                    ),
+                                    if (detailLine.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        detailLine,
+                                        maxLines: compact ? 2 : 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodySmall,
                                       ),
                                     ],
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        _StudentMetaChip(
+                                          icon: Icons.history_outlined,
+                                          label: _attendanceHint(meta),
+                                          color: meta.lastAttendanceDate == null
+                                              ? kInkSecondary
+                                              : kSealRed,
+                                        ),
+                                        _StudentMetaChip(
+                                          icon: Icons.payments_outlined,
+                                          label:
+                                              '¥${student.pricePerClass.toStringAsFixed(0)}/节',
+                                          color: kPrimaryBlue,
+                                        ),
+                                        _StudentMetaChip(
+                                          icon: Icons.flag_outlined,
+                                          label: student.status == 'active'
+                                              ? '在读'
+                                              : '休学',
+                                          color: statusColor,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                                final action = TextButton.icon(
+                                  onPressed: selectStudent,
+                                  icon: const Icon(
+                                    Icons.arrow_outward_outlined,
                                   ),
-                                ),
-                              ),
+                                  label: Text(widget.actionLabel),
+                                );
+
+                                return Semantics(
+                                  button: true,
+                                  label: '$displayName，${widget.actionLabel}',
+                                  onTap: selectStudent,
+                                  child: ExcludeSemantics(
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(18),
+                                        onTap: selectStudent,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(14),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.56,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              18,
+                                            ),
+                                            border: Border.all(
+                                              color: statusColor.withValues(
+                                                alpha: 0.12,
+                                              ),
+                                            ),
+                                          ),
+                                          child: compact
+                                              ? Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment
+                                                          .stretch,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        avatar,
+                                                        const SizedBox(
+                                                          width: 12,
+                                                        ),
+                                                        Expanded(
+                                                          child: studentInfo,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 10),
+                                                    Align(
+                                                      alignment:
+                                                          Alignment.centerRight,
+                                                      child: action,
+                                                    ),
+                                                  ],
+                                                )
+                                              : Row(
+                                                  children: [
+                                                    avatar,
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: studentInfo,
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    action,
+                                                  ],
+                                                ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             );
                           },
                         ),
@@ -481,11 +526,18 @@ class _StudentMetaChip extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width - 128,
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

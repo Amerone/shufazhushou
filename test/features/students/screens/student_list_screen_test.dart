@@ -22,6 +22,22 @@ void main() {
     expect(find.text('批量导入'), findsOneWidget);
   });
 
+  testWidgets('small screen with larger text keeps primary entries usable', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 760);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    _FakeStudentNotifier.seededStudents = _seededStudents;
+
+    await _pumpScreen(tester, textScaler: const TextScaler.linear(1.3));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('新增学生'), findsOneWidget);
+    expect(find.text('批量导入'), findsOneWidget);
+  });
+
   testWidgets('filters student list by selected status', (tester) async {
     _FakeStudentNotifier.seededStudents = _seededStudents;
 
@@ -161,7 +177,7 @@ final _seededStudents = [
   ),
 ];
 
-Future<void> _pumpScreen(WidgetTester tester) async {
+Future<void> _pumpScreen(WidgetTester tester, {TextScaler? textScaler}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -170,6 +186,12 @@ Future<void> _pumpScreen(WidgetTester tester) async {
       ],
       child: MaterialApp(
         theme: buildAppTheme(),
+        builder: textScaler == null
+            ? null
+            : (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+                child: child ?? const SizedBox.shrink(),
+              ),
         home: const StudentListScreen(),
       ),
     ),

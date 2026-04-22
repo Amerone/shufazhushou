@@ -211,9 +211,11 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                           const SizedBox(height: 12),
                           LayoutBuilder(
                             builder: (context, constraints) {
-                              final compact = constraints.maxWidth < 460;
-                              final itemWidth = compact
-                                  ? (constraints.maxWidth - 12) / 2
+                              final width = constraints.maxWidth;
+                              final itemWidth = width < 340
+                                  ? width
+                                  : width < 640
+                                  ? (width - 12) / 2
                                   : (constraints.maxWidth - 36) / 4;
 
                               return Wrap(
@@ -641,11 +643,18 @@ class _ImportMetaBadge extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width - 120,
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

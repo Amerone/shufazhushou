@@ -41,6 +41,21 @@ void main() {
     expect(find.text('home'), findsOneWidget);
     expect(find.text('setup'), findsNothing);
   });
+
+  testWidgets('reduce motion skips launch animation and opens next screen', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    _FakeStudentNotifier.seededStudents = [_seededStudent];
+
+    await _pumpLaunchScreen(tester);
+    await _settleUi(tester);
+
+    expect(find.text('home'), findsOneWidget);
+    expect(find.text('setup'), findsNothing);
+  });
 }
 
 const _defaultSettings = {

@@ -78,6 +78,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final pkgInfo = ref.watch(packageInfoProvider);
     final versionStr = pkgInfo.whenOrNull(data: (info) => info.version) ?? '';
     final viewPaddingBottom = MediaQuery.of(context).viewPadding.bottom;
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    final horizontalPadding = MediaQuery.sizeOf(context).width < 390
+        ? 16.0
+        : 24.0;
+
+    final scrollToTopAction = IgnorePointer(
+      ignoring: !_showScrollToTop,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
+        child: FloatingActionButton.small(
+          heroTag: 'settings-scroll-top',
+          onPressed: _scrollToTop,
+          tooltip: '回到顶部',
+          backgroundColor: Colors.white.withValues(alpha: 0.92),
+          foregroundColor: kPrimaryBlue,
+          elevation: 0,
+          child: const Icon(Icons.vertical_align_top_outlined),
+        ),
+      ),
+    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -138,7 +158,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                   return ListView(
                     controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      4,
+                      horizontalPadding,
+                      120,
+                    ),
                     children: [
                       if (priority != null) ...[
                         _PriorityBanner(
@@ -495,30 +520,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
-      floatingActionButton: AnimatedSlide(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        offset: _showScrollToTop ? Offset.zero : const Offset(0, 1.6),
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 180),
-          opacity: _showScrollToTop ? 1 : 0,
-          child: IgnorePointer(
-            ignoring: !_showScrollToTop,
-            child: Padding(
-              padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
-              child: FloatingActionButton.small(
-                heroTag: 'settings-scroll-top',
-                onPressed: _scrollToTop,
-                tooltip: '回到顶部',
-                backgroundColor: Colors.white.withValues(alpha: 0.92),
-                foregroundColor: kPrimaryBlue,
-                elevation: 0,
-                child: const Icon(Icons.vertical_align_top_outlined),
+      floatingActionButton: reduceMotion
+          ? Opacity(opacity: _showScrollToTop ? 1 : 0, child: scrollToTopAction)
+          : AnimatedSlide(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              offset: _showScrollToTop ? Offset.zero : const Offset(0, 1.6),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: _showScrollToTop ? 1 : 0,
+                child: scrollToTopAction,
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -656,7 +669,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
       ),
-    );
+    ).whenComplete(ctrl.dispose);
   }
 
   Future<void> _restoreDismissedInsights() async {

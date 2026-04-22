@@ -53,66 +53,80 @@ class SettingsOverviewPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: kPrimaryBlue.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.tune_outlined, color: kPrimaryBlue),
-              ),
-              SizedBox(
-                width: version.isEmpty ? 220 : 160,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '当前配置概览',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 380;
+              final textWidth = compact
+                  ? constraints.maxWidth
+                  : constraints.maxWidth - (version.isEmpty ? 60 : 150);
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: kPrimaryBlue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.tune_outlined, color: kPrimaryBlue),
+                  ),
+                  SizedBox(
+                    width: textWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '当前配置概览',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '先看关键状态，再进入对应分区调整教师资料、模板和备份。',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(height: 1.45),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (version.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.68),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: kInkSecondary.withValues(alpha: 0.16),
+                        ),
+                      ),
+                      child: Text(
+                        'v$version',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: kPrimaryBlue,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '先看关键状态，再进入对应分区调整教师资料、模板和备份。',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              if (version.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.68),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: kInkSecondary.withValues(alpha: 0.16),
-                    ),
-                  ),
-                  child: Text(
-                    'v$version',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: kPrimaryBlue,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-            ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 720 ? 4 : 2;
+              final columns = constraints.maxWidth >= 720
+                  ? 4
+                  : constraints.maxWidth >= 420
+                  ? 2
+                  : 1;
               final itemWidth =
                   (constraints.maxWidth - 12 * (columns - 1)) / columns;
 
@@ -214,7 +228,11 @@ class SettingsOverviewPanel extends StatelessWidget {
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 720 ? 4 : 2;
+              final columns = constraints.maxWidth >= 720
+                  ? 4
+                  : constraints.maxWidth >= 420
+                  ? 2
+                  : 1;
               final itemWidth =
                   (constraints.maxWidth - 12 * (columns - 1)) / columns;
 

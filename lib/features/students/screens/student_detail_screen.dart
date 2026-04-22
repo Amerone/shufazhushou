@@ -131,7 +131,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     return text.isEmpty ? '请稍后重试。' : text;
   }
 
-
   Future<void> _loadMore({int? generation}) async {
     if (_loadingMore) return;
     final requestGeneration = generation ?? _attendanceLoadGeneration;
@@ -305,6 +304,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final viewPaddingBottom = MediaQuery.of(context).viewPadding.bottom;
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
     final studentAsync = ref.watch(studentByIdAsyncProvider(widget.studentId));
     if (studentAsync.hasError && !studentAsync.hasValue) {
       return _buildMessageState(
@@ -365,7 +365,24 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     );
     final paymentsAsync = ref.watch(studentPaymentsProvider(widget.studentId));
     final payments = paymentsAsync.valueOrNull ?? const <Payment>[];
-    final isLoadingPayments = paymentsAsync.isLoading && !paymentsAsync.hasValue;
+    final isLoadingPayments =
+        paymentsAsync.isLoading && !paymentsAsync.hasValue;
+    final scrollToTopAction = IgnorePointer(
+      ignoring: !_showScrollToTop,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
+        child: FloatingActionButton.small(
+          heroTag: 'student-detail-scroll-top',
+          onPressed: _scrollToTop,
+          tooltip: '\u56de\u5230\u9876\u90e8',
+          backgroundColor: Colors.white.withValues(alpha: 0.92),
+          foregroundColor: kPrimaryBlue,
+          elevation: 0,
+          child: const Icon(Icons.vertical_align_top_outlined),
+        ),
+      ),
+    );
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: InkWashBackground(
@@ -436,6 +453,8 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                     Expanded(
                                       child: Text(
                                         student.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: theme.textTheme.titleMedium
                                             ?.copyWith(
                                               fontWeight: FontWeight.w700,
@@ -710,30 +729,18 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
           ],
         ),
       ),
-      floatingActionButton: AnimatedSlide(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        offset: _showScrollToTop ? Offset.zero : const Offset(0, 1.6),
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 180),
-          opacity: _showScrollToTop ? 1 : 0,
-          child: IgnorePointer(
-            ignoring: !_showScrollToTop,
-            child: Padding(
-              padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
-              child: FloatingActionButton.small(
-                heroTag: 'student-detail-scroll-top',
-                onPressed: _scrollToTop,
-                tooltip: '\u56de\u5230\u9876\u90e8',
-                backgroundColor: Colors.white.withValues(alpha: 0.92),
-                foregroundColor: kPrimaryBlue,
-                elevation: 0,
-                child: const Icon(Icons.vertical_align_top_outlined),
+      floatingActionButton: reduceMotion
+          ? Opacity(opacity: _showScrollToTop ? 1 : 0, child: scrollToTopAction)
+          : AnimatedSlide(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              offset: _showScrollToTop ? Offset.zero : const Offset(0, 1.6),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: _showScrollToTop ? 1 : 0,
+                child: scrollToTopAction,
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -901,7 +908,17 @@ class _InfoChip extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: kInkSecondary),
           const SizedBox(width: 6),
-          Text(label, style: theme.textTheme.bodySmall),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width - 128,
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
         ],
       ),
     );

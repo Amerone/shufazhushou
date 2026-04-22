@@ -134,18 +134,17 @@ class HomeWorkbenchPanel extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                  '优先待办',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+              Text(
+                '优先待办',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(width: 12),
               tasksAsync.when(
                 loading: () => const _CountBadge(label: '加载中'),
                 error: (_, _) => const _CountBadge(label: '待刷新'),
@@ -160,14 +159,33 @@ class HomeWorkbenchPanel extends ConsumerWidget {
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (error, _) => Container(
+              width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: kRed.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: kRed.withValues(alpha: 0.12)),
               ),
-              child: Text(
-                '待办摘要加载失败：$error',
-                style: theme.textTheme.bodySmall?.copyWith(color: kRed),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '待办摘要加载失败：$error',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: kRed,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      ref.invalidate(homeWorkbenchProvider);
+                      ref.invalidate(insightProvider);
+                    },
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('重新加载'),
+                  ),
+                ],
               ),
             ),
             data: (tasks) {
@@ -268,6 +286,7 @@ class _WorkbenchTaskCard extends StatelessWidget {
             Semantics(
               button: true,
               label: '${task.title}，${task.summary}，${task.actionLabel}',
+              hint: '轻触处理待办',
               child: InkWell(
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
@@ -353,15 +372,18 @@ class _TaskActions extends StatelessWidget {
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 260;
         final actionCue = Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(actionIcon, size: 18, color: actionColor),
             const SizedBox(width: 6),
-            Text(
-              actionLabel,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: actionColor,
-                fontWeight: FontWeight.w700,
+            Expanded(
+              child: Text(
+                actionLabel,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: actionColor,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
@@ -370,7 +392,8 @@ class _TaskActions extends StatelessWidget {
           onPressed: onDismissTap,
           style: TextButton.styleFrom(
             foregroundColor: kInkSecondary,
-            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+            minimumSize: const Size(44, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           ),
           icon: const Icon(Icons.visibility_off_outlined, size: 18),
           label: Text(dismissLabel),

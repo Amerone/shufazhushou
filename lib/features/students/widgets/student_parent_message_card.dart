@@ -336,6 +336,9 @@ class _TemplateChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = selected ? kSealRed : kInkSecondary;
     final semanticsLabel = recommended ? '$label，推荐话术' : label;
+    final transitionDuration = MediaQuery.of(context).disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
 
     return Semantics(
       button: true,
@@ -347,7 +350,7 @@ class _TemplateChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           onTap: onTap,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: transitionDuration,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: selected

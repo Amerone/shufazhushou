@@ -44,24 +44,45 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _byFee ? '按金额查看前 10 名学员贡献' : '按课次查看前 10 名学员贡献',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SegmentedButton<bool>(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 380;
+                final description = Text(
+                  _byFee ? '按金额查看前 10 名学员贡献' : '按课次查看前 10 名学员贡献',
+                  style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+                );
+                final selector = SegmentedButton<bool>(
                   segments: const [
                     ButtonSegment(value: true, label: Text('金额')),
                     ButtonSegment(value: false, label: Text('节数')),
                   ],
                   selected: {_byFee},
+                  showSelectedIcon: false,
                   onSelectionChanged: (s) => setState(() => _byFee = s.first),
-                ),
-              ],
+                );
+
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      description,
+                      const SizedBox(height: 10),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: selector,
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: description),
+                    const SizedBox(width: 12),
+                    selector,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 8),
             ...topEntries.map((entry) {

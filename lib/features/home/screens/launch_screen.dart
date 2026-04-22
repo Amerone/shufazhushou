@@ -25,6 +25,7 @@ class LaunchScreen extends ConsumerStatefulWidget {
 class _LaunchScreenState extends ConsumerState<LaunchScreen>
     with SingleTickerProviderStateMixin {
   bool _navigating = false;
+  bool _reduceMotionNavigationQueued = false;
   late final AnimationController _controller;
   late final Animation<double> _badgeOpacity;
   late final Animation<double> _titleReveal;
@@ -135,6 +136,21 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
 
     unawaited(_skipIntroWhenAlreadySeen());
     unawaited(_controller.forward());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!MediaQuery.disableAnimationsOf(context) ||
+        _reduceMotionNavigationQueued) {
+      return;
+    }
+    _reduceMotionNavigationQueued = true;
+    _controller.stop();
+    _controller.value = 0.82;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      unawaited(_navigateNext());
+    });
   }
 
   Future<void> _skipIntroWhenAlreadySeen() async {

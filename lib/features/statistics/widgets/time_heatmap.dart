@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/heatmap_provider.dart';
 import '../../../shared/theme.dart';
+import '../../../shared/widgets/empty_state.dart';
 import 'statistics_load_error.dart';
 
 class TimeHeatmap extends ConsumerStatefulWidget {
@@ -47,6 +48,10 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
         onRetry: () => ref.invalidate(heatmapProvider),
       ),
       data: (data) {
+        if (data.isEmpty) {
+          return const EmptyState(message: '当前周期暂无上课时段数据');
+        }
+
         final map = <String, int>{};
         var maxCount = 1;
 

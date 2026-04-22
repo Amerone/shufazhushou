@@ -330,32 +330,36 @@ class _PaymentBottomSheetState extends ConsumerState<PaymentBottomSheet> {
                   },
                 ),
                 const SizedBox(height: 12),
-                InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () async {
-                    final d = await showDatePicker(
-                      context: context,
-                      initialDate: _date,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime.now(),
-                    );
-                    if (d == null || !mounted) return;
-                    setState(() => _date = d);
-                  },
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: '缴费日期',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                Semantics(
+                  button: true,
+                  label: '选择缴费日期，当前 ${formatDate(_date)}',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () async {
+                      final d = await showDatePicker(
+                        context: context,
+                        initialDate: _date,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now(),
+                      );
+                      if (d == null || !mounted) return;
+                      setState(() => _date = d);
+                    },
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: '缴费日期',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.5),
                       ),
-                      filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.5),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(formatDate(_date))),
-                        const Icon(Icons.calendar_today_outlined, size: 18),
-                      ],
+                      child: Row(
+                        children: [
+                          Expanded(child: Text(formatDate(_date))),
+                          const Icon(Icons.calendar_today_outlined, size: 18),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -424,6 +428,8 @@ class _BalancePreviewRow extends StatelessWidget {
         Expanded(
           child: Text(
             '$status ¥${amount.abs().toStringAsFixed(2)}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: color,
               fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,

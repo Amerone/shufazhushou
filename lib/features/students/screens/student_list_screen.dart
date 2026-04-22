@@ -126,7 +126,9 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                                 if (current.filter == filter) return;
                                 ref
                                     .read(studentListQueryProvider.notifier)
-                                    .state = current.copyWith(filter: filter);
+                                    .state = current.copyWith(
+                                  filter: filter,
+                                );
                               },
                             ),
                           ),
@@ -181,9 +183,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   Widget _buildEmptyState(StudentListQuery query) {
     if (query.hasActiveFilter) {
       return EmptyState(
-        message: query.text.isNotEmpty
-            ? '没有找到“${query.text}”'
-            : '没有符合当前筛选的学生',
+        message: query.text.isNotEmpty ? '没有找到“${query.text}”' : '没有符合当前筛选的学生',
         actionLabel: '重置筛选',
         onAction: _resetFilters,
       );
@@ -307,7 +307,10 @@ class _StudentListToolbar extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _StudentSummaryPill(label: '在读 $activeCount', color: kPrimaryBlue),
+              _StudentSummaryPill(
+                label: '在读 $activeCount',
+                color: kPrimaryBlue,
+              ),
               _StudentSummaryPill(label: '休学 $suspendedCount', color: kOrange),
             ],
           ),
@@ -369,34 +372,61 @@ class _StudentListToolbar extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
             ),
-            child: Row(
-              children: [
-                Icon(
-                  query.hasActiveFilter
-                      ? Icons.filter_alt_outlined
-                      : Icons.people_outline,
-                  size: 18,
-                  color: kPrimaryBlue,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    resultSummary,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 360;
+                final summaryLine = Row(
+                  children: [
+                    Icon(
+                      query.hasActiveFilter
+                          ? Icons.filter_alt_outlined
+                          : Icons.people_outline,
+                      size: 18,
                       color: kPrimaryBlue,
-                      fontWeight: FontWeight.w700,
                     ),
-                  ),
-                ),
-                if (query.hasActiveFilter)
-                  TextButton(
-                    onPressed: () {
-                      unawaited(InteractionFeedback.selection(context));
-                      onResetFilters();
-                    },
-                    child: const Text('重置筛选'),
-                  ),
-              ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        resultSummary,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: kPrimaryBlue,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+                final resetButton = TextButton(
+                  onPressed: () {
+                    unawaited(InteractionFeedback.selection(context));
+                    onResetFilters();
+                  },
+                  child: const Text('重置筛选'),
+                );
+
+                if (!query.hasActiveFilter) return summaryLine;
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      summaryLine,
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: resetButton,
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: summaryLine),
+                    const SizedBox(width: 8),
+                    resetButton,
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -451,8 +481,7 @@ class _StudentCard extends StatelessWidget {
 
     return RepaintBoundary(
       child: GlassCard(
-        semanticLabel:
-            '$displayName，${isSuspended ? '休学' : '在读'}，轻触查看学生档案',
+        semanticLabel: '$displayName，${isSuspended ? '休学' : '在读'}，轻触查看学生档案',
         onTap: () {
           unawaited(InteractionFeedback.pageTurn(context));
           context.push('/students/${student.id}');
@@ -461,9 +490,10 @@ class _StudentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 380;
+                final avatar = Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
@@ -476,31 +506,34 @@ class _StudentCard extends StatelessWidget {
                         : Icons.person_outline,
                     color: accentColor,
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        displayName,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                );
+                final identity = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
-                      if (parentLine.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(parentLine, style: theme.textTheme.bodySmall),
-                      ],
+                    ),
+                    if (parentLine.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        parentLine,
+                        maxLines: compact ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall,
+                      ),
                     ],
-                  ),
-                ),
-                _StudentStatusBadge(
+                  ],
+                );
+                final statusBadge = _StudentStatusBadge(
                   label: isSuspended ? '休学' : '在读',
                   color: accentColor,
-                ),
-                const SizedBox(width: 8),
-                Tooltip(
+                );
+                final editButton = Tooltip(
                   message: '编辑$displayName',
                   child: IconButton.filledTonal(
                     onPressed: () {
@@ -511,8 +544,38 @@ class _StudentCard extends StatelessWidget {
                     color: accentColor,
                     visualDensity: VisualDensity.compact,
                   ),
-                ),
-              ],
+                );
+
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          avatar,
+                          const SizedBox(width: 12),
+                          Expanded(child: identity),
+                          const SizedBox(width: 8),
+                          editButton,
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      statusBadge,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    avatar,
+                    const SizedBox(width: 14),
+                    Expanded(child: identity),
+                    statusBadge,
+                    const SizedBox(width: 8),
+                    editButton,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 14),
             Wrap(
@@ -625,21 +688,40 @@ class _StudentInfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: kInkSecondary),
-          const SizedBox(width: 6),
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final maxLabelWidth = (availableWidth - 48)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: kInkSecondary),
+              const SizedBox(width: 6),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxLabelWidth),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

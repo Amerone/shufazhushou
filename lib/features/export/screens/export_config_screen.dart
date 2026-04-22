@@ -655,9 +655,14 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final compact = constraints.maxWidth < 420;
-                    final metricWidth = compact
-                        ? (constraints.maxWidth - 12) / 2
-                        : (constraints.maxWidth - 36) / 4;
+                    final metricColumns = constraints.maxWidth < 360
+                        ? 1
+                        : compact
+                        ? 2
+                        : 4;
+                    final metricWidth =
+                        (constraints.maxWidth - 12 * (metricColumns - 1)) /
+                        metricColumns;
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -950,28 +955,43 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _presetMessages
-                    .map(
-                      (message) => ActionChip(
-                        label: Text(
-                          message,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        backgroundColor: Colors.white.withValues(alpha: 0.5),
-                        side: BorderSide(
-                          color: kInkSecondary.withValues(alpha: 0.2),
-                        ),
-                        onPressed: () {
-                          unawaited(InteractionFeedback.selection(context));
-                          _msgCtrl.text = message;
-                          setState(() {});
-                        },
-                      ),
-                    )
-                    .toList(),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _presetMessages
+                        .map(
+                          (message) => ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: constraints.maxWidth,
+                            ),
+                            child: ActionChip(
+                              label: Text(
+                                message,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              backgroundColor: Colors.white.withValues(
+                                alpha: 0.5,
+                              ),
+                              side: BorderSide(
+                                color: kInkSecondary.withValues(alpha: 0.2),
+                              ),
+                              onPressed: () {
+                                unawaited(
+                                  InteractionFeedback.selection(context),
+                                );
+                                _msgCtrl.text = message;
+                                setState(() {});
+                              },
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  );
+                },
               ),
               const SizedBox(height: 24),
               _ExportSectionHeader(
@@ -1059,7 +1079,15 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                             ),
                           ),
                           onPressed: _loading ? null : _previewPdf,
-                          icon: const Icon(Icons.preview_outlined),
+                          icon: _loading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.preview_outlined),
                           label: Text(
                             _loading
                                 ? '\u5904\u7406\u4e2d...'
@@ -1077,8 +1105,20 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                             ),
                           ),
                           onPressed: _loading ? null : _sharePdf,
-                          icon: const Icon(Icons.share_outlined),
-                          label: const Text('\u5206\u4eab PDF'),
+                          icon: _loading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.share_outlined),
+                          label: Text(
+                            _loading
+                                ? '\u5904\u7406\u4e2d...'
+                                : '\u5206\u4eab PDF',
+                          ),
                         ),
                       ),
                       SizedBox(
@@ -1095,8 +1135,20 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                             foregroundColor: kGreen,
                           ),
                           onPressed: _loading ? null : _exportExcel,
-                          icon: const Icon(Icons.table_view_outlined),
-                          label: const Text('\u5bfc\u51fa Excel'),
+                          icon: _loading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.table_view_outlined),
+                          label: Text(
+                            _loading
+                                ? '\u5904\u7406\u4e2d...'
+                                : '\u5bfc\u51fa Excel',
+                          ),
                         ),
                       ),
                     ],
