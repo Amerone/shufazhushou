@@ -129,8 +129,42 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.ensureVisible(find.byType(Switch).last);
-    await tester.tap(find.byType(Switch).last);
+    final aiAnalysisLabel = find.text('\u5305\u542b AI \u5206\u6790');
+    await tester.ensureVisible(aiAnalysisLabel);
+    await tester.tap(aiAnalysisLabel);
+    await _settleUi(tester);
+
+    expect(
+      find.text(
+        '\u4f1a\u4ece\u5b66\u751f\u5907\u6ce8\u4e2d\u63d0\u53d6\u5df2\u4fdd\u5b58\u7684 AI \u5206\u6790\uff0c\u5e76\u63d2\u5165 PDF\u3002',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('export switches can toggle from the whole row label', (
+    tester,
+  ) async {
+    final note = AiAnalysisNoteCodec.appendProgressAnalysis(
+      existingNote: null,
+      analysisText: 'SENTINEL_EXPORT_ANALYSIS',
+      analyzedAt: DateTime(2026, 4, 1, 9),
+    );
+    final student = Student(
+      id: 'student-row-toggle',
+      name: 'Dora',
+      pricePerClass: 200,
+      status: 'active',
+      note: note,
+      createdAt: 1,
+      updatedAt: 1,
+    );
+
+    await _pumpScreen(tester, student);
+
+    final aiAnalysisLabel = find.text('\u5305\u542b AI \u5206\u6790');
+    await tester.ensureVisible(aiAnalysisLabel);
+    await tester.tap(aiAnalysisLabel);
     await _settleUi(tester);
 
     expect(

@@ -40,6 +40,24 @@ void main() {
     expect(find.byIcon(Icons.psychology_alt_outlined), findsWidgets);
   });
 
+  testWidgets('switch rows toggle from the full setting tile', (tester) async {
+    _setLargeViewport(tester);
+
+    await _pumpScreen(tester);
+
+    final hapticsLabel = find.text('启用触感反馈');
+    await tester.scrollUntilVisible(hapticsLabel, 400);
+    await tester.tap(hapticsLabel);
+    await tester.pumpAndSettle();
+
+    expect(_FakeSettingsNotifier.setCallCount, 1);
+    expect(
+      _FakeSettingsNotifier.seededSettings[InteractionFeedback
+          .hapticsEnabledKey],
+      'true',
+    );
+  });
+
   testWidgets('developer tools stay hidden until version tapped five times', (
     tester,
   ) async {

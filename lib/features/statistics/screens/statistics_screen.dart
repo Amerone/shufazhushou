@@ -188,21 +188,24 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
         ? 16.0
         : 24.0;
 
-    final scrollToTopAction = IgnorePointer(
-      ignoring: !_showScrollToTop,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
-        child: Semantics(
-          button: true,
-          label: '\u8fd4\u56de\u7edf\u8ba1\u9875\u9876\u90e8',
-          child: FloatingActionButton.small(
-            heroTag: 'statistics-scroll-top',
-            onPressed: _scrollToTop,
-            tooltip: '回到顶部',
-            backgroundColor: Colors.white.withValues(alpha: 0.92),
-            foregroundColor: kPrimaryBlue,
-            elevation: 0,
-            child: const Icon(Icons.vertical_align_top_outlined),
+    final scrollToTopAction = ExcludeSemantics(
+      excluding: !_showScrollToTop,
+      child: IgnorePointer(
+        ignoring: !_showScrollToTop,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
+          child: Semantics(
+            button: true,
+            label: '\u8fd4\u56de\u7edf\u8ba1\u9875\u9876\u90e8',
+            child: FloatingActionButton.small(
+              heroTag: 'statistics-scroll-top',
+              onPressed: _scrollToTop,
+              tooltip: '回到顶部',
+              backgroundColor: Colors.white.withValues(alpha: 0.92),
+              foregroundColor: kPrimaryBlue,
+              elevation: 0,
+              child: const Icon(Icons.vertical_align_top_outlined),
+            ),
           ),
         ),
       ),

@@ -59,6 +59,27 @@ void main() {
     expect(find.text('Carol'), findsNothing);
   });
 
+  testWidgets('filter summary exposes live semantics updates', (tester) async {
+    _FakeStudentNotifier.seededStudents = _seededStudents;
+    final semantics = tester.ensureSemantics();
+    try {
+      await _pumpScreen(tester);
+
+      expect(find.bySemanticsLabel('共 3 位学生'), findsOneWidget);
+
+      final filterButton = find.descendant(
+        of: find.byWidgetPredicate((widget) => widget is SegmentedButton),
+        matching: find.text('休学'),
+      );
+      await tester.tap(filterButton);
+      await _settleUi(tester);
+
+      expect(find.bySemanticsLabel('当前显示 1 / 3 位学生'), findsOneWidget);
+    } finally {
+      semantics.dispose();
+    }
+  });
+
   testWidgets('shows direct payment entry on student cards', (tester) async {
     _FakeStudentNotifier.seededStudents = _seededStudents;
 

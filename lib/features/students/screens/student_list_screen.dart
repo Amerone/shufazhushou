@@ -398,26 +398,34 @@ class _StudentListToolbar extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxWidth < 360;
-                final summaryLine = Row(
-                  children: [
-                    Icon(
-                      query.hasActiveFilter
-                          ? Icons.filter_alt_outlined
-                          : Icons.people_outline,
-                      size: 18,
-                      color: kPrimaryBlue,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        resultSummary,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                final summaryLine = Semantics(
+                  container: true,
+                  liveRegion: true,
+                  label: resultSummary,
+                  child: ExcludeSemantics(
+                    child: Row(
+                      children: [
+                        Icon(
+                          query.hasActiveFilter
+                              ? Icons.filter_alt_outlined
+                              : Icons.people_outline,
+                          size: 18,
                           color: kPrimaryBlue,
-                          fontWeight: FontWeight.w700,
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            resultSummary,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: kPrimaryBlue,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 );
                 final resetButton = TextButton(
                   onPressed: () {

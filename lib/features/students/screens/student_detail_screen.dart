@@ -390,18 +390,25 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     final payments = paymentsAsync.valueOrNull ?? const <Payment>[];
     final isLoadingPayments =
         paymentsAsync.isLoading && !paymentsAsync.hasValue;
-    final scrollToTopAction = IgnorePointer(
-      ignoring: !_showScrollToTop,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
-        child: FloatingActionButton.small(
-          heroTag: 'student-detail-scroll-top',
-          onPressed: _scrollToTop,
-          tooltip: '\u56de\u5230\u9876\u90e8',
-          backgroundColor: Colors.white.withValues(alpha: 0.92),
-          foregroundColor: kPrimaryBlue,
-          elevation: 0,
-          child: const Icon(Icons.vertical_align_top_outlined),
+    final scrollToTopAction = ExcludeSemantics(
+      excluding: !_showScrollToTop,
+      child: IgnorePointer(
+        ignoring: !_showScrollToTop,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
+          child: Semantics(
+            button: true,
+            label: '返回学员详情页顶部',
+            child: FloatingActionButton.small(
+              heroTag: 'student-detail-scroll-top',
+              onPressed: _scrollToTop,
+              tooltip: '\u56de\u5230\u9876\u90e8',
+              backgroundColor: Colors.white.withValues(alpha: 0.92),
+              foregroundColor: kPrimaryBlue,
+              elevation: 0,
+              child: const Icon(Icons.vertical_align_top_outlined),
+            ),
+          ),
         ),
       ),
     );

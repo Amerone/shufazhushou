@@ -1624,93 +1624,102 @@ class _ExportSwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final effectiveOnChanged = enabled ? onChanged : null;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: enabled ? 0.54 : 0.4),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kInkSecondary.withValues(alpha: 0.14)),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 360;
-          final iconColor = enabled ? kPrimaryBlue : kInkSecondary;
-          final titleStyle = theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: enabled ? null : kInkSecondary,
-          );
-          final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
-            color: enabled ? null : kInkSecondary,
-          );
+    return Semantics(
+      container: true,
+      button: true,
+      toggled: value,
+      enabled: effectiveOnChanged != null,
+      label: title,
+      value: value ? '已开启' : '已关闭',
+      hint: effectiveOnChanged == null
+          ? subtitle
+          : (value ? '轻触关闭。$subtitle' : '轻触开启。$subtitle'),
+      onTap: effectiveOnChanged == null
+          ? null
+          : () => effectiveOnChanged(!value),
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: enabled ? 0.54 : 0.4),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: kInkSecondary.withValues(alpha: 0.14)),
+            ),
+            child: InkWell(
+              onTap: effectiveOnChanged == null
+                  ? null
+                  : () => effectiveOnChanged(!value),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 360;
+                  final iconColor = enabled ? kPrimaryBlue : kInkSecondary;
+                  final titleStyle = theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: enabled ? null : kInkSecondary,
+                  );
+                  final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
+                    color: enabled ? null : kInkSecondary,
+                  );
+                  final content = Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: iconColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(icon, color: iconColor),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(title, style: titleStyle),
+                            const SizedBox(height: 4),
+                            Text(subtitle, style: subtitleStyle),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                  final switchControl = IgnorePointer(
+                    child: Switch(value: value, onChanged: effectiveOnChanged),
+                  );
 
-          return compact
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: iconColor.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(icon, color: iconColor),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(title, style: titleStyle),
-                              const SizedBox(height: 4),
-                              Text(subtitle, style: subtitleStyle),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Switch(
-                        value: value,
-                        onChanged: enabled ? onChanged : null,
-                      ),
-                    ),
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: iconColor.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(icon, color: iconColor),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(title, style: titleStyle),
-                          const SizedBox(height: 4),
-                          Text(subtitle, style: subtitleStyle),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Switch(value: value, onChanged: enabled ? onChanged : null),
-                  ],
-                );
-        },
+                  return compact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            content,
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: switchControl,
+                            ),
+                          ],
+                        )
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: content),
+                            const SizedBox(width: 12),
+                            switchControl,
+                          ],
+                        );
+                },
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

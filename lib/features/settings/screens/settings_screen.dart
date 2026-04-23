@@ -83,18 +83,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ? 16.0
         : 24.0;
 
-    final scrollToTopAction = IgnorePointer(
-      ignoring: !_showScrollToTop,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
-        child: FloatingActionButton.small(
-          heroTag: 'settings-scroll-top',
-          onPressed: _scrollToTop,
-          tooltip: '回到顶部',
-          backgroundColor: Colors.white.withValues(alpha: 0.92),
-          foregroundColor: kPrimaryBlue,
-          elevation: 0,
-          child: const Icon(Icons.vertical_align_top_outlined),
+    final scrollToTopAction = ExcludeSemantics(
+      excluding: !_showScrollToTop,
+      child: IgnorePointer(
+        ignoring: !_showScrollToTop,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
+          child: Semantics(
+            button: true,
+            label: '返回设置页顶部',
+            child: FloatingActionButton.small(
+              heroTag: 'settings-scroll-top',
+              onPressed: _scrollToTop,
+              tooltip: '回到顶部',
+              backgroundColor: Colors.white.withValues(alpha: 0.92),
+              foregroundColor: kPrimaryBlue,
+              elevation: 0,
+              child: const Icon(Icons.vertical_align_top_outlined),
+            ),
+          ),
         ),
       ),
     );
@@ -1184,94 +1191,94 @@ class _SettingsSwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final switchControl = IgnorePointer(
+      child: Switch(
+        value: value,
+        activeThumbColor: kPrimaryBlue,
+        onChanged: onChanged,
+      ),
+    );
+
+    final content = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: kPrimaryBlue.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: kPrimaryBlue),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(subtitle, style: theme.textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    void toggle() => onChanged(!value);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 360;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: compact
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: kPrimaryBlue.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(icon, color: kPrimaryBlue),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(subtitle, style: theme.textTheme.bodySmall),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Switch(
-                        value: value,
-                        activeThumbColor: kPrimaryBlue,
-                        onChanged: onChanged,
-                      ),
-                    ),
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: kPrimaryBlue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(icon, color: kPrimaryBlue),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
+        return Semantics(
+          container: true,
+          button: true,
+          toggled: value,
+          label: title,
+          value: value ? '已开启' : '已关闭',
+          hint: value ? '轻触关闭。$subtitle' : '轻触开启。$subtitle',
+          onTap: toggle,
+          child: ExcludeSemantics(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: toggle,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: compact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            content,
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: switchControl,
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(subtitle, style: theme.textTheme.bodySmall),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Switch(
-                      value: value,
-                      activeThumbColor: kPrimaryBlue,
-                      onChanged: onChanged,
-                    ),
-                  ],
+                          ],
+                        )
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: content),
+                            const SizedBox(width: 12),
+                            switchControl,
+                          ],
+                        ),
                 ),
+              ),
+            ),
+          ),
         );
       },
     );
