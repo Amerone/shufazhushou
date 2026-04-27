@@ -12,6 +12,7 @@ import 'package:moyun/core/providers/attendance_provider.dart';
 import 'package:moyun/core/providers/fee_summary_provider.dart';
 import 'package:moyun/core/providers/student_provider.dart';
 import 'package:moyun/features/students/screens/student_detail_screen.dart';
+import 'package:moyun/features/students/widgets/student_detail_anchor_bar.dart';
 import 'package:moyun/shared/theme.dart';
 
 void main() {
@@ -39,6 +40,13 @@ void main() {
       ),
     );
     await _settleUi(tester);
+    expect(find.byType(StudentDetailAnchorBar), findsOneWidget);
+    expect(
+      find.byIcon(Icons.account_balance_wallet_outlined),
+      findsAtLeastNWidgets(1),
+    );
+    expect(find.byIcon(Icons.payments_outlined), findsAtLeastNWidgets(1));
+    expect(find.byIcon(Icons.fact_check_outlined), findsAtLeastNWidgets(1));
 
     expect(find.widgetWithText(OutlinedButton, '费用'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '缴费'), findsOneWidget);

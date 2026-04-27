@@ -13,9 +13,9 @@ import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/async_value_widget.dart';
-import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 import '../../../shared/widgets/page_header.dart';
+import '../widgets/backup_screen_widgets.dart';
 
 class BackupScreen extends ConsumerStatefulWidget {
   const BackupScreen({super.key});
@@ -31,7 +31,7 @@ Widget buildBackupPassphraseVisibilityToggleForTesting({
   required String hideTooltip,
   required VoidCallback onPressed,
 }) {
-  return _PassphraseVisibilityToggle(
+  return BackupPassphraseVisibilityToggle(
     obscure: obscure,
     showTooltip: showTooltip,
     hideTooltip: hideTooltip,
@@ -44,7 +44,7 @@ Widget buildBackupRestoreActionForTesting({
   required BackupRecord record,
   required VoidCallback? onRestore,
 }) {
-  return _BackupRestoreAction(record: record, onRestore: onRestore);
+  return BackupRestoreAction(record: record, onRestore: onRestore);
 }
 
 class _BackupScreenState extends ConsumerState<BackupScreen> {
@@ -153,7 +153,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        suffixIcon: _PassphraseVisibilityToggle(
+                        suffixIcon: BackupPassphraseVisibilityToggle(
                           obscure: obscurePassphrase,
                           showTooltip: '显示备份口令',
                           hideTooltip: '隐藏备份口令',
@@ -180,7 +180,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          suffixIcon: _PassphraseVisibilityToggle(
+                          suffixIcon: BackupPassphraseVisibilityToggle(
                             obscure: obscureConfirm,
                             showTooltip: '显示确认口令',
                             hideTooltip: '隐藏确认口令',
@@ -436,7 +436,11 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                       lastBackup == null ||
                       DateTime.now().difference(lastBackup).inDays >=
                           kBackupWarningDays;
+                  final warningMessage = lastBackup == null
+                      ? '还没有创建过备份，建议先生成第一份完整副本。'
+                      : '距离上次备份已超过 $kBackupWarningDays 天，建议现在更新一份新的副本。';
                   final statusColor = isOverdue ? kOrange : kGreen;
+                  final statusLabel = isOverdue ? '建议更新' : '状态正常';
 
                   return FutureBuilder<List<BackupRecord>>(
                     future: _backupsFuture,
@@ -452,366 +456,38 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                         ),
                         children: [
                           if (snapshot.hasError)
-                            GlassCard(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.all(18),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Icon(Icons.error_outline, color: kRed),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      '备份列表加载失败，请稍后重试。',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(color: kRed),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        setState(_refreshBackupState),
-                                    child: const Text('重试'),
-                                  ),
-                                ],
-                              ),
+                            BackupListErrorCard(
+                              onRetry: () => setState(_refreshBackupState),
                             ),
                           if (isOverdue)
-                            GlassCard(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.all(18),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      color: kOrange.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: const Icon(
-                                      Icons.warning_amber_rounded,
-                                      color: kOrange,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Text(
-                                      lastBackup == null
-                                          ? '还没有创建过备份，建议先生成第一份完整副本。'
-                                          : '距离上次备份已超过 $kBackupWarningDays 天，建议现在更新一份新的副本。',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            color: kOrange,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          GlassCard(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withValues(
-                                          alpha: 0.12,
-                                        ),
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Icon(
-                                        Icons.inventory_2_outlined,
-                                        color: statusColor,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '备份总览',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withValues(
-                                          alpha: 0.12,
-                                        ),
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        isOverdue ? '建议更新' : '状态正常',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: statusColor,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    final columns = constraints.maxWidth >= 720
-                                        ? 4
-                                        : constraints.maxWidth >= 420
-                                        ? 2
-                                        : 1;
-                                    final itemWidth =
-                                        (constraints.maxWidth -
-                                            12 * (columns - 1)) /
-                                        columns;
-
-                                    return Wrap(
-                                      spacing: 12,
-                                      runSpacing: 12,
-                                      children: [
-                                        SizedBox(
-                                          width: itemWidth,
-                                          child: _MetricCard(
-                                            label: '最近一次',
-                                            value: _lastBackupLabel(lastBackup),
-                                            color: statusColor,
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: itemWidth,
-                                          child: _MetricCard(
-                                            label: '上次时间',
-                                            value: _lastBackupTime(lastBackup),
-                                            color: kPrimaryBlue,
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: itemWidth,
-                                          child: _MetricCard(
-                                            label: '应用内备份',
-                                            value: '${backups.length} 份',
-                                            color: kSealRed,
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: itemWidth,
-                                          child: const _MetricCard(
-                                            label: '建议周期',
-                                            value: '7 天',
-                                            color: kGreen,
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 14),
-                                FutureBuilder<String>(
-                                  future: _backupDirectoryFuture,
-                                  builder: (context, directorySnapshot) {
-                                    final directoryPath =
-                                        directorySnapshot.data ?? '正在读取…';
-                                    return Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(14),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.54,
-                                        ),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: kInkSecondary.withValues(
-                                            alpha: 0.08,
-                                          ),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '应用内备份位置',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleSmall
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            directoryPath,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall
-                                                ?.copyWith(height: 1.5),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
+                            BackupWarningCard(message: warningMessage),
+                          FutureBuilder<String>(
+                            future: _backupDirectoryFuture,
+                            builder: (context, directorySnapshot) {
+                              return BackupOverviewCard(
+                                statusColor: statusColor,
+                                statusLabel: statusLabel,
+                                lastBackupLabel: _lastBackupLabel(lastBackup),
+                                lastBackupTime: _lastBackupTime(lastBackup),
+                                backupCount: backups.length,
+                                directoryPath:
+                                    directorySnapshot.data ?? '正在读取…',
+                              );
+                            },
                           ),
-                          GlassCard(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _SectionHeader(
-                                  title: '立即操作',
-                                  subtitle: '常用流程只保留两步：生成加密备份并分享，或从已有备份恢复。',
-                                ),
-                                const SizedBox(height: 14),
-                                LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    final compact = constraints.maxWidth < 460;
-                                    final buttonWidth = compact
-                                        ? constraints.maxWidth
-                                        : (constraints.maxWidth - 12) / 2;
-                                    return Wrap(
-                                      spacing: 12,
-                                      runSpacing: 12,
-                                      children: [
-                                        SizedBox(
-                                          width: buttonWidth,
-                                          child: FilledButton.icon(
-                                            onPressed: _submitting
-                                                ? null
-                                                : _createBackup,
-                                            style: FilledButton.styleFrom(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 16,
-                                                  ),
-                                            ),
-                                            icon: const Icon(
-                                              Icons.backup_outlined,
-                                            ),
-                                            label: const Text('生成加密备份并分享'),
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: buttonWidth,
-                                          child: OutlinedButton.icon(
-                                            onPressed: _submitting
-                                                ? null
-                                                : _restoreFromPicker,
-                                            style: OutlinedButton.styleFrom(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 16,
-                                                  ),
-                                            ),
-                                            icon: const Icon(Icons.restore),
-                                            label: const Text('从文件恢复'),
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
+                          BackupActionsCard(
+                            submitting: _submitting,
+                            onCreateBackup: _createBackup,
+                            onRestoreFromPicker: _restoreFromPicker,
                           ),
-                          GlassCard(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _SectionHeader(
-                                  title: '最近备份',
-                                  subtitle:
-                                      '即使你上次没有保存到外部文件，也可以直接在这里重新生成加密分享文件，或恢复应用内副本。',
-                                ),
-                                const SizedBox(height: 14),
-                                if (snapshot.connectionState ==
-                                        ConnectionState.waiting &&
-                                    backups.isEmpty)
-                                  const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 16,
-                                      ),
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  )
-                                else if (backups.isEmpty)
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.54,
-                                      ),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: kInkSecondary.withValues(
-                                          alpha: 0.08,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      '还没有应用内备份，先生成一份。',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(height: 1.5),
-                                    ),
-                                  )
-                                else
-                                  ...backups.map(
-                                    (record) => Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 12,
-                                      ),
-                                      child: _BackupRecordCard(
-                                        record: record,
-                                        sizeLabel: _formatFileSize(
-                                          record.sizeInBytes,
-                                        ),
-                                        onShare: _submitting
-                                            ? null
-                                            : () => _shareBackup(record),
-                                        onRestore: _submitting
-                                            ? null
-                                            : () => _restoreFromRecord(record),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                          BackupRecentRecordsSection(
+                            connectionState: snapshot.connectionState,
+                            backups: backups,
+                            submitting: _submitting,
+                            sizeLabelBuilder: (record) =>
+                                _formatFileSize(record.sizeInBytes),
+                            onShare: _shareBackup,
+                            onRestore: _restoreFromRecord,
                           ),
                         ],
                       );
@@ -822,197 +498,6 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-
-  const _SectionHeader({required this.title, this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
-        ],
-      ],
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _MetricCard({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: kInkSecondary),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PassphraseVisibilityToggle extends StatelessWidget {
-  final bool obscure;
-  final String showTooltip;
-  final String hideTooltip;
-  final VoidCallback onPressed;
-
-  const _PassphraseVisibilityToggle({
-    required this.obscure,
-    required this.showTooltip,
-    required this.hideTooltip,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: obscure ? showTooltip : hideTooltip,
-      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-      onPressed: onPressed,
-      icon: Icon(
-        obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-      ),
-    );
-  }
-}
-
-class _BackupRestoreAction extends StatelessWidget {
-  final BackupRecord record;
-  final VoidCallback? onRestore;
-
-  const _BackupRestoreAction({required this.record, this.onRestore});
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '恢复备份 ${record.fileName}',
-      hint: '会先显示确认提示，确认后覆盖当前全部数据',
-      button: true,
-      enabled: onRestore != null,
-      onTap: onRestore,
-      child: ExcludeSemantics(
-        child: OutlinedButton.icon(
-          onPressed: onRestore,
-          icon: const Icon(Icons.restore_outlined),
-          label: const Text('恢复此备份'),
-        ),
-      ),
-    );
-  }
-}
-
-class _BackupRecordCard extends StatelessWidget {
-  final BackupRecord record;
-  final String sizeLabel;
-  final VoidCallback? onShare;
-  final VoidCallback? onRestore;
-
-  const _BackupRecordCard({
-    required this.record,
-    required this.sizeLabel,
-    required this.onShare,
-    required this.onRestore,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.54),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kInkSecondary.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            record.fileName,
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${formatDate(record.modifiedAt)} '
-            '${record.modifiedAt.hour.toString().padLeft(2, '0')}:'
-            '${record.modifiedAt.minute.toString().padLeft(2, '0')}'
-            ' · $sizeLabel',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            record.path,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: kInkSecondary, height: 1.45),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.tonalIcon(
-                onPressed: onShare,
-                icon: const Icon(Icons.share_outlined),
-                label: const Text('加密分享'),
-              ),
-              _BackupRestoreAction(record: record, onRestore: onRestore),
-            ],
-          ),
-        ],
       ),
     );
   }

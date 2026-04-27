@@ -4,7 +4,7 @@
 
 - 引擎：SQLite（通过 sqflite）
 - 数据库文件名：`moyun.db`（兼容迁移旧文件 `calligraphy_assistant.db`）
-- 当前版本：`5`
+- 当前版本：`6`
 
 ---
 
@@ -208,14 +208,14 @@ SELECT DISTINCT student_id FROM attendance WHERE status IN ('present','late');
 
 ```dart
 // database_helper.dart 关键逻辑
-static const int _version = 5;
-static const String _dbName = 'moyun.db';
+static const int databaseVersion = 6;
+static const String databaseFileName = 'moyun.db';
 
 Future<Database> _initDB() async {
-  final path = join(await getDatabasesPath(), _dbName);
+  final path = join(await getDatabasesPath(), databaseFileName);
   return openDatabase(
     path,
-    version: _version,
+    version: databaseVersion,
     onCreate: _onCreate,
     onUpgrade: _onUpgrade,
     onOpen: (db) async {
@@ -238,6 +238,9 @@ Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
   if (oldVersion < 5) {
     await _addColumnIfMissing(db, 'attendance', 'artwork_image_path TEXT');
   }
+  if (oldVersion < 6) {
+    await _ensureIndexes(db);
+  }
 }
 ```
 
@@ -251,13 +254,41 @@ Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
 - `attendance.artwork_image_path`：课堂作品图片本地路径
 - 升级过程使用 `PRAGMA table_info` 检查列是否存在，避免重复升级时报错
 
+### v6 索引补充
+
+v6 不改动表结构，只补齐高频查询索引：
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_attendance_date_status
+ON attendance(date, status);
+
+CREATE INDEX IF NOT EXISTS idx_attendance_student_timeline
+ON attendance(student_id, date DESC, start_time DESC, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_attendance_student_status_date
+ON attendance(student_id, status, date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_students_status_created
+ON students(status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_payments_payment_date
+ON payments(payment_date);
+
+CREATE INDEX IF NOT EXISTS idx_payments_student_date
+ON payments(student_id, payment_date DESC);
+```
+
 ---
 
 ## 备份策略
 
 - 备份 = 生成 SQLite 数据库快照，并同时保存课堂作品图片快照
-- 文件名格式：`backup_YYYYMMDD_HHmmss.db`
-- 恢复 = 用户选择备份文件，覆盖当前数据库并同步恢复课堂作品图片后重启 App
+- 明文备份文件名格式：`moyun_backup_YYYY-MM-DD_HH-MM-SS.db`
+  - 示例：`moyun_backup_2026-04-27_09-08-07.db`
+- 加密导出文件名格式：`moyun_backup_YYYY-MM-DD_HH-MM-SS.moyunbak`
+  - 示例：`moyun_backup_2026-04-27_09-08-07.moyunbak`
+- 恢复文件扩展名支持：`.db`、`.sqlite`、`.sqlite3`、`.moyunbak`
+- 恢复 = 用户选择备份文件，覆盖当前数据库并同步恢复课堂作品图片与敏感设置后重启 App
 - 超过 7 天未备份：读取 `settings.last_backup_at`，在设置页显示橙色警告
 
 ---

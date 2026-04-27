@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/dao/student_dao.dart';
-import '../../../core/models/attendance.dart';
 import '../../../core/models/structured_attendance_feedback.dart';
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/class_template_provider.dart';
@@ -19,6 +18,9 @@ import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/time_wheel_picker.dart';
+import 'quick_entry_conflict_dialog.dart';
+import 'quick_entry_sheet_components.dart';
+import '../services/quick_entry_record_builder.dart';
 
 const quickEntryDefaultStartTimeSettingKey = 'quick_entry_default_start_time';
 const quickEntryDefaultEndTimeSettingKey = 'quick_entry_default_end_time';
@@ -59,8 +61,6 @@ String quickEntryStatusLabel(String? status) {
   }
   return status ?? '';
 }
-
-enum _ConflictResolution { overwrite, changeTime, cancel }
 
 class QuickEntrySheet extends ConsumerStatefulWidget {
   final Set<String> initialSelectedIds;
@@ -294,49 +294,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     });
   }
 
-  Widget _buildPickerField({
-    required String label,
-    required String semanticsLabel,
-    required String semanticsHint,
-    required String value,
-    required Future<void> Function() onTap,
-    IconData? trailingIcon,
-  }) {
-    void handleTap() => unawaited(onTap());
-
-    return Semantics(
-      button: true,
-      label: semanticsLabel,
-      hint: semanticsHint,
-      value: value,
-      onTap: handleTap,
-      child: ExcludeSemantics(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: handleTap,
-          child: InputDecorator(
-            decoration: InputDecoration(
-              labelText: label,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.56),
-            ),
-            child: trailingIcon == null
-                ? Text(value)
-                : Row(
-                    children: [
-                      Expanded(child: Text(value)),
-                      Icon(trailingIcon, size: 18),
-                    ],
-                  ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _save() async {
     if (_saving) return;
     if (_endTime.compareTo(_startTime) <= 0) {
@@ -358,21 +315,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       final selectedStudents = students
           .where((m) => _selectedIds.contains(m.student.id))
           .toList();
-      final invalidPriceStudent = selectedStudents
-          .where((m) => m.student.pricePerClass < 0)
-          .firstOrNull;
-      if (invalidPriceStudent != null) {
-        final displayName =
-            ref.read(
-              studentDisplayNameMapProvider,
-            )[invalidPriceStudent.student.id] ??
-            invalidPriceStudent.student.name;
-        if (mounted) {
-          AppToast.showError(context, '$displayName 的课时单价无效，请先编辑学生档案。');
-        }
-        return;
-      }
-
       final displayNames = ref.read(studentDisplayNameMapProvider);
       final conflictRecords = await dao.findConflictsForStudents(
         selectedStudents.map((m) => m.student.id),
@@ -380,23 +322,28 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         _startTime,
         _endTime,
       );
-      final conflictIds = {
-        for (final entry in conflictRecords.entries) entry.key: entry.value.id,
-      };
-      final conflicts = [
-        for (final m in selectedStudents)
-          if (conflictRecords.containsKey(m.student.id))
-            (displayNames[m.student.id] ?? m.student.name),
+      final conflictItems = [
+        for (final item in selectedStudents)
+          if (conflictRecords.containsKey(item.student.id))
+            QuickEntryConflictItem(
+              studentName: displayNames[item.student.id] ?? item.student.name,
+              existingTimeRange:
+                  '${conflictRecords[item.student.id]!.startTime}-${conflictRecords[item.student.id]!.endTime}',
+              existingStatusLabel: quickEntryStatusLabel(
+                conflictRecords[item.student.id]!.status,
+              ),
+            ),
       ];
 
-      if (conflicts.isNotEmpty && mounted) {
-        final resolution = await _showConflictResolutionDialog(
-          selectedStudents: selectedStudents,
-          displayNames: displayNames,
-          conflictRecords: conflictRecords,
+      if (conflictItems.isNotEmpty && mounted) {
+        final resolution = await showQuickEntryConflictDialog(
+          context: context,
+          currentSlot: '${_dateStr()} $_startTime-$_endTime',
+          conflicts: conflictItems,
         );
-        if (resolution != _ConflictResolution.overwrite) {
-          if (resolution == _ConflictResolution.changeTime && mounted) {
+        if (resolution != QuickEntryConflictResolution.overwrite) {
+          if (resolution == QuickEntryConflictResolution.changeTime &&
+              mounted) {
             setState(() => _step = 1);
             AppToast.showSuccess(context, '已返回时间设置，可调整后重新保存');
           }
@@ -404,65 +351,34 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         }
       }
 
-      final statusEnum = AttendanceStatus.values.firstWhere(
-        (e) => e.name == _status,
-      );
       final now = DateTime.now().millisecondsSinceEpoch;
       final lessonFocusTags = _lessonFocusTags.toList(growable: false);
       final homePracticeNote = _homePracticeCtrl.text.trim();
       final progressScores = _buildProgressScores();
 
-      final records = <Attendance>[];
-      for (final m in selectedStudents) {
-        final price = m.student.pricePerClass;
-        final fee = FeeCalculator.calcFee(statusEnum, price);
-        final existingRecord = conflictRecords[m.student.id];
-        final resolvedLessonFocusTags =
-            existingRecord != null && lessonFocusTags.isEmpty
-            ? existingRecord.lessonFocusTags
-            : lessonFocusTags;
-        final resolvedHomePracticeNote =
-            existingRecord != null && homePracticeNote.isEmpty
-            ? existingRecord.homePracticeNote
-            : (homePracticeNote.isEmpty ? null : homePracticeNote);
-        final resolvedProgressScores =
-            existingRecord != null && progressScores == null
-            ? existingRecord.progressScores
-            : progressScores;
-
-        records.add(
-          existingRecord?.copyWith(
-                date: _dateStr(),
-                startTime: _startTime,
-                endTime: _endTime,
-                status: _status,
-                priceSnapshot: price,
-                feeAmount: fee,
-                lessonFocusTags: resolvedLessonFocusTags,
-                homePracticeNote: resolvedHomePracticeNote,
-                progressScores: resolvedProgressScores,
-                updatedAt: now,
-              ) ??
-              Attendance(
-                id: const Uuid().v4(),
-                studentId: m.student.id,
-                date: _dateStr(),
-                startTime: _startTime,
-                endTime: _endTime,
-                status: _status,
-                priceSnapshot: price,
-                feeAmount: fee,
-                lessonFocusTags: resolvedLessonFocusTags,
-                homePracticeNote: resolvedHomePracticeNote,
-                progressScores: resolvedProgressScores,
-                createdAt: now,
-                updatedAt: now,
-              ),
-        );
-      }
+      final buildResult = const QuickEntryRecordBuilder().build(
+        request: QuickEntryRecordRequest(
+          students: selectedStudents
+              .map((item) => item.student)
+              .toList(growable: false),
+          conflictRecordsByStudentId: conflictRecords,
+          date: _dateStr(),
+          startTime: _startTime,
+          endTime: _endTime,
+          status: _status,
+          lessonFocusTags: lessonFocusTags,
+          homePracticeNote: homePracticeNote,
+          progressScores: progressScores,
+          nowMs: now,
+          idFactory: () => const Uuid().v4(),
+        ),
+      );
 
       await _persistQuickEntryPreferences(selectedStudents);
-      await dao.batchInsertWithConflictReplace(records, conflictIds);
+      await dao.batchInsertWithConflictReplace(
+        buildResult.records,
+        buildResult.conflictIds,
+      );
 
       invalidateAfterAttendanceChange(ref);
 
@@ -471,6 +387,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       if (!mounted) return;
       AppToast.showSuccess(context, '已保存 ${selectedStudents.length} 条出勤记录');
       Navigator.of(context).pop();
+    } on QuickEntryInvalidPriceException catch (error) {
+      final displayName =
+          ref.read(studentDisplayNameMapProvider)[error.student.id] ??
+          error.student.name;
+      if (mounted) {
+        AppToast.showError(context, '$displayName 的课时单价无效，请先编辑学生档案。');
+      }
     } on FormatException catch (error) {
       if (mounted) {
         AppToast.showError(
@@ -483,179 +406,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  Future<_ConflictResolution> _showConflictResolutionDialog({
-    required List<StudentWithMeta> selectedStudents,
-    required Map<String, String> displayNames,
-    required Map<String, Attendance> conflictRecords,
-  }) async {
-    final currentSlot = '${_dateStr()} $_startTime-$_endTime';
-    final conflictedStudents = selectedStudents
-        .where((item) => conflictRecords.containsKey(item.student.id))
-        .toList(growable: false);
-
-    final result = await showDialog<_ConflictResolution>(
-      context: context,
-      builder: (dialogCtx) {
-        final theme = Theme.of(dialogCtx);
-        final screenSize = MediaQuery.sizeOf(dialogCtx);
-
-        return Dialog(
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 24,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 460,
-              maxHeight: screenSize.height * 0.82,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: kOrange.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.event_busy_rounded,
-                          color: kOrange,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '发现时段冲突',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '本次将保存 $currentSlot。以下学员该时段已有记录，请选择处理方式。',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: kInkSecondary,
-                                height: 1.45,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: conflictedStudents.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (_, index) {
-                        final item = conflictedStudents[index];
-                        final record = conflictRecords[item.student.id]!;
-                        final name =
-                            displayNames[item.student.id] ?? item.student.name;
-                        return Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: kInkSecondary.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: kInkSecondary.withValues(alpha: 0.12),
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.person_outline_rounded,
-                                size: 20,
-                                color: kInkSecondary,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      name,
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '已有记录：${record.startTime}-${record.endTime} · ${quickEntryStatusLabel(record.status)}',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(color: kInkSecondary),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '覆盖会保留旧记录中的课堂反馈、课后练习和作品照片，除非本次填写了新的内容。',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: kInkSecondary,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    alignment: WrapAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(
-                          dialogCtx,
-                        ).pop(_ConflictResolution.cancel),
-                        child: const Text('取消保存'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.of(
-                          dialogCtx,
-                        ).pop(_ConflictResolution.changeTime),
-                        icon: const Icon(Icons.schedule_rounded, size: 18),
-                        label: const Text('返回改时间'),
-                      ),
-                      FilledButton.icon(
-                        onPressed: () => Navigator.of(
-                          dialogCtx,
-                        ).pop(_ConflictResolution.overwrite),
-                        icon: const Icon(Icons.check_rounded, size: 18),
-                        label: const Text('覆盖并保存'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    return result ?? _ConflictResolution.cancel;
   }
 
   Future<void> _quickSaveWithDefaults() async {
@@ -800,91 +550,49 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         restorableRecentIds.every((id) => _selectedIds.contains(id));
     final selectedStudents = _selectedStudentsFrom(students);
     final estimatedTotalFee = _estimatedTotalFee(selectedStudents);
+    final estimatedTotalFeeLabel = _formatAmount(estimatedTotalFee);
     final canContinue =
         !studentsLoading && !studentsLoadFailed && selectedStudents.isNotEmpty;
+    final emptyMessage = students.isEmpty
+        ? '还没有学生档案，先新增或导入学生，之后就能直接记课。'
+        : _searchQuery.isEmpty
+        ? '当前没有可记课的学员，可切换“显示休学”或先新增学生。'
+        : '没有找到符合条件的学员。';
+    final showStudentActions = students.isEmpty || _searchQuery.isEmpty;
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: '搜索学生姓名或手机号',
-              prefixIcon: const Icon(Icons.search),
-              isDense: true,
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.56),
-            ),
-            onChanged: (v) => setState(() => _searchQuery = v.trim()),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _QuickActionChip(
-                icon: allFilteredSelected ? Icons.deselect : Icons.select_all,
-                label: allFilteredSelected ? '取消全选' : '全选',
-                onTap: filtered.isEmpty
-                    ? null
-                    : () {
-                        unawaited(InteractionFeedback.selection(context));
-                        setState(() {
-                          if (allFilteredSelected) {
-                            _selectedIds.removeAll(filteredIds);
-                          } else {
-                            _selectedIds.addAll(filteredIds);
-                          }
-                        });
-                      },
-              ),
-              _QuickActionChip(
-                icon: _showSuspended ? Icons.visibility_off : Icons.visibility,
-                label: _showSuspended ? '隐藏休学' : '显示休学',
-                onTap: () {
+        QuickEntryStudentFilterBar(
+          onSearchChanged: (value) => setState(() => _searchQuery = value),
+          allFilteredSelected: allFilteredSelected,
+          onToggleAllFiltered: filtered.isEmpty
+              ? null
+              : () {
                   unawaited(InteractionFeedback.selection(context));
-                  setState(() => _showSuspended = !_showSuspended);
+                  setState(() {
+                    if (allFilteredSelected) {
+                      _selectedIds.removeAll(filteredIds);
+                    } else {
+                      _selectedIds.addAll(filteredIds);
+                    }
+                  });
                 },
-              ),
-              if (restorableRecentIds.isNotEmpty)
-                _QuickActionChip(
-                  icon: restoredRecentGroup
-                      ? Icons.checklist_rtl_outlined
-                      : Icons.history_outlined,
-                  label: restoredRecentGroup
-                      ? '上次同班已恢复'
-                      : '恢复上次同班（${restorableRecentIds.length}人）',
-                  onTap: restoredRecentGroup
-                      ? null
-                      : () {
-                          unawaited(InteractionFeedback.selection(context));
-                          setState(() {
-                            _selectedIds.addAll(restorableRecentIds);
-                          });
-                        },
-                ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: kPrimaryBlue.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '已选 ${_selectedIds.length}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: kPrimaryBlue,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          showSuspended: _showSuspended,
+          onToggleShowSuspended: () {
+            unawaited(InteractionFeedback.selection(context));
+            setState(() => _showSuspended = !_showSuspended);
+          },
+          restorableRecentCount: restorableRecentIds.length,
+          restoredRecentGroup: restoredRecentGroup,
+          onRestoreRecentGroup: restoredRecentGroup
+              ? null
+              : () {
+                  unawaited(InteractionFeedback.selection(context));
+                  setState(() {
+                    _selectedIds.addAll(restorableRecentIds);
+                  });
+                },
+          selectedCount: _selectedIds.length,
         ),
         if (_loadedRememberedDefaults)
           Padding(
@@ -910,255 +618,48 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         const SizedBox(height: 10),
         Expanded(
           child: studentsLoading
-              ? const _QuickEntryStudentLoading()
+              ? const QuickEntryStudentLoading()
               : studentsLoadFailed
-              ? _QuickEntryStudentLoadError(
+              ? QuickEntryStudentLoadError(
                   onRetry: () => ref.invalidate(studentProvider),
                 )
               : filtered.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.54),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: kInkSecondary.withValues(alpha: 0.1),
-                              ),
-                            ),
-                            child: Text(
-                              students.isEmpty
-                                  ? '还没有学生档案，先新增或导入学生，之后就能直接记课。'
-                                  : _searchQuery.isEmpty
-                                  ? '当前没有可记课的学员，可切换“显示休学”或先新增学生。'
-                                  : '没有找到符合条件的学员。',
-                              style: Theme.of(
-                                context,
-                              ).textTheme.bodySmall?.copyWith(height: 1.5),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          if (students.isEmpty || _searchQuery.isEmpty) ...[
-                            const SizedBox(height: 12),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final compact = constraints.maxWidth < 340;
-                                final importButton = OutlinedButton.icon(
-                                  onPressed: () =>
-                                      _openStudentRoute('/students/import'),
-                                  icon: const Icon(Icons.upload_file_outlined),
-                                  label: const Text('批量导入'),
-                                );
-                                final createButton = FilledButton.icon(
-                                  onPressed: () =>
-                                      _openStudentRoute('/students/create'),
-                                  icon: const Icon(Icons.person_add_alt_1),
-                                  label: const Text('新增学生'),
-                                );
-
-                                if (compact) {
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      importButton,
-                                      const SizedBox(height: 10),
-                                      createButton,
-                                    ],
-                                  );
-                                }
-
-                                return Row(
-                                  children: [
-                                    Expanded(child: importButton),
-                                    const SizedBox(width: 12),
-                                    Expanded(child: createButton),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
+              ? QuickEntryStudentEmptyState(
+                  message: emptyMessage,
+                  showStudentActions: showStudentActions,
+                  onImportStudents: () => _openStudentRoute('/students/import'),
+                  onCreateStudent: () => _openStudentRoute('/students/create'),
                 )
-              : ListView.builder(
+              : QuickEntryStudentList(
                   controller: controller,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: filtered.length,
-                  itemBuilder: (_, i) {
-                    final m = filtered[i];
-                    final selected = _selectedIds.contains(m.student.id);
-                    final displayName =
-                        displayNames[m.student.id] ?? m.student.name;
-                    final statusText = m.student.status == 'active'
-                        ? '在读'
-                        : '休学';
-                    final statusColorValue = m.student.status == 'active'
-                        ? kGreen
-                        : kOrange;
-                    void toggleSelection([bool? value]) {
-                      unawaited(InteractionFeedback.selection(context));
-                      setState(() {
-                        final shouldSelect = value ?? !selected;
-                        if (shouldSelect) {
-                          _selectedIds.add(m.student.id);
-                        } else {
-                          _selectedIds.remove(m.student.id);
-                        }
-                      });
-                    }
-
-                    return Semantics(
-                      button: true,
-                      selected: selected,
-                      label:
-                          '$displayName，$statusText，${selected ? '已选择' : '未选择'}，轻触切换选择',
-                      onTap: toggleSelection,
-                      child: ExcludeSemantics(
-                        child: Container(
-                          margin: EdgeInsets.only(
-                            bottom: i == filtered.length - 1 ? 0 : 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? kPrimaryBlue.withValues(alpha: 0.08)
-                                : Colors.white.withValues(alpha: 0.56),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: selected
-                                  ? kPrimaryBlue.withValues(alpha: 0.28)
-                                  : kInkSecondary.withValues(alpha: 0.1),
-                            ),
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(18),
-                            onTap: toggleSelection,
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Row(
-                                children: [
-                                  Checkbox(
-                                    value: selected,
-                                    onChanged: toggleSelection,
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          displayName,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleSmall
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                        ),
-                                        if (m.student.parentPhone?.isNotEmpty ??
-                                            false) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            m.student.parentPhone!,
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.bodySmall,
-                                          ),
-                                        ],
-                                        const SizedBox(height: 8),
-                                        Wrap(
-                                          spacing: 8,
-                                          runSpacing: 8,
-                                          children: [
-                                            _QuickInfoPill(
-                                              icon: Icons.payments_outlined,
-                                              label:
-                                                  '¥${m.student.pricePerClass.toStringAsFixed(0)}/节',
-                                            ),
-                                            _QuickInfoPill(
-                                              icon: Icons.badge_outlined,
-                                              label: statusText,
-                                              color: statusColorValue,
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
+                  students: filtered,
+                  selectedIds: _selectedIds,
+                  displayNames: displayNames,
+                  onToggleStudent: (studentWithMeta, shouldSelect) {
+                    unawaited(InteractionFeedback.selection(context));
+                    setState(() {
+                      if (shouldSelect) {
+                        _selectedIds.add(studentWithMeta.student.id);
+                      } else {
+                        _selectedIds.remove(studentWithMeta.student.id);
+                      }
+                    });
                   },
                 ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: Column(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: !canContinue
-                      ? null
-                      : () {
-                          unawaited(InteractionFeedback.selection(context));
-                          setState(() => _step = 1);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text('下一步（已选 ${_selectedIds.length} 人）'),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: !canContinue
-                      ? null
-                      : () {
-                          unawaited(InteractionFeedback.selection(context));
-                          unawaited(_quickSaveWithDefaults());
-                        },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: const Icon(Icons.flash_on_outlined),
-                  label: Text(
-                    '直接保存（${selectedStudents.length}人 / ¥${_formatAmount(estimatedTotalFee)}）',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '直接保存会按当前日期、时间和状态记课，预计扣费 ¥${_formatAmount(estimatedTotalFee)}。',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
+        QuickEntryStep0Actions(
+          canContinue: canContinue,
+          selectedCount: _selectedIds.length,
+          quickSaveStudentCount: selectedStudents.length,
+          estimatedFeeLabel: estimatedTotalFeeLabel,
+          onContinue: () {
+            unawaited(InteractionFeedback.selection(context));
+            setState(() => _step = 1);
+          },
+          onQuickSave: () {
+            unawaited(InteractionFeedback.selection(context));
+            unawaited(_quickSaveWithDefaults());
+          },
         ),
       ],
     );
@@ -1175,81 +676,15 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
       padding: const EdgeInsets.all(16),
       children: [
         if (_loadedRememberedDefaults) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: kPrimaryBlue.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 2),
-                  child: Icon(
-                    Icons.history_toggle_off_outlined,
-                    size: 16,
-                    color: kPrimaryBlue,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '已沿用上次常用设置：$_startTime-$_endTime，状态“${quickEntryStatusLabel(_status)}”。',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: kPrimaryBlue,
-                      height: 1.45,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          QuickEntryRememberedDefaultsBanner(
+            startTime: _startTime,
+            endTime: _endTime,
+            statusLabel: quickEntryStatusLabel(_status),
           ),
           const SizedBox(height: 16),
         ],
         if (selectedNames.isNotEmpty) ...[
-          Text('已选学员', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.54),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
-            ),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final name in selectedNames.take(12))
-                  Chip(
-                    label: Text(name),
-                    backgroundColor: kPrimaryBlue.withValues(alpha: 0.08),
-                    side: BorderSide(
-                      color: kPrimaryBlue.withValues(alpha: 0.12),
-                    ),
-                    labelStyle: theme.textTheme.bodySmall?.copyWith(
-                      color: kPrimaryBlue,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                if (selectedNames.length > 12)
-                  Chip(
-                    label: Text('另 ${selectedNames.length - 12} 人'),
-                    backgroundColor: kSealRed.withValues(alpha: 0.08),
-                    side: BorderSide(color: kSealRed.withValues(alpha: 0.12)),
-                    labelStyle: theme.textTheme.bodySmall?.copyWith(
-                      color: kSealRed,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          QuickEntrySelectedStudentsSection(selectedNames: selectedNames),
           const SizedBox(height: 16),
         ],
         if (templates.isNotEmpty) ...[
@@ -1280,7 +715,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           ),
           const SizedBox(height: 16),
         ],
-        _buildPickerField(
+        QuickEntryPickerField(
           label: '上课日期',
           semanticsLabel: '上课日期选择器',
           semanticsHint: '轻触选择上课日期',
@@ -1292,14 +727,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 340;
-            final startPicker = _buildPickerField(
+            final startPicker = QuickEntryPickerField(
               label: '开始时间',
               semanticsLabel: '开始时间选择器',
               semanticsHint: '轻触选择开始时间',
               value: _startTime,
               onTap: _pickStartTime,
             );
-            final endPicker = _buildPickerField(
+            final endPicker = QuickEntryPickerField(
               label: '结束时间',
               semanticsLabel: '结束时间选择器',
               semanticsHint: '轻触选择结束时间',
@@ -1345,121 +780,42 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
               .toList(),
         ),
         const SizedBox(height: 16),
-        Theme(
-          data: theme.copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-            childrenPadding: const EdgeInsets.only(top: 4),
-            title: Text('课堂反馈（可选）', style: theme.textTheme.titleSmall),
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text('课堂重点', style: theme.textTheme.bodySmall),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: kLessonFocusTagOptions
-                    .map(
-                      (tag) => FilterChip(
-                        label: Text(tag),
-                        selected: _lessonFocusTags.contains(tag),
-                        onSelected: (selected) {
-                          unawaited(InteractionFeedback.selection(context));
-                          setState(() {
-                            if (selected) {
-                              _lessonFocusTags.add(tag);
-                            } else {
-                              _lessonFocusTags.remove(tag);
-                            }
-                          });
-                        },
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _homePracticeCtrl,
-                minLines: 2,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: '课后练习建议',
-                  hintText: '例如：每日临摹 15 分钟，重点观察起收笔节奏。',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.56),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text('进步评分（0-5）', style: theme.textTheme.bodySmall),
-              ),
-              const SizedBox(height: 8),
-              _ScoreEditor(
-                label: '笔画质量',
-                value: _strokeQuality,
-                onChanged: (value) => setState(() => _strokeQuality = value),
-                onClear: () => setState(() => _strokeQuality = null),
-              ),
-              _ScoreEditor(
-                label: '结构准确',
-                value: _structureAccuracy,
-                onChanged: (value) =>
-                    setState(() => _structureAccuracy = value),
-                onClear: () => setState(() => _structureAccuracy = null),
-              ),
-              _ScoreEditor(
-                label: '节奏连贯',
-                value: _rhythmConsistency,
-                onChanged: (value) =>
-                    setState(() => _rhythmConsistency = value),
-                onClear: () => setState(() => _rhythmConsistency = null),
-              ),
-            ],
-          ),
+        QuickEntryFeedbackSection(
+          selectedLessonFocusTags: _lessonFocusTags,
+          homePracticeController: _homePracticeCtrl,
+          strokeQuality: _strokeQuality,
+          structureAccuracy: _structureAccuracy,
+          rhythmConsistency: _rhythmConsistency,
+          onLessonFocusTagSelected: (tag, selected) {
+            setState(() {
+              if (selected) {
+                _lessonFocusTags.add(tag);
+              } else {
+                _lessonFocusTags.remove(tag);
+              }
+            });
+          },
+          onStrokeQualityChanged: (value) =>
+              setState(() => _strokeQuality = value),
+          onStrokeQualityCleared: () => setState(() => _strokeQuality = null),
+          onStructureAccuracyChanged: (value) =>
+              setState(() => _structureAccuracy = value),
+          onStructureAccuracyCleared: () =>
+              setState(() => _structureAccuracy = null),
+          onRhythmConsistencyChanged: (value) =>
+              setState(() => _rhythmConsistency = value),
+          onRhythmConsistencyCleared: () =>
+              setState(() => _rhythmConsistency = null),
         ),
         const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: kPrimaryBlue.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
-          ),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _QuickInfoPill(
-                icon: Icons.calendar_today_outlined,
-                label: _dateStr(),
-              ),
-              _QuickInfoPill(
-                icon: Icons.access_time_outlined,
-                label: '$_startTime - $_endTime',
-              ),
-              _QuickInfoPill(
-                icon: Icons.flag_outlined,
-                label: quickEntryStatusLabel(_status),
-                color: statusColor(_status),
-              ),
-              _QuickInfoPill(
-                icon: Icons.groups_2_outlined,
-                label: '${_selectedIds.length} 人',
-              ),
-              _QuickInfoPill(
-                icon: Icons.payments_outlined,
-                label:
-                    '预计 ¥${_formatAmount(_estimatedTotalFee(_selectedStudentsFrom(ref.read(studentProvider).valueOrNull ?? [])))}',
-                color: kPrimaryBlue,
-              ),
-            ],
-          ),
+        QuickEntrySelectionSummaryPanel(
+          dateLabel: _dateStr(),
+          timeRangeLabel: '$_startTime - $_endTime',
+          statusLabel: quickEntryStatusLabel(_status),
+          statusColor: statusColor(_status),
+          selectedCount: _selectedIds.length,
+          estimatedFeeLabel:
+              '\u9884\u8ba1 \u00a5${_formatAmount(_estimatedTotalFee(_selectedStudentsFrom(ref.read(studentProvider).valueOrNull ?? [])))}',
         ),
         const SizedBox(height: 24),
         LayoutBuilder(
@@ -1506,210 +862,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           },
         ),
       ],
-    );
-  }
-}
-
-class _QuickActionChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  const _QuickActionChip({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(
-      avatar: Icon(icon, size: 16, color: kInkSecondary),
-      label: Text(label),
-      onPressed: onTap,
-      backgroundColor: Colors.white.withValues(alpha: 0.56),
-      side: BorderSide(color: kInkSecondary.withValues(alpha: 0.14)),
-    );
-  }
-}
-
-class _QuickEntryStudentLoading extends StatelessWidget {
-  const _QuickEntryStudentLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      liveRegion: true,
-      label: '正在加载学生列表',
-      child: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator.adaptive(),
-              SizedBox(height: 14),
-              Text('正在加载学生列表...'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickEntryStudentLoadError extends StatelessWidget {
-  final VoidCallback onRetry;
-
-  const _QuickEntryStudentLoadError({required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Container(
-          width: double.infinity,
-          constraints: const BoxConstraints(maxWidth: 420),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: kRed.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: kRed.withValues(alpha: 0.12)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline_rounded,
-                color: kRed.withValues(alpha: 0.8),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '学生列表加载失败',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: kRed,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '请重新加载后再选择学员记课。',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
-              ),
-              const SizedBox(height: 14),
-              FilledButton.tonalIcon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('重新加载'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickInfoPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color? color;
-
-  const _QuickInfoPill({required this.icon, required this.label, this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final resolvedColor = color ?? kInkSecondary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: resolvedColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: resolvedColor),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: resolvedColor == kInkSecondary ? null : resolvedColor,
-              fontWeight: resolvedColor == kInkSecondary
-                  ? null
-                  : FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScoreEditor extends StatelessWidget {
-  final String label;
-  final double? value;
-  final ValueChanged<double> onChanged;
-  final VoidCallback onClear;
-
-  const _ScoreEditor({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.56),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kInkSecondary.withValues(alpha: 0.14)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Text(label, style: theme.textTheme.bodyMedium),
-              const Spacer(),
-              Text(
-                value == null ? '未评分' : value!.toStringAsFixed(1),
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () {
-                  unawaited(InteractionFeedback.selection(context));
-                  onClear();
-                },
-                child: const Text('清空'),
-              ),
-            ],
-          ),
-          Slider(
-            value: value ?? 3.0,
-            min: 0,
-            max: 5,
-            divisions: 10,
-            label: (value ?? 3.0).toStringAsFixed(1),
-            semanticFormatterCallback: (nextValue) =>
-                '$label ${nextValue.toStringAsFixed(1)} 分',
-            onChanged: (nextValue) {
-              unawaited(InteractionFeedback.selection(context));
-              onChanged(nextValue);
-            },
-          ),
-        ],
-      ),
     );
   }
 }

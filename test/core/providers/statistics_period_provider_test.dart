@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moyun/core/providers/clock_provider.dart';
 import 'package:moyun/core/providers/statistics_period_provider.dart';
+import 'package:moyun/core/services/app_clock.dart';
 
 void main() {
   test('buildStatisticsRangeForDate computes stable week month and year', () {
@@ -31,7 +33,9 @@ void main() {
     () {
       final container = ProviderContainer(
         overrides: [
-          statisticsNowProvider.overrideWith((ref) => DateTime(2026, 4, 3)),
+          appClockProvider.overrideWithValue(
+            AppClock.fixed(DateTime(2026, 4, 3)),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -46,4 +50,21 @@ void main() {
       expect(range.to, '2026-12-31');
     },
   );
+
+  test('statisticsPeriodProvider uses injected app clock by default', () {
+    final container = ProviderContainer(
+      overrides: [
+        appClockProvider.overrideWithValue(
+          AppClock.fixed(DateTime(2026, 4, 27, 10)),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final range = container.read(statisticsPeriodProvider);
+
+    expect(range.period, StatisticsPeriod.month);
+    expect(range.from, '2026-04-01');
+    expect(range.to, '2026-04-30');
+  });
 }

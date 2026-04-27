@@ -6,6 +6,8 @@ param(
 
     [switch]$SkipPubGet,
 
+    [switch]$SkipChecks,
+
     [switch]$NoTreeShakeIcons
 )
 
@@ -103,6 +105,20 @@ try {
         & flutter pub get
         if ($LASTEXITCODE -ne 0) {
             throw "flutter pub get failed with exit code $LASTEXITCODE"
+        }
+    }
+
+    if (-not $SkipChecks) {
+        Write-Host 'Running flutter analyze...'
+        & flutter analyze
+        if ($LASTEXITCODE -ne 0) {
+            throw "flutter analyze failed with exit code $LASTEXITCODE"
+        }
+
+        Write-Host 'Running flutter test...'
+        & flutter test
+        if ($LASTEXITCODE -ne 0) {
+            throw "flutter test failed with exit code $LASTEXITCODE"
         }
     }
 

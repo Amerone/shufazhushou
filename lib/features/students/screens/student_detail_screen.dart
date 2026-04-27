@@ -28,14 +28,14 @@ import '../widgets/attendance_artwork_analysis_launcher.dart';
 import '../widgets/student_attendance_record_card.dart';
 import '../widgets/student_artwork_timeline_card.dart';
 import '../widgets/student_action_launcher.dart';
+import '../widgets/student_detail_anchor_bar.dart';
 import '../widgets/student_ai_insight_card.dart';
 import '../widgets/student_ai_progress_card.dart';
 import '../widgets/student_finance_overview_card.dart';
 import '../widgets/student_growth_workbench_card.dart';
 import '../widgets/student_parent_message_card.dart';
 import '../widgets/student_primary_actions_card.dart';
-
-enum _StudentDetailAnchor { finance, payments, attendance }
+import '../widgets/student_detail_sections.dart';
 
 class StudentDetailScreen extends ConsumerStatefulWidget {
   final String studentId;
@@ -58,8 +58,8 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   final Set<String> _analyzingImageRecordIds = <String>{};
   final Set<String> _deletingPaymentIds = <String>{};
   final ScrollController _scrollController = ScrollController();
-  final Map<_StudentDetailAnchor, GlobalKey> _sectionKeys = {
-    for (final anchor in _StudentDetailAnchor.values) anchor: GlobalKey(),
+  final Map<StudentDetailAnchor, GlobalKey> _sectionKeys = {
+    for (final anchor in StudentDetailAnchor.values) anchor: GlobalKey(),
   };
   static const List<String> _errorPrefixes = <String>[
     'Exception: ',
@@ -97,7 +97,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     }
   }
 
-  Future<void> _scrollToSection(_StudentDetailAnchor anchor) async {
+  Future<void> _scrollToSection(StudentDetailAnchor anchor) async {
     await InteractionFeedback.selection(context);
     if (!mounted) return;
     final targetContext = _sectionKeys[anchor]?.currentContext;
@@ -440,18 +440,13 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 120),
                   children: [
-                    _StudentDetailAnchorBar(
-                      onOpenFinance: () =>
-                          _scrollToSection(_StudentDetailAnchor.finance),
-                      onOpenPayments: () =>
-                          _scrollToSection(_StudentDetailAnchor.payments),
-                      onOpenAttendance: () =>
-                          _scrollToSection(_StudentDetailAnchor.attendance),
+                    StudentDetailAnchorBar(
+                      onSelect: (anchor) => _scrollToSection(anchor),
                     ),
                     const SizedBox(height: 12),
                     // 1. 财务总览
-                    _StudentSectionBlock(
-                      anchorKey: _sectionKeys[_StudentDetailAnchor.finance],
+                    StudentSectionBlock(
+                      anchorKey: _sectionKeys[StudentDetailAnchor.finance],
                       child: StudentFinanceOverviewCard(
                         student: student,
                         from: from,
@@ -463,7 +458,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     ),
                     if (allTimeFeeAsync.hasError && allTimeFee != null) ...[
                       const SizedBox(height: 10),
-                      _RefreshErrorCard(
+                      StudentDetailRefreshErrorCard(
                         title: '账本刷新失败',
                         message: '当前费用概览和沟通摘要可能是上次加载的数据。',
                         errorText: _formatError(allTimeFeeAsync.error!),
@@ -512,7 +507,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                             ),
                                       ),
                                     ),
-                                    _ProfileBadge(
+                                    StudentProfileBadge(
                                       icon: Icons.verified_user_outlined,
                                       label: statusText,
                                       color: statusColor,
@@ -529,13 +524,13 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                     children: [
                                       if (student.parentName?.isNotEmpty ??
                                           false)
-                                        _InfoChip(
+                                        StudentDetailInfoChip(
                                           icon: Icons.family_restroom_outlined,
                                           label: student.parentName!,
                                         ),
                                       if (student.parentPhone?.isNotEmpty ??
                                           false)
-                                        _InfoChip(
+                                        StudentDetailInfoChip(
                                           icon: Icons.call_outlined,
                                           label: student.parentPhone!,
                                         ),
@@ -544,7 +539,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                 ],
                                 if (student.note?.isNotEmpty ?? false) ...[
                                   const SizedBox(height: 10),
-                                  _DetailNoteCard(note: student.note!),
+                                  StudentDetailNoteCard(note: student.note!),
                                 ],
                               ],
                             ),
@@ -556,7 +551,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     StudentPrimaryActionsCard(
                       onOpenPayment: () => _openPaymentSheet(student),
                       onOpenAttendance: () =>
-                          _scrollToSection(_StudentDetailAnchor.attendance),
+                          _scrollToSection(StudentDetailAnchor.attendance),
                       onOpenExport: _openExportSheet,
                       onEditStudent: _openEditStudent,
                     ),
@@ -579,7 +574,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                         ),
                       )
                     else if (allTimeFeeAsync.hasError)
-                      _RefreshErrorCard(
+                      StudentDetailRefreshErrorCard(
                         title: '学员账本加载失败',
                         message: '无法刷新学员账本，当前页面的费用信息可能不完整。',
                         errorText: _formatError(allTimeFeeAsync.error!),
@@ -597,17 +592,17 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     StudentArtworkTimelineCard(entries: artworkTimeline),
                     const SizedBox(height: 22),
                     // 3. 缴费记录
-                    _StudentSectionBlock(
-                      anchorKey: _sectionKeys[_StudentDetailAnchor.payments],
+                    StudentSectionBlock(
+                      anchorKey: _sectionKeys[StudentDetailAnchor.payments],
                       child: Column(
                         children: [
-                          _SectionHeader(
+                          StudentDetailSectionHeader(
                             title: '\u7f34\u8d39\u8bb0\u5f55',
                             trailing: '${payments.length} \u6761',
                           ),
                           const SizedBox(height: 10),
                           if (paymentsAsync.hasError) ...[
-                            _RefreshErrorCard(
+                            StudentDetailRefreshErrorCard(
                               title: '缴费记录刷新失败',
                               message: payments.isEmpty
                                   ? '暂时无法加载缴费记录，当前页面可能只显示旧数据。'
@@ -644,7 +639,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                 padding: EdgeInsets.only(
                                   bottom: payment == payments.last ? 0 : 10,
                                 ),
-                                child: _PaymentCard(
+                                child: StudentPaymentCard(
                                   payment: payment,
                                   deleting: _deletingPaymentIds.contains(
                                     payment.id,
@@ -658,11 +653,11 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     ),
                     const SizedBox(height: 22),
                     // 4. 出勤记录
-                    _StudentSectionBlock(
-                      anchorKey: _sectionKeys[_StudentDetailAnchor.attendance],
+                    StudentSectionBlock(
+                      anchorKey: _sectionKeys[StudentDetailAnchor.attendance],
                       child: Column(
                         children: [
-                          _SectionHeader(
+                          StudentDetailSectionHeader(
                             title: '\u51fa\u52e4\u8bb0\u5f55',
                             subtitle:
                                 '\u70b9\u51fb\u8bb0\u5f55\u53ef\u7f16\u8f91\u51fa\u52e4\u72b6\u6001\u3001\u5907\u6ce8\u548c\u8bfe\u5802\u53cd\u9988\u3002',
@@ -808,547 +803,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                 child: scrollToTopAction,
               ),
             ),
-    );
-  }
-}
-
-class _StudentDetailAnchorBar extends StatelessWidget {
-  final VoidCallback onOpenFinance;
-  final VoidCallback onOpenPayments;
-  final VoidCallback onOpenAttendance;
-
-  const _StudentDetailAnchorBar({
-    required this.onOpenFinance,
-    required this.onOpenPayments,
-    required this.onOpenAttendance,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '学生档案快捷导航',
-      child: GlassCard(
-        padding: const EdgeInsets.all(12),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxWidth < 420;
-            final buttonWidth = compact
-                ? constraints.maxWidth
-                : (constraints.maxWidth - 16) / 3;
-
-            return Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _StudentDetailAnchorButton(
-                  width: buttonWidth,
-                  icon: Icons.account_balance_wallet_outlined,
-                  label: '费用',
-                  onPressed: onOpenFinance,
-                ),
-                _StudentDetailAnchorButton(
-                  width: buttonWidth,
-                  icon: Icons.payments_outlined,
-                  label: '缴费',
-                  onPressed: onOpenPayments,
-                ),
-                _StudentDetailAnchorButton(
-                  width: buttonWidth,
-                  icon: Icons.fact_check_outlined,
-                  label: '出勤',
-                  onPressed: onOpenAttendance,
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _StudentDetailAnchorButton extends StatelessWidget {
-  final double width;
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-
-  const _StudentDetailAnchorButton({
-    required this.width,
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(44),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        ),
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18),
-        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-      ),
-    );
-  }
-}
-
-class _StudentSectionBlock extends StatelessWidget {
-  final Key? anchorKey;
-  final Widget child;
-
-  const _StudentSectionBlock({this.anchorKey, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(key: anchorKey, child: child);
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-  final String trailing;
-
-  const _SectionHeader({
-    required this.title,
-    this.subtitle,
-    required this.trailing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 420;
-        final titleBlock = Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  subtitle!,
-                  style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
-                ),
-              ],
-            ],
-          ),
-        );
-        final trailingBadge = Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
-          ),
-          child: Text(
-            trailing,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        );
-
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.42),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 4,
-                height: subtitle == null ? 26 : 44,
-                decoration: BoxDecoration(
-                  color: kPrimaryBlue.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              const SizedBox(width: 10),
-              if (compact)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [titleBlock]),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: trailingBadge,
-                      ),
-                    ],
-                  ),
-                )
-              else ...[
-                titleBlock,
-                const SizedBox(width: 12),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 150),
-                  child: trailingBadge,
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ProfileBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _ProfileBadge({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailNoteCard extends StatelessWidget {
-  final String note;
-
-  const _DetailNoteCard({required this.note});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.58),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '\u5907\u6ce8',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 6),
-          Text(note),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _InfoChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: kInkSecondary),
-          const SizedBox(width: 6),
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: (MediaQuery.sizeOf(context).width - 148).clamp(
-                80.0,
-                360.0,
-              ),
-            ),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RefreshErrorCard extends StatelessWidget {
-  final String title;
-  final String message;
-  final String errorText;
-  final String retryLabel;
-  final VoidCallback onRetry;
-
-  const _RefreshErrorCard({
-    required this.title,
-    required this.message,
-    required this.errorText,
-    required this.retryLabel,
-    required this.onRetry,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return GlassCard(
-      padding: const EdgeInsets.all(14),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 420;
-          final content = Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: kOrange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.sync_problem_outlined,
-                  size: 18,
-                  color: kOrange,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(message, style: theme.textTheme.bodySmall),
-                    const SizedBox(height: 4),
-                    Text(
-                      errorText,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: kInkSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-          final action = TextButton.icon(
-            style: TextButton.styleFrom(minimumSize: const Size(88, 44)),
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_outlined, size: 18),
-            label: Text(retryLabel),
-          );
-
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                content,
-                const SizedBox(height: 8),
-                Align(alignment: Alignment.centerRight, child: action),
-              ],
-            );
-          }
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(child: content),
-              const SizedBox(width: 8),
-              action,
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _PaymentCard extends StatelessWidget {
-  final Payment payment;
-  final bool deleting;
-  final VoidCallback onDelete;
-
-  const _PaymentCard({
-    required this.payment,
-    required this.deleting,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 420;
-          final deleteAction = _DangerActionButton(
-            tooltip: '\u5220\u9664\u7f34\u8d39\u8bb0\u5f55',
-            loading: deleting,
-            onPressed: onDelete,
-          );
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 46,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: kGreen.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.payments_outlined,
-                      color: kGreen,
-                      size: 18,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '\u5df2\u6536',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: kGreen,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '\u00a5${payment.amount.toStringAsFixed(2)}',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (compact) deleteAction,
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    StudentDetailMetaChip(
-                      icon: Icons.calendar_today_outlined,
-                      label: payment.paymentDate,
-                    ),
-                    if (payment.note?.isNotEmpty == true) ...[
-                      const SizedBox(height: 8),
-                      Text(payment.note!, style: theme.textTheme.bodySmall),
-                    ],
-                  ],
-                ),
-              ),
-              if (!compact) ...[const SizedBox(width: 10), deleteAction],
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _DangerActionButton extends StatelessWidget {
-  final String tooltip;
-  final bool loading;
-  final VoidCallback onPressed;
-
-  const _DangerActionButton({
-    required this.tooltip,
-    required this.loading,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: kRed.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: loading ? null : onPressed,
-        icon: loading
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.delete_outline),
-        color: kRed,
-        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-        visualDensity: VisualDensity.compact,
-      ),
     );
   }
 }

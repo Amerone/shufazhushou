@@ -48,56 +48,64 @@ void main() {
       expect(facts.latestUpdatedAt, 30);
     });
 
-    test('keeps only formal records with progress scores for progress insight', () {
-      final facts = StudentAttendanceInsightFacts.fromRecords([
-        _attendance(
-          id: 'trial-scored',
-          status: 'trial',
-          progressScores: const AttendanceProgressScores(strokeQuality: 1),
-        ),
-        _attendance(id: 'present-unscored', status: 'present'),
-        _attendance(
-          id: 'late-scored',
-          status: 'late',
-          progressScores: const AttendanceProgressScores(strokeQuality: 2),
-        ),
-        _attendance(
-          id: 'present-scored',
-          status: 'present',
-          progressScores: const AttendanceProgressScores(structureAccuracy: 3),
-        ),
-      ]);
+    test(
+      'keeps only formal records with progress scores for progress insight',
+      () {
+        final facts = StudentAttendanceInsightFacts.fromRecords([
+          _attendance(
+            id: 'trial-scored',
+            status: 'trial',
+            progressScores: const AttendanceProgressScores(strokeQuality: 1),
+          ),
+          _attendance(id: 'present-unscored', status: 'present'),
+          _attendance(
+            id: 'late-scored',
+            status: 'late',
+            progressScores: const AttendanceProgressScores(strokeQuality: 2),
+          ),
+          _attendance(
+            id: 'present-scored',
+            status: 'present',
+            progressScores: const AttendanceProgressScores(
+              structureAccuracy: 3,
+            ),
+          ),
+        ]);
 
-      expect(
-        facts.recentScoredFormalRecords.map((record) => record.id),
-        ['late-scored', 'present-scored'],
-      );
-    });
+        expect(facts.recentScoredFormalRecords.map((record) => record.id), [
+          'late-scored',
+          'present-scored',
+        ]);
+      },
+    );
 
-    test('copyWith preserves aggregate fields while replacing scored records', () {
-      final original = StudentAttendanceInsightFacts.fromRecords([
-        _attendance(
-          id: 'present-scored',
-          status: 'present',
-          feeAmount: 100,
-          progressScores: const AttendanceProgressScores(strokeQuality: 2),
-          updatedAt: 20,
-        ),
-      ]);
-      final replacement = [
-        _attendance(id: 'replacement', status: 'late', updatedAt: 30),
-      ];
+    test(
+      'copyWith preserves aggregate fields while replacing scored records',
+      () {
+        final original = StudentAttendanceInsightFacts.fromRecords([
+          _attendance(
+            id: 'present-scored',
+            status: 'present',
+            feeAmount: 100,
+            progressScores: const AttendanceProgressScores(strokeQuality: 2),
+            updatedAt: 20,
+          ),
+        ]);
+        final replacement = [
+          _attendance(id: 'replacement', status: 'late', updatedAt: 30),
+        ];
 
-      final copied = original.copyWith(
-        recentScoredFormalRecords: replacement,
-      );
+        final copied = original.copyWith(
+          recentScoredFormalRecords: replacement,
+        );
 
-      expect(copied.totalReceivable, original.totalReceivable);
-      expect(copied.lastFormalDate, original.lastFormalDate);
-      expect(copied.hasFormal, original.hasFormal);
-      expect(copied.latestUpdatedAt, original.latestUpdatedAt);
-      expect(copied.recentScoredFormalRecords, replacement);
-    });
+        expect(copied.totalReceivable, original.totalReceivable);
+        expect(copied.lastFormalDate, original.lastFormalDate);
+        expect(copied.hasFormal, original.hasFormal);
+        expect(copied.latestUpdatedAt, original.latestUpdatedAt);
+        expect(copied.recentScoredFormalRecords, replacement);
+      },
+    );
   });
 }
 

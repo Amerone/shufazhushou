@@ -71,7 +71,9 @@ class _AttendanceArtworkPreviewState extends State<AttendanceArtworkPreview> {
             ),
             const SizedBox(height: 8),
             Semantics(
-              label: hasImageFile ? '${widget.title}，点击查看原图' : widget.emptyLabel,
+              label: hasImageFile
+                  ? '${widget.title}，点击查看原图'
+                  : widget.emptyLabel,
               button: hasImageFile,
               image: true,
               child: InkWell(
@@ -113,8 +115,8 @@ class _AttendanceArtworkPreviewState extends State<AttendanceArtworkPreview> {
                                               .round()
                                               .clamp(160, 1200)
                                               .toInt();
-                                      final cacheHeight =
-                                          (cacheWidth * 3 / 4).round();
+                                      final cacheHeight = (cacheWidth * 3 / 4)
+                                          .round();
 
                                       return Image.file(
                                         imageFile,
@@ -197,6 +199,7 @@ Future<void> showAttendanceArtworkPreviewDialog(
                     ),
                   ),
                   IconButton(
+                    tooltip: '关闭预览',
                     onPressed: () => Navigator.of(dialogContext).pop(),
                     icon: const Icon(Icons.close),
                   ),
@@ -224,9 +227,7 @@ Future<void> showAttendanceArtworkPreviewDialog(
                               ),
                             ),
                           )
-                        : const _ArtworkUnavailable(
-                            label: '作品文件不存在，请重新上传。',
-                          ),
+                        : const _ArtworkUnavailable(label: '作品文件不存在，请重新上传。'),
                   ),
                 ),
               ),

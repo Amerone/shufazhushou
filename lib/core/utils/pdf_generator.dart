@@ -9,7 +9,10 @@ import '../models/seal_config.dart';
 import '../models/student.dart';
 import '../models/attendance.dart';
 import '../models/payment.dart';
-import '../services/student_growth_summary_service.dart';
+import '../services/pdf_export_file_namer.dart';
+import '../services/pdf_report_seal_stamp.dart';
+import '../services/pdf_report_summary_service.dart';
+import '../services/pdf_report_text_formatter.dart';
 import 'fee_calculator.dart';
 import '../../shared/constants.dart';
 
@@ -30,9 +33,7 @@ class PdfGenerator {
   static const _washInkDeep = PdfColor.fromInt(0x18393E35);
   static const _metricGreen = PdfColor.fromInt(0xFF6F8A68);
   static const _tableStripe = PdfColor.fromInt(0x0AF5F1E8);
-  static final _invalidFileNameChars = RegExp(r'[\\/:*?"<>|]');
-  static final _fileNameWhitespace = RegExp(r'\s+');
-  static final _fileNameUnderscores = RegExp(r'_+');
+  static const _pdfExportFileNamer = PdfExportFileNamer();
 
   static Future<String> generate({
     required Student student,
@@ -83,34 +84,20 @@ class PdfGenerator {
       color: _inkSecondary,
     );
 
-    final sortedRecords = [...records]
-      ..sort((a, b) {
-        final dateCompare = a.date.compareTo(b.date);
-        if (dateCompare != 0) return dateCompare;
-        return a.startTime.compareTo(b.startTime);
-      });
-    final sortedPayments = [...payments]
-      ..sort((a, b) => a.paymentDate.compareTo(b.paymentDate));
-    final feedbackRecords = sortedRecords
-        .where((record) => _hasStructuredFeedback(record))
-        .toList(growable: false);
-    final totalMinutes = sortedRecords.fold<int>(
-      0,
-      (sum, record) => sum + _durationMinutes(record.startTime, record.endTime),
-    );
-    final totalFee = sortedRecords.fold<double>(
-      0,
-      (sum, record) => sum + record.feeAmount,
-    );
-    final totalPaid = sortedPayments.fold<double>(
-      0,
-      (sum, payment) => sum + payment.amount,
-    );
-    final ledger = StudentLedgerView(
-      balance: feeSummary?.balance ?? (totalPaid - totalFee),
+    final reportSummary = const PdfReportSummaryService().build(
+      records: records,
+      payments: payments,
       pricePerClass: student.pricePerClass,
-      hasBalanceHistory: totalFee > 0 || totalPaid > 0,
+      feeSummary: feeSummary,
+      now: DateTime.now(),
     );
+    final sortedRecords = reportSummary.sortedRecords;
+    final sortedPayments = reportSummary.sortedPayments;
+    final feedbackRecords = reportSummary.feedbackRecords;
+    final totalMinutes = reportSummary.totalMinutes;
+    final totalFee = reportSummary.totalFee;
+    final totalPaid = reportSummary.totalPaid;
+    final ledger = reportSummary.ledger;
     final balance = ledger.balance;
     final balanceLabel = ledger.balanceStatusLabel;
     final balanceValue = 'CNY ${balance.abs().toStringAsFixed(2)}';
@@ -121,11 +108,9 @@ class PdfGenerator {
     };
     final messageText = message.trim();
     final aiAnalysisText = aiAnalysis?.trim() ?? '';
-    final aiAnalysisParagraphs = _splitAiAnalysisParagraphs(aiAnalysisText);
-    final growthSummary = const StudentGrowthSummaryService().build(
-      records: sortedRecords,
-      now: DateTime.now(),
-    );
+    final aiAnalysisParagraphs =
+        PdfReportTextFormatter.splitAiAnalysisParagraphs(aiAnalysisText);
+    final growthSummary = reportSummary.growthSummary;
 
     final pdf = pw.Document(
       theme: pw.ThemeData.withFont(base: ttf, bold: ttf),
@@ -153,112 +138,6 @@ class PdfGenerator {
     }
 
     final watermarkWidget = watermark ? buildWatermark() : null;
-
-    pw.Widget buildSealStamp({double size = 60, bool tilted = true}) {
-      final grid = sealConfig.gridLayout;
-      final isInverted = sealConfig.isInverted;
-      final bgColor = isInverted ? _sealRed : null;
-      final textColor = isInverted ? PdfColors.white : _sealRed;
-      final charStyle = pw.TextStyle(
-        font: calliFont,
-        fontSize: size * 0.32,
-        color: textColor,
-      );
-
-      pw.BoxBorder? border;
-      bool isUniformBorder = true;
-      switch (sealConfig.border) {
-        case 'full':
-          border = pw.Border.all(color: _sealRed, width: 2);
-          break;
-        case 'broken':
-          border = pw.Border(
-            top: const pw.BorderSide(color: _sealRed, width: 2.4),
-            right: const pw.BorderSide(color: _sealRed, width: 1.2),
-            bottom: const pw.BorderSide(color: _sealRed, width: 1.6),
-            left: const pw.BorderSide(color: _sealRed, width: 2.8),
-          );
-          isUniformBorder = false;
-          break;
-        case 'borrowed':
-          border = const pw.Border(
-            top: pw.BorderSide(color: _sealRed, width: 2),
-            right: pw.BorderSide(color: _sealRed, width: 2),
-            bottom: pw.BorderSide.none,
-            left: pw.BorderSide.none,
-          );
-          isUniformBorder = false;
-          break;
-        case 'none':
-          border = null;
-          break;
-        default:
-          border = pw.Border.all(color: _sealRed, width: 2);
-      }
-
-      pw.Widget content;
-      if (sealConfig.layout == 'diagonal') {
-        content = pw.Padding(
-          padding: const pw.EdgeInsets.all(3),
-          child: pw.Column(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text(grid[0][0], style: charStyle),
-                  pw.Text(grid[0][1], style: charStyle),
-                ],
-              ),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text(grid[1][0], style: charStyle),
-                  pw.Text(grid[1][1], style: charStyle),
-                ],
-              ),
-            ],
-          ),
-        );
-      } else {
-        content = pw.Column(
-          mainAxisAlignment: pw.MainAxisAlignment.center,
-          children: [
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-              children: [
-                pw.Text(grid[0][0], style: charStyle),
-                pw.Text(grid[0][1], style: charStyle),
-              ],
-            ),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-              children: [
-                pw.Text(grid[1][0], style: charStyle),
-                pw.Text(grid[1][1], style: charStyle),
-              ],
-            ),
-          ],
-        );
-      }
-
-      final stamp = pw.Container(
-        width: size,
-        height: size,
-        decoration: pw.BoxDecoration(
-          color: bgColor,
-          border: border,
-          borderRadius: isUniformBorder ? pw.BorderRadius.circular(4) : null,
-        ),
-        padding: const pw.EdgeInsets.all(3),
-        child: content,
-      );
-
-      return pw.Opacity(
-        opacity: 0.9,
-        child: tilted ? pw.Transform.rotate(angle: -0.08, child: stamp) : stamp,
-      );
-    }
 
     // The background layers mimic a calm ledger with rotated gradients and muted strokes.
     pw.Widget buildPaperBackground() {
@@ -610,7 +489,9 @@ class PdfGenerator {
                 '${sortedRecords[i].startTime} - ${sortedRecords[i].endTime}',
               ),
               buildTableCell(
-                _formatStatusLabel(sortedRecords[i].status),
+                PdfReportTextFormatter.formatStatusLabel(
+                  sortedRecords[i].status,
+                ),
                 align: pw.TextAlign.center,
               ),
               buildTableCell(
@@ -651,73 +532,78 @@ class PdfGenerator {
         runSpacing: 12,
         children: [
           for (final record in feedbackRecords)
-            pw.Container(
-              width: 220,
-              padding: const pw.EdgeInsets.fromLTRB(14, 14, 14, 14),
-              decoration: pw.BoxDecoration(
-                color: _paperPanel,
-                border: pw.Border.all(color: _frameLine, width: 0.8),
-                borderRadius: pw.BorderRadius.circular(10),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      buildTag(record.date),
-                      buildTag(
-                        '${record.startTime} - ${record.endTime}',
-                        accent: _sealRed,
+            () {
+              final progressSummary =
+                  PdfReportTextFormatter.formatProgressSummary(record);
+              return pw.Container(
+                width: 220,
+                padding: const pw.EdgeInsets.fromLTRB(14, 14, 14, 14),
+                decoration: pw.BoxDecoration(
+                  color: _paperPanel,
+                  border: pw.Border.all(color: _frameLine, width: 0.8),
+                  borderRadius: pw.BorderRadius.circular(10),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        buildTag(record.date),
+                        buildTag(
+                          '${record.startTime} - ${record.endTime}',
+                          accent: _sealRed,
+                        ),
+                      ],
+                    ),
+                    pw.SizedBox(height: 10),
+                    pw.Container(width: 40, height: 2, color: _sealRed),
+                    if (record.lessonFocusTags.isNotEmpty) ...[
+                      pw.SizedBox(height: 10),
+                      pw.Text(
+                        '\u8bfe\u5802\u91cd\u70b9',
+                        style: bodyStrong.copyWith(fontSize: 10.6),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        PdfReportTextFormatter.formatLessonFocusTags(record),
+                        style: body.copyWith(fontSize: 10.5, lineSpacing: 3),
                       ),
                     ],
-                  ),
-                  pw.SizedBox(height: 10),
-                  pw.Container(width: 40, height: 2, color: _sealRed),
-                  if (record.lessonFocusTags.isNotEmpty) ...[
+                    if (record.homePracticeNote?.trim().isNotEmpty ??
+                        false) ...[
+                      pw.SizedBox(height: 10),
+                      pw.Text(
+                        '\u8fdb\u6b65\u6458\u8981',
+                        style: bodyStrong.copyWith(fontSize: 10.6),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        record.homePracticeNote!.trim(),
+                        style: body.copyWith(fontSize: 10.5, lineSpacing: 3),
+                      ),
+                    ],
                     pw.SizedBox(height: 10),
                     pw.Text(
-                      '\u8bfe\u5802\u91cd\u70b9',
+                      '\u8fdb\u6b65\u8bb0\u5f55',
                       style: bodyStrong.copyWith(fontSize: 10.6),
                     ),
                     pw.SizedBox(height: 4),
                     pw.Text(
-                      _formatLessonFocusTags(record),
-                      style: body.copyWith(fontSize: 10.5, lineSpacing: 3),
+                      progressSummary.isEmpty
+                          ? '\u672c\u6b21\u8bfe\u5802\u6682\u65e0\u7ed3\u6784\u5316\u8bc4\u5206\uff0c\u8bf7\u7ed3\u5408\u5907\u6ce8\u4e0e\u91cd\u70b9\u6807\u7b7e\u67e5\u770b\u3002'
+                          : progressSummary,
+                      style: body.copyWith(
+                        fontSize: 10.5,
+                        color: _inkSecondary,
+                        lineSpacing: 3,
+                      ),
                     ),
                   ],
-                  if (record.homePracticeNote?.trim().isNotEmpty ?? false) ...[
-                    pw.SizedBox(height: 10),
-                    pw.Text(
-                      '\u8fdb\u6b65\u6458\u8981',
-                      style: bodyStrong.copyWith(fontSize: 10.6),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      record.homePracticeNote!.trim(),
-                      style: body.copyWith(fontSize: 10.5, lineSpacing: 3),
-                    ),
-                  ],
-                  pw.SizedBox(height: 10),
-                  pw.Text(
-                    '\u8fdb\u6b65\u8bb0\u5f55',
-                    style: bodyStrong.copyWith(fontSize: 10.6),
-                  ),
-                  pw.SizedBox(height: 4),
-                  pw.Text(
-                    _formatProgressSummary(record).isEmpty
-                        ? '\u672c\u6b21\u8bfe\u5802\u6682\u65e0\u7ed3\u6784\u5316\u8bc4\u5206\uff0c\u8bf7\u7ed3\u5408\u5907\u6ce8\u4e0e\u91cd\u70b9\u6807\u7b7e\u67e5\u770b\u3002'
-                        : _formatProgressSummary(record),
-                    style: body.copyWith(
-                      fontSize: 10.5,
-                      color: _inkSecondary,
-                      lineSpacing: 3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            }(),
         ],
       );
     }
@@ -978,7 +864,11 @@ class PdfGenerator {
               ),
               pw.Align(
                 alignment: pw.Alignment.bottomRight,
-                child: buildSealStamp(size: 68),
+                child: PdfReportSealStamp.build(
+                  sealConfig: sealConfig,
+                  font: calliFont,
+                  size: 68,
+                ),
               ),
             ],
           );
@@ -1009,7 +899,7 @@ class PdfGenerator {
               pw.SizedBox(width: 12),
               buildMetricCard(
                 label: '\u603b\u65f6\u957f',
-                value: _formatDuration(totalMinutes),
+                value: PdfReportTextFormatter.formatDuration(totalMinutes),
                 accent: _metricGreen,
                 caption:
                     '\u6839\u636e\u4e0a\u8bfe\u5f00\u59cb\u4e0e\u7ed3\u675f\u65f6\u95f4\u8ba1\u7b97',
@@ -1101,7 +991,11 @@ class PdfGenerator {
             pw.SizedBox(height: 18),
             pw.Align(
               alignment: pw.Alignment.centerRight,
-              child: buildSealStamp(size: 54),
+              child: PdfReportSealStamp.build(
+                sealConfig: sealConfig,
+                font: calliFont,
+                size: 54,
+              ),
             ),
           ],
         ],
@@ -1145,7 +1039,11 @@ class PdfGenerator {
             pw.SizedBox(height: 10),
             pw.Align(
               alignment: pw.Alignment.centerRight,
-              child: buildSealStamp(size: 56),
+              child: PdfReportSealStamp.build(
+                sealConfig: sealConfig,
+                font: calliFont,
+                size: 56,
+              ),
             ),
           ],
         ),
@@ -1203,7 +1101,10 @@ class PdfGenerator {
                             style: calliSignature,
                           ),
                           pw.SizedBox(height: 10),
-                          buildSealStamp(),
+                          PdfReportSealStamp.build(
+                            sealConfig: sealConfig,
+                            font: calliFont,
+                          ),
                         ],
                       ),
                     ),
@@ -1217,145 +1118,15 @@ class PdfGenerator {
     }
 
     final dir = await getTemporaryDirectory();
-    final safeStudentName = _sanitizeFileNameSegment(
-      student.name,
-      fallback: 'student',
-    );
-    final safeFrom = _sanitizeFileNameSegment(from, fallback: 'from');
-    final safeTo = _sanitizeFileNameSegment(to, fallback: 'to');
-    final fileStamp = _formatFileStamp(DateTime.now());
     final path = p.join(
       dir.path,
-      '${safeStudentName}_${safeFrom}_${safeTo}_$fileStamp.pdf',
+      _pdfExportFileNamer.buildFileName(
+        studentName: student.name,
+        from: from,
+        to: to,
+      ),
     );
     await File(path).writeAsBytes(await pdf.save());
     return path;
-  }
-
-  static bool _hasStructuredFeedback(Attendance record) {
-    return record.lessonFocusTags.isNotEmpty ||
-        (record.homePracticeNote?.trim().isNotEmpty ?? false) ||
-        !(record.progressScores?.isEmpty ?? true);
-  }
-
-  static String _formatLessonFocusTags(Attendance record) {
-    if (record.lessonFocusTags.isEmpty) return '';
-    return record.lessonFocusTags.join(', ');
-  }
-
-  static String _formatProgressSummary(Attendance record) {
-    final scores = record.progressScores;
-    if (scores == null || scores.isEmpty) return '';
-
-    final parts = <String>[];
-    if (scores.strokeQuality != null) {
-      parts.add(
-        '\u7b14\u753b\u8d28\u91cf\uff1a${scores.strokeQuality!.toStringAsFixed(1)}',
-      );
-    }
-    if (scores.structureAccuracy != null) {
-      parts.add(
-        '\u7ed3\u6784\u51c6\u786e\u5ea6\uff1a${scores.structureAccuracy!.toStringAsFixed(1)}',
-      );
-    }
-    if (scores.rhythmConsistency != null) {
-      parts.add(
-        '\u8282\u594f\u7a33\u5b9a\u6027\uff1a${scores.rhythmConsistency!.toStringAsFixed(1)}',
-      );
-    }
-    return parts.join(' / ');
-  }
-
-  static String _formatStatusLabel(String status) {
-    switch (status) {
-      case 'present':
-        return '\u51fa\u52e4';
-      case 'late':
-        return '\u8fdf\u5230';
-      case 'leave':
-        return '\u8bf7\u5047';
-      case 'absent':
-        return '\u7f3a\u52e4';
-      case 'trial':
-        return '\u8bd5\u542c';
-      default:
-        return status;
-    }
-  }
-
-  static List<String> _splitAiAnalysisParagraphs(String text) {
-    if (text.isEmpty) return const [];
-
-    final byBlankLine = text
-        .split(RegExp(r'\n\s*\n'))
-        .map((paragraph) => paragraph.trim())
-        .where((paragraph) => paragraph.isNotEmpty)
-        .toList(growable: false);
-    if (byBlankLine.length > 1) return byBlankLine;
-
-    final byLine = text
-        .split(RegExp(r'\n+'))
-        .map((paragraph) => paragraph.trim())
-        .where((paragraph) => paragraph.isNotEmpty)
-        .toList(growable: false);
-    if (byLine.length > 1) return byLine;
-
-    final bySentence =
-        RegExp(r'[^\u3002\uFF01\uFF1F!?]+[\u3002\uFF01\uFF1F!?]?')
-            .allMatches(text)
-            .map((match) => match.group(0)?.trim() ?? '')
-            .where((paragraph) => paragraph.isNotEmpty)
-            .toList(growable: false);
-    if (bySentence.length > 1) return bySentence;
-
-    return [text];
-  }
-
-  static int _durationMinutes(String startTime, String endTime) {
-    final startParts = startTime.split(':');
-    final endParts = endTime.split(':');
-    if (startParts.length != 2 || endParts.length != 2) return 0;
-
-    final startHour = int.tryParse(startParts[0]) ?? 0;
-    final startMinute = int.tryParse(startParts[1]) ?? 0;
-    final endHour = int.tryParse(endParts[0]) ?? 0;
-    final endMinute = int.tryParse(endParts[1]) ?? 0;
-
-    final startTotal = startHour * 60 + startMinute;
-    final endTotal = endHour * 60 + endMinute;
-    final diff = endTotal - startTotal;
-    return diff > 0 ? diff : 0;
-  }
-
-  static String _formatDuration(int minutes) {
-    if (minutes <= 0) return '0\u5206\u949f';
-    if (minutes < 60) return '$minutes\u5206\u949f';
-
-    final hours = minutes ~/ 60;
-    final rest = minutes % 60;
-    if (rest == 0) return '$hours\u5c0f\u65f6';
-    return '$hours\u5c0f\u65f6 $rest\u5206\u949f';
-  }
-
-  static String _sanitizeFileNameSegment(
-    String value, {
-    required String fallback,
-  }) {
-    final sanitized = value
-        .trim()
-        .replaceAll(_invalidFileNameChars, '_')
-        .replaceAll(_fileNameWhitespace, '_')
-        .replaceAll(_fileNameUnderscores, '_')
-        .replaceAll(RegExp(r'^[._]+|[._]+$'), '');
-    return sanitized.isEmpty ? fallback : sanitized;
-  }
-
-  static String _formatFileStamp(DateTime time) {
-    final month = time.month.toString().padLeft(2, '0');
-    final day = time.day.toString().padLeft(2, '0');
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    final second = time.second.toString().padLeft(2, '0');
-    return '${time.year}$month$day$hour$minute$second';
   }
 }

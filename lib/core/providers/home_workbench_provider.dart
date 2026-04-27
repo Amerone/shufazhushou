@@ -1,14 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/constants.dart' show AttendanceStatus;
 import '../database/dao/student_dao.dart' show StudentWithMeta;
 import '../models/attendance.dart';
 import '../models/student_insight_facts.dart';
 import '../services/home_workbench_service.dart';
 import 'attendance_provider.dart';
+import 'clock_provider.dart';
 import 'fee_summary_provider.dart';
 import 'insight_provider.dart';
 import 'student_provider.dart';
-import '../../shared/constants.dart' show AttendanceStatus;
 
 final homeWorkbenchServiceProvider = Provider(
   (ref) => const HomeWorkbenchService(),
@@ -66,7 +67,7 @@ final homeWorkbenchProvider = FutureProvider<List<HomeWorkbenchTask>>((
     dismissedKeys: dismissedKeys,
     activeStudentCount: activeStudentCount,
     activePeriodLabel: '本月',
-    now: DateTime.now(),
+    now: ref.read(appClockProvider).now(),
   );
 
   return workbenchService.buildTasks(

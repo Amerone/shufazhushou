@@ -119,10 +119,7 @@ class StudentListQuery {
   final String text;
   final StudentListFilter filter;
 
-  const StudentListQuery({
-    this.text = '',
-    this.filter = StudentListFilter.all,
-  });
+  const StudentListQuery({this.text = '', this.filter = StudentListFilter.all});
 
   static const empty = StudentListQuery();
 
@@ -139,9 +136,7 @@ class StudentListQuery {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is StudentListQuery &&
-          text == other.text &&
-          filter == other.filter;
+      other is StudentListQuery && text == other.text && filter == other.filter;
 
   @override
   int get hashCode => Object.hash(text, filter);
@@ -181,22 +176,24 @@ final studentListViewModelProvider = Provider<StudentListViewModel>((ref) {
   final activeCount = students
       .where((item) => item.student.status == 'active')
       .length;
-  final filtered = students.where((item) {
-    final student = item.student;
-    final matchesFilter = switch (query.filter) {
-      StudentListFilter.all => true,
-      StudentListFilter.active => student.status == 'active',
-      StudentListFilter.suspended => student.status != 'active',
-    };
-    if (!matchesFilter) return false;
-    if (normalizedQuery.isEmpty) return true;
+  final filtered = students
+      .where((item) {
+        final student = item.student;
+        final matchesFilter = switch (query.filter) {
+          StudentListFilter.all => true,
+          StudentListFilter.active => student.status == 'active',
+          StudentListFilter.suspended => student.status != 'active',
+        };
+        if (!matchesFilter) return false;
+        if (normalizedQuery.isEmpty) return true;
 
-    return student.name.toLowerCase().contains(normalizedQuery) ||
-        (student.parentPhone?.toLowerCase().contains(normalizedQuery) ??
-            false) ||
-        (student.parentName?.toLowerCase().contains(normalizedQuery) ??
-            false);
-  }).toList(growable: false);
+        return student.name.toLowerCase().contains(normalizedQuery) ||
+            (student.parentPhone?.toLowerCase().contains(normalizedQuery) ??
+                false) ||
+            (student.parentName?.toLowerCase().contains(normalizedQuery) ??
+                false);
+      })
+      .toList(growable: false);
 
   final resultSummary = query.hasActiveFilter
       ? '当前显示 ${filtered.length} / ${students.length} 位学生'

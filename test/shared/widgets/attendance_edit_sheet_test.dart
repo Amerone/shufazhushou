@@ -6,10 +6,15 @@ import 'package:moyun/core/database/database_helper.dart';
 import 'package:moyun/core/models/attendance.dart';
 import 'package:moyun/core/providers/attendance_provider.dart';
 import 'package:moyun/core/database/dao/attendance_dao.dart';
+import 'package:moyun/core/providers/settings_provider.dart';
 import 'package:moyun/shared/theme.dart';
 import 'package:moyun/shared/widgets/attendance_edit_sheet.dart';
 
+import '../../helpers/fake_settings_notifier.dart';
+
 void main() {
+  setUp(FakeSettingsNotifier.reset);
+
   testWidgets('attendance edit sheet shows live fee preview for status', (
     tester,
   ) async {
@@ -29,6 +34,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [settingsProvider.overrideWith(FakeSettingsNotifier.new)],
         child: MaterialApp(
           theme: buildAppTheme(),
           home: Scaffold(body: AttendanceEditSheet(record: record)),
@@ -65,6 +71,7 @@ void main() {
     try {
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [settingsProvider.overrideWith(FakeSettingsNotifier.new)],
           child: MaterialApp(
             theme: buildAppTheme(),
             home: Scaffold(body: AttendanceEditSheet(record: record)),
@@ -121,7 +128,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [attendanceDaoProvider.overrideWithValue(fakeDao)],
+        overrides: [
+          settingsProvider.overrideWith(FakeSettingsNotifier.new),
+          attendanceDaoProvider.overrideWithValue(fakeDao),
+        ],
         child: MaterialApp(
           theme: buildAppTheme(),
           home: Scaffold(
@@ -166,7 +176,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [attendanceDaoProvider.overrideWithValue(fakeDao)],
+        overrides: [
+          settingsProvider.overrideWith(FakeSettingsNotifier.new),
+          attendanceDaoProvider.overrideWithValue(fakeDao),
+        ],
         child: MaterialApp(
           theme: buildAppTheme(),
           home: Scaffold(

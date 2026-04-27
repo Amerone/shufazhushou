@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moyun/core/providers/package_info_provider.dart';
 import 'package:moyun/core/providers/settings_provider.dart';
 import 'package:moyun/features/settings/screens/settings_screen.dart';
+import 'package:moyun/features/settings/widgets/settings_text_edit_sheet.dart';
 import 'package:moyun/shared/utils/interaction_feedback.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -162,6 +163,7 @@ Future<void> _openTeacherNameSheet(WidgetTester tester) async {
       .first;
   await tester.tap(teacherTile);
   await tester.pumpAndSettle();
+  expect(find.byType(SettingsTextEditSheet), findsOneWidget);
   expect(find.byType(TextField), findsOneWidget);
 }
 

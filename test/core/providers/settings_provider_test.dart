@@ -105,6 +105,90 @@ void main() {
 
   group('SettingsNotifier mutation', () {
     test(
+      'keeps legacy sensitive value and rolls back state when secure write fails',
+      () async {
+        final dao = _FakeSettingsDao(
+          initialValues: const {QwenVisionConfig.settingApiKey: 'legacy-key'},
+        );
+        final sensitive = _FakeSensitiveSettingsStore(
+          initialValues: const {QwenVisionConfig.settingApiKey: 'legacy-key'},
+          shouldThrowRead: true,
+          shouldThrowWrite: true,
+        );
+        final container = ProviderContainer(
+          overrides: [
+            settingsDaoProvider.overrideWithValue(dao),
+            sensitiveSettingsStoreProvider.overrideWithValue(sensitive),
+          ],
+        );
+        addTearDown(container.dispose);
+        await container.read(settingsProvider.future);
+
+        await expectLater(
+          () => container
+              .read(settingsProvider.notifier)
+              .set(QwenVisionConfig.settingApiKey, 'new-key'),
+          throwsException,
+        );
+
+        expect(dao.deletedKeys, isEmpty);
+        expect(
+          sensitive.currentValues[QwenVisionConfig.settingApiKey],
+          'legacy-key',
+        );
+        expect(
+          container
+              .read(settingsProvider)
+              .valueOrNull?[QwenVisionConfig.settingApiKey],
+          'legacy-key',
+        );
+      },
+    );
+
+    test(
+      'setAll keeps legacy sensitive value and rolls back state when secure write fails',
+      () async {
+        final dao = _FakeSettingsDao(
+          initialValues: const {QwenVisionConfig.settingApiKey: 'legacy-key'},
+        );
+        final sensitive = _FakeSensitiveSettingsStore(
+          initialValues: const {QwenVisionConfig.settingApiKey: 'legacy-key'},
+          shouldThrowRead: true,
+          shouldThrowWrite: true,
+        );
+        final container = ProviderContainer(
+          overrides: [
+            settingsDaoProvider.overrideWithValue(dao),
+            sensitiveSettingsStoreProvider.overrideWithValue(sensitive),
+          ],
+        );
+        addTearDown(container.dispose);
+        await container.read(settingsProvider.future);
+
+        await expectLater(
+          () => container.read(settingsProvider.notifier).setAll(const {
+            QwenVisionConfig.settingApiKey: 'new-key',
+            'teacher_name': 'Teacher',
+          }),
+          throwsException,
+        );
+
+        expect(dao.deletedKeys, isEmpty);
+        expect(dao.upserts, isEmpty);
+        expect(
+          sensitive.currentValues[QwenVisionConfig.settingApiKey],
+          'legacy-key',
+        );
+        expect(
+          container
+              .read(settingsProvider)
+              .valueOrNull?[QwenVisionConfig.settingApiKey],
+          'legacy-key',
+        );
+      },
+    );
+
+    test(
       'clears sensitive setting from legacy DB row when value is emptied',
       () async {
         final dao = _FakeSettingsDao(

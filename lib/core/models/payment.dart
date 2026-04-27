@@ -64,7 +64,6 @@ class Payment {
           createdAt == other.createdAt;
 
   @override
-  int get hashCode => Object.hash(
-    id, studentId, amount, paymentDate, note, createdAt,
-  );
+  int get hashCode =>
+      Object.hash(id, studentId, amount, paymentDate, note, createdAt);
 }

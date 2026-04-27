@@ -16,15 +16,16 @@ import '../../../core/providers/fee_summary_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../../core/services/ai_analysis_note_codec.dart';
-import '../../../core/services/student_growth_summary_service.dart';
 import '../../../core/utils/excel_exporter.dart';
 import '../../../core/utils/fee_calculator.dart';
 import '../../../core/utils/pdf_generator.dart';
+import '../services/export_parent_snapshot_service.dart';
+import '../services/export_temp_file_cleaner.dart';
+import '../widgets/export_config_widgets.dart';
 import '../../../shared/constants.dart';
 import '../../../shared/theme.dart';
 import '../../../shared/utils/interaction_feedback.dart';
 import '../../../shared/utils/toast.dart';
-import '../../../shared/widgets/brush_stroke_divider.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/ink_wash_background.dart';
 
@@ -32,59 +33,18 @@ const _sharedExportTempCleanupDelay = Duration(minutes: 10);
 
 @visibleForTesting
 Future<void> deleteExportTempFileForTesting(String path) =>
-    _deleteExportTempFile(path);
+    deleteExportTempFile(path);
 
 @visibleForTesting
 Future<void> cleanupExportTempFileForShareForTesting(
   String path,
   ShareResultStatus status, {
   Duration deferredDelay = _sharedExportTempCleanupDelay,
-}) =>
-    _cleanupExportTempFileForShare(path, status, deferredDelay: deferredDelay);
+}) => cleanupExportTempFileForShare(path, status, deferredDelay: deferredDelay);
 
 @visibleForTesting
 bool shouldTreatShareAsCompletedForTesting(ShareResultStatus status) =>
-    _shouldTreatShareAsCompleted(status);
-
-Future<void> _deleteExportTempFile(String? path) async {
-  final trimmedPath = path?.trim();
-  if (trimmedPath == null || trimmedPath.isEmpty) {
-    return;
-  }
-
-  try {
-    final file = File(trimmedPath);
-    if (await file.exists()) {
-      await file.delete();
-    }
-  } on FileSystemException {
-    // Ignore cleanup failures for temporary export artifacts.
-  }
-}
-
-Future<void> _cleanupExportTempFileForShare(
-  String? path,
-  ShareResultStatus status, {
-  Duration deferredDelay = _sharedExportTempCleanupDelay,
-}) async {
-  if (status == ShareResultStatus.dismissed) {
-    await _deleteExportTempFile(path);
-    return;
-  }
-
-  if (deferredDelay <= Duration.zero) {
-    await _deleteExportTempFile(path);
-    return;
-  }
-
-  unawaited(
-    Future<void>.delayed(deferredDelay, () => _deleteExportTempFile(path)),
-  );
-}
-
-bool _shouldTreatShareAsCompleted(ShareResultStatus status) {
-  return status != ShareResultStatus.dismissed;
-}
+    shouldTreatShareAsCompleted(status);
 
 class ExportConfigScreen extends ConsumerStatefulWidget {
   final String studentId;
@@ -116,7 +76,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
   bool _loading = false;
   Student? _latestStudentSnapshot;
   late ExportTemplateId _template;
-  Future<_ParentSnapshot>? _parentSnapshotFuture;
+  Future<ExportParentSnapshot>? _parentSnapshotFuture;
   String? _parentSnapshotKey;
 
   String _fmt(DateTime date) => formatDate(date);
@@ -201,7 +161,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     );
   }
 
-  Future<_ParentSnapshot> _parentSnapshotFor(Student? student) {
+  Future<ExportParentSnapshot> _parentSnapshotFor(Student? student) {
     final key =
         '${widget.studentId}|${_fmt(_from)}|${_fmt(_to)}|'
         '${student?.updatedAt ?? 0}';
@@ -212,28 +172,16 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     return _parentSnapshotFuture!;
   }
 
-  Future<_ParentSnapshot> _loadParentSnapshot(Student? student) async {
+  Future<ExportParentSnapshot> _loadParentSnapshot(Student? student) async {
     final dataFuture = _loadData();
     final feeSummaryFuture = _loadFeeSummary();
     final resolvedStudent = student ?? await _loadStudent();
     final data = await dataFuture;
     final feeSummary = await feeSummaryFuture;
-    final summary = const StudentGrowthSummaryService().build(
+    return const ExportParentSnapshotService().buildSnapshot(
       records: data.records,
-    );
-    final ledger = StudentLedgerView.fromSummary(
-      feeSummary,
+      feeSummary: feeSummary,
       pricePerClass: resolvedStudent?.pricePerClass ?? 0,
-    );
-
-    return _ParentSnapshot(
-      balanceLabel:
-          '${ledger.currentBalanceLabel} ¥${feeSummary.balance.toStringAsFixed(2)}',
-      balanceColor: _snapshotBalanceColor(ledger),
-      nextLessonLabel: summary.nextLessonLabel,
-      progressPoint: summary.progressPoint,
-      attentionPoint: summary.attentionPoint,
-      dataFreshness: summary.dataFreshness,
     );
   }
 
@@ -447,7 +395,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
-      await _deleteExportTempFile(tempPath);
+      await deleteExportTempFile(tempPath);
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -467,12 +415,16 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       if (shareResult == null) {
         return;
       }
-      await _cleanupExportTempFileForShare(tempPath, shareResult.status);
+      await cleanupExportTempFileForShare(
+        tempPath,
+        shareResult.status,
+        deferredDelay: _sharedExportTempCleanupDelay,
+      );
       tempPath = null;
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
-      await _deleteExportTempFile(tempPath);
+      await deleteExportTempFile(tempPath);
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -505,9 +457,13 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       if (shareResult == null) {
         return;
       }
-      await _cleanupExportTempFileForShare(tempPath, shareResult.status);
+      await cleanupExportTempFileForShare(
+        tempPath,
+        shareResult.status,
+        deferredDelay: _sharedExportTempCleanupDelay,
+      );
       tempPath = null;
-      if (!_shouldTreatShareAsCompleted(shareResult.status)) {
+      if (!shouldTreatShareAsCompleted(shareResult.status)) {
         return;
       }
       if (!mounted) return;
@@ -521,7 +477,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
-      await _deleteExportTempFile(tempPath);
+      await deleteExportTempFile(tempPath);
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -569,7 +525,6 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final student = _latestStudentSnapshot ?? _findStudent();
     final rangeLabel = '${_fmt(_from)} - ${_fmt(_to)}';
@@ -600,343 +555,82 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: kInkSecondary.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Semantics(
-                  button: true,
-                  label: '关闭导出配置',
-                  onTap: () => Navigator.of(context).pop(),
-                  child: ExcludeSemantics(
-                    child: IconButton(
-                      tooltip: '关闭导出配置',
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                      color: kInkSecondary,
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white.withValues(alpha: 0.6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: kInkSecondary.withValues(alpha: 0.16),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '\u5bfc\u51fa\u5b66\u4e60\u62a5\u544a',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '\u53ef\u9884\u89c8 PDF\u3001\u76f4\u63a5\u5206\u4eab\uff0c\u6216\u5bfc\u51fa Excel \u8bb0\u5f55\u3002',
-                style: theme.textTheme.bodySmall,
-                textAlign: TextAlign.center,
+              ExportConfigSheetHeader(
+                title: '\u5bfc\u51fa\u5b66\u4e60\u62a5\u544a',
+                subtitle:
+                    '\u53ef\u9884\u89c8 PDF\u3001\u76f4\u63a5\u5206\u4eab\uff0c\u6216\u5bfc\u51fa Excel \u8bb0\u5f55\u3002',
+                onClose: () => Navigator.of(context).pop(),
               ),
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.54),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: kInkSecondary.withValues(alpha: 0.14),
-                  ),
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final compact = constraints.maxWidth < 420;
-                    final metricColumns = constraints.maxWidth < 360
-                        ? 1
-                        : compact
-                        ? 2
-                        : 4;
-                    final metricWidth =
-                        (constraints.maxWidth - 12 * (metricColumns - 1)) /
-                        metricColumns;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: kPrimaryBlue.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Icon(
-                                Icons.description_outlined,
-                                color: kPrimaryBlue,
-                              ),
-                            ),
-                            SizedBox(
-                              width: compact
-                                  ? constraints.maxWidth
-                                  : constraints.maxWidth - 60,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '\u5bfc\u51fa\u6982\u89c8',
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w700),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '\u786e\u8ba4\u5bfc\u51fa\u5bf9\u8c61\u3001\u65e5\u671f\u8303\u56f4\u4e0e\u5bc4\u8bed\u540e\uff0c\u518d\u8fdb\u884c\u9884\u89c8\u6216\u5206\u4eab\u3002',
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            SizedBox(
-                              width: metricWidth,
-                              child: _ExportSummaryMetric(
-                                icon: Icons.view_carousel_outlined,
-                                label: '\u5bfc\u51fa\u6a21\u677f',
-                                value: templateLabel,
-                                color: kPrimaryBlue,
-                              ),
-                            ),
-                            SizedBox(
-                              width: metricWidth,
-                              child: _ExportSummaryMetric(
-                                icon: Icons.person_outline,
-                                label: '\u5bfc\u51fa\u5bf9\u8c61',
-                                value:
-                                    student?.name ?? '\u5f53\u524d\u5b66\u751f',
-                                color: kPrimaryBlue,
-                              ),
-                            ),
-                            SizedBox(
-                              width: metricWidth,
-                              child: _ExportSummaryMetric(
-                                icon: Icons.date_range_outlined,
-                                label: '\u5bfc\u51fa\u8303\u56f4',
-                                value: '$rangeDays\u5929',
-                                color: kSealRed,
-                              ),
-                            ),
-                            SizedBox(
-                              width: metricWidth,
-                              child: _ExportSummaryMetric(
-                                icon: Icons.chat_bubble_outline,
-                                label: '\u5bc4\u8bed',
-                                value: hasMessage
-                                    ? '$messageLength\u5b57'
-                                    : '\u672a\u8bbe\u7f6e',
-                                color: hasMessage ? kGreen : kOrange,
-                              ),
-                            ),
-                            SizedBox(
-                              width: metricWidth,
-                              child: _ExportSummaryMetric(
-                                icon: Icons.water_drop_outlined,
-                                label: 'PDF \u6c34\u5370',
-                                value: _watermark
-                                    ? '\u5df2\u542f\u7528'
-                                    : '\u5df2\u5173\u95ed',
-                                color: _watermark
-                                    ? kPrimaryBlue
-                                    : kInkSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _ExportMetaBadge(
-                              icon: Icons.schedule_outlined,
-                              label: rangeLabel,
-                              color: kPrimaryBlue,
-                            ),
-                            _ExportMetaBadge(
-                              icon: Icons.view_carousel_outlined,
-                              label: templateLabel,
-                              color: kPrimaryBlue,
-                            ),
-                            _ExportMetaBadge(
-                              icon: Icons.picture_as_pdf_outlined,
-                              label: _watermark
-                                  ? '\u542b\u6c34\u5370 PDF'
-                                  : '\u65e0\u6c34\u5370 PDF',
-                              color: _watermark ? kSealRed : kInkSecondary,
-                            ),
-                            _ExportMetaBadge(
-                              icon: Icons.psychology_alt_outlined,
-                              label: includeAiAnalysis
-                                  ? (hasSavedAiAnalysis
-                                        ? '\u5305\u542b AI \u5206\u6790'
-                                        : '\u6682\u65e0 AI \u5206\u6790')
-                                  : '\u4e0d\u542b AI \u5206\u6790',
-                              color: includeAiAnalysis
-                                  ? (hasSavedAiAnalysis ? kGreen : kOrange)
-                                  : kInkSecondary,
-                            ),
-                            const _ExportMetaBadge(
-                              icon: Icons.approval_outlined,
-                              label:
-                                  '\u5370\u7ae0\u4e0e\u7b7e\u540d\u6837\u5f0f',
-                              color: kSealRed,
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                ),
+              ExportOverviewPanel(
+                templateLabel: templateLabel,
+                studentName: student?.name ?? '\u5f53\u524d\u5b66\u751f',
+                rangeDays: rangeDays,
+                rangeLabel: rangeLabel,
+                hasMessage: hasMessage,
+                messageLength: messageLength,
+                watermarkEnabled: _watermark,
+                includeAiAnalysis: includeAiAnalysis,
+                hasSavedAiAnalysis: hasSavedAiAnalysis,
               ),
               const SizedBox(height: 24),
-              _ExportSectionHeader(
+              ExportSectionHeader(
                 title: '\u5bb6\u957f\u9996\u5c4f\u6458\u8981',
                 subtitle:
                     '\u9884\u89c8\u5bb6\u957f\u6253\u5f00\u62a5\u544a\u65f6\u6700\u5148\u770b\u5230\u7684\u4fe1\u606f\uff0c\u4fbf\u4e8e\u5206\u4eab\u524d\u68c0\u67e5\u91cd\u70b9\u3002',
                 trailing: '5 \u9879',
               ),
               const SizedBox(height: 12),
-              _ParentSnapshotCard(future: _parentSnapshotFor(student)),
+              ExportParentSnapshotCard(future: _parentSnapshotFor(student)),
               const SizedBox(height: 24),
-              _ExportSectionHeader(
+              ExportSectionHeader(
                 title: '\u5bfc\u51fa\u6a21\u677f',
                 subtitle: templateDescription,
                 trailing: templateLabel,
               ),
               const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.44),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: kInkSecondary.withValues(alpha: 0.12),
-                  ),
-                ),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: ExportTemplateId.values
-                      .map(
-                        (template) => ChoiceChip(
-                          label: Text(template.label),
-                          selected: _template == template,
-                          onSelected: (_) => _selectTemplate(template),
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
+              ExportTemplateSelector(
+                selectedTemplate: _template,
+                onSelected: _selectTemplate,
               ),
               const SizedBox(height: 24),
-              _ExportSectionHeader(
+              ExportSectionHeader(
                 title: '\u5bfc\u51fa\u8303\u56f4',
                 subtitle:
                     '\u65e5\u671f\u8303\u56f4\u4f1a\u5f71\u54cd PDF \u9884\u89c8\u3001\u5206\u4eab\u548c Excel \u5bfc\u51fa\u3002',
                 trailing: '$rangeDays\u5929',
               ),
               const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.44),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: kInkSecondary.withValues(alpha: 0.12),
-                  ),
+              ExportDateRangeFields(
+                fromLabel: '\u5f00\u59cb\u65e5\u671f',
+                fromValue: _fmt(_from),
+                onFromTap: () => _pickDate(
+                  initialDate: _from,
+                  onPicked: (date) {
+                    setState(() {
+                      _from = date;
+                      if (_to.isBefore(date)) {
+                        _to = date;
+                      }
+                    });
+                  },
                 ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final width = constraints.maxWidth;
-                    final fieldWidth = width < 420 ? width : (width - 32) / 2;
-
-                    return Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: fieldWidth,
-                          child: _DateField(
-                            label: '\u5f00\u59cb\u65e5\u671f',
-                            value: _fmt(_from),
-                            onTap: () => _pickDate(
-                              initialDate: _from,
-                              onPicked: (date) {
-                                setState(() {
-                                  _from = date;
-                                  if (_to.isBefore(date)) {
-                                    _to = date;
-                                  }
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                        if (width >= 420)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 4),
-                            child: Icon(
-                              Icons.arrow_forward_outlined,
-                              size: 16,
-                              color: kInkSecondary,
-                            ),
-                          ),
-                        SizedBox(
-                          width: fieldWidth,
-                          child: _DateField(
-                            label: '\u7ed3\u675f\u65e5\u671f',
-                            value: _fmt(_to),
-                            onTap: () => _pickDate(
-                              initialDate: _to,
-                              onPicked: (date) {
-                                setState(() {
-                                  _to = date;
-                                  if (_from.isAfter(date)) {
-                                    _from = date;
-                                  }
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
+                toLabel: '\u7ed3\u675f\u65e5\u671f',
+                toValue: _fmt(_to),
+                onToTap: () => _pickDate(
+                  initialDate: _to,
+                  onPicked: (date) {
+                    setState(() {
+                      _to = date;
+                      if (_from.isAfter(date)) {
+                        _from = date;
+                      }
+                    });
                   },
                 ),
               ),
               const SizedBox(height: 24),
-              _ExportSectionHeader(
+              ExportSectionHeader(
                 title: '\u5bc4\u8bed\u5185\u5bb9',
                 subtitle:
                     '\u663e\u793a\u5728 PDF \u7ed3\u5c3e\u9875\uff0c\u53ef\u901a\u8fc7\u9884\u8bbe\u5feb\u901f\u586b\u5145\u3002',
@@ -945,64 +639,21 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                     : '\u672a\u8bbe\u7f6e',
               ),
               const SizedBox(height: 12),
-              TextField(
+              ExportMessageSection(
                 controller: _msgCtrl,
                 onChanged: (_) => setState(() {}),
-                maxLength: 200,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: '\u5bc4\u8bed',
-                  counterText: '',
-                  hintText:
-                      '\u4f8b\u5982\uff1a\u672c\u6708\u8fdb\u6b65\u660e\u663e\uff0c\u8bf7\u7ee7\u7eed\u4fdd\u6301\u3002',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.5),
-                ),
-              ),
-              const SizedBox(height: 12),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _presetMessages
-                        .map(
-                          (message) => ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: constraints.maxWidth,
-                            ),
-                            child: ActionChip(
-                              label: Text(
-                                message,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              backgroundColor: Colors.white.withValues(
-                                alpha: 0.5,
-                              ),
-                              side: BorderSide(
-                                color: kInkSecondary.withValues(alpha: 0.2),
-                              ),
-                              onPressed: () {
-                                unawaited(
-                                  InteractionFeedback.selection(context),
-                                );
-                                _msgCtrl.text = message;
-                                setState(() {});
-                              },
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  );
+                labelText: '\u5bc4\u8bed',
+                hintText:
+                    '\u4f8b\u5982\uff1a\u672c\u6708\u8fdb\u6b65\u660e\u663e\uff0c\u8bf7\u7ee7\u7eed\u4fdd\u6301\u3002',
+                presetMessages: _presetMessages,
+                onPresetSelected: (message) {
+                  unawaited(InteractionFeedback.selection(context));
+                  _msgCtrl.text = message;
+                  setState(() {});
                 },
               ),
               const SizedBox(height: 24),
-              _ExportSectionHeader(
+              ExportSectionHeader(
                 title: '\u5bfc\u51fa\u9009\u9879',
                 subtitle:
                     '\u8fd9\u4e9b\u9009\u9879\u4f1a\u5f71\u54cd PDF \u7684\u5185\u5bb9\u4e0e\u6837\u5f0f\uff0cExcel \u5bfc\u51fa\u4e0d\u53d7\u5f71\u54cd\u3002',
@@ -1011,7 +662,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                     : '\u6c34\u5370\u5df2\u5173\u95ed',
               ),
               const SizedBox(height: 12),
-              _ExportSwitchTile(
+              ExportSwitchTile(
                 value: _watermark,
                 icon: Icons.water_drop_outlined,
                 title: '\u542f\u7528\u6c34\u5370',
@@ -1023,7 +674,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                 },
               ),
               const SizedBox(height: 12),
-              _ExportSwitchTile(
+              ExportSwitchTile(
                 value: includeAiAnalysis,
                 icon: Icons.psychology_alt_outlined,
                 title: '\u5305\u542b AI \u5206\u6790',
@@ -1039,129 +690,18 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                 },
               ),
               const SizedBox(height: 24),
-              _ExportSectionHeader(
+              ExportSectionHeader(
                 title: '\u5bfc\u51fa\u64cd\u4f5c',
                 subtitle:
                     '\u53ef\u5148\u9884\u89c8 PDF\uff0c\u518d\u5206\u4eab\uff0c\u6216\u76f4\u63a5\u5bfc\u51fa Excel\u3002',
                 trailing: _loading ? '\u5904\u7406\u4e2d' : '\u5c31\u7eea',
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: const [
-                  _ExportMetaBadge(
-                    icon: Icons.preview_outlined,
-                    label: 'PDF \u9884\u89c8',
-                    color: kPrimaryBlue,
-                  ),
-                  _ExportMetaBadge(
-                    icon: Icons.share_outlined,
-                    label: '\u7cfb\u7edf\u5206\u4eab\u9762\u677f',
-                    color: kSealRed,
-                  ),
-                  _ExportMetaBadge(
-                    icon: Icons.table_view_outlined,
-                    label: '\u540c\u65f6\u652f\u6301 Excel \u5bfc\u51fa',
-                    color: kGreen,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth;
-                  final buttonWidth = width < 420 ? width : (width - 8) / 2;
-
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      SizedBox(
-                        width: buttonWidth,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: _loading ? null : _previewPdf,
-                          icon: _loading
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.preview_outlined),
-                          label: Text(
-                            _loading
-                                ? '\u5904\u7406\u4e2d...'
-                                : '\u9884\u89c8 PDF',
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: buttonWidth,
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: _loading ? null : _sharePdf,
-                          icon: _loading
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.share_outlined),
-                          label: Text(
-                            _loading
-                                ? '\u5904\u7406\u4e2d...'
-                                : '\u5206\u4eab PDF',
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: BorderSide(
-                              color: kGreen.withValues(alpha: 0.5),
-                            ),
-                            foregroundColor: kGreen,
-                          ),
-                          onPressed: _loading ? null : _exportExcel,
-                          icon: _loading
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.table_view_outlined),
-                          label: Text(
-                            _loading
-                                ? '\u5904\u7406\u4e2d...'
-                                : '\u5bfc\u51fa Excel',
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+              ExportActionPanel(
+                loading: _loading,
+                onPreview: _previewPdf,
+                onSharePdf: _sharePdf,
+                onExportExcel: _exportExcel,
               ),
             ],
           ),
@@ -1178,549 +718,9 @@ class _ExportData {
   const _ExportData({required this.records, required this.payments});
 }
 
-class _ParentSnapshot {
-  final String balanceLabel;
-  final Color balanceColor;
-  final String nextLessonLabel;
-  final String progressPoint;
-  final String attentionPoint;
-  final String dataFreshness;
-
-  const _ParentSnapshot({
-    required this.balanceLabel,
-    required this.balanceColor,
-    required this.nextLessonLabel,
-    required this.progressPoint,
-    required this.attentionPoint,
-    required this.dataFreshness,
-  });
-}
-
 class _PreparedPdf {
   final String path;
   final Student student;
 
   const _PreparedPdf({required this.path, required this.student});
-}
-
-Color _snapshotBalanceColor(StudentLedgerView ledger) {
-  switch (ledger.balanceState) {
-    case LedgerBalanceState.debt:
-      return kRed;
-    case LedgerBalanceState.settled:
-      return kInkSecondary;
-    case LedgerBalanceState.surplus:
-      return kGreen;
-  }
-}
-
-class _ParentSnapshotCard extends StatelessWidget {
-  final Future<_ParentSnapshot> future;
-
-  const _ParentSnapshotCard({required this.future});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return FutureBuilder<_ParentSnapshot>(
-      future: future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return Semantics(
-            container: true,
-            liveRegion: true,
-            label: '正在整理家长首屏摘要，可继续配置导出选项',
-            child: ExcludeSemantics(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.44),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: kInkSecondary.withValues(alpha: 0.12),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    const SizedBox(width: 12),
-                    Text('正在整理家长首屏摘要...', style: theme.textTheme.bodySmall),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-
-        if (snapshot.hasError || snapshot.data == null) {
-          return Semantics(
-            container: true,
-            liveRegion: true,
-            label: '家长端摘要加载失败，不影响 PDF 预览、分享 PDF 或导出 Excel，可直接继续导出，或稍后重试',
-            child: ExcludeSemantics(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: kRed.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: kRed.withValues(alpha: 0.12)),
-                ),
-                child: Text(
-                  '家长端摘要加载失败，不影响导出。可直接继续预览、分享 PDF 或导出 Excel，或稍后重试。',
-                  style: theme.textTheme.bodySmall?.copyWith(color: kRed),
-                ),
-              ),
-            ),
-          );
-        }
-
-        final data = snapshot.data!;
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.44),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: kInkSecondary.withValues(alpha: 0.12)),
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 440;
-              final itemWidth = compact
-                  ? constraints.maxWidth
-                  : (constraints.maxWidth - 12) / 2;
-
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  SizedBox(
-                    width: itemWidth,
-                    child: _SnapshotMetric(
-                      icon: Icons.account_balance_wallet_outlined,
-                      label: '余额',
-                      value: data.balanceLabel,
-                      color: data.balanceColor,
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _SnapshotMetric(
-                      icon: Icons.schedule_outlined,
-                      label: '下次课',
-                      value: data.nextLessonLabel,
-                      color: kSealRed,
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _SnapshotMetric(
-                      icon: Icons.trending_up_outlined,
-                      label: '进步点',
-                      value: data.progressPoint,
-                      color: kGreen,
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _SnapshotMetric(
-                      icon: Icons.track_changes_outlined,
-                      label: '待巩固点',
-                      value: data.attentionPoint,
-                      color: kPrimaryBlue,
-                    ),
-                  ),
-                  SizedBox(
-                    width: constraints.maxWidth,
-                    child: _SnapshotMetric(
-                      icon: Icons.update_outlined,
-                      label: '数据截止',
-                      value: data.dataFreshness,
-                      color: kInkSecondary,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _SnapshotMetric extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _SnapshotMetric({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ExportSectionHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String? trailing;
-
-  const _ExportSectionHeader({
-    required this.title,
-    required this.subtitle,
-    this.trailing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 420;
-
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: trailing == null || compact
-                  ? constraints.maxWidth
-                  : constraints.maxWidth - 96,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 6),
-                  const BrushStrokeDivider(
-                    width: 62,
-                    height: 8,
-                    color: kSealRed,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(subtitle, style: theme.textTheme.bodySmall),
-                ],
-              ),
-            ),
-            if (trailing != null)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.64),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: kInkSecondary.withValues(alpha: 0.12),
-                  ),
-                ),
-                child: Text(trailing!, style: theme.textTheme.bodySmall),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _ExportSummaryMetric extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _ExportSummaryMetric({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 10),
-          Text(label, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ExportMetaBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _ExportMetaBadge({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DateField extends StatelessWidget {
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-
-  const _DateField({
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: '$label，当前 $value',
-      hint: '选择日期',
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: InputDecorator(
-            decoration: InputDecoration(
-              labelText: label,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.5),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(value, style: const TextStyle(fontSize: 16)),
-                ),
-                const Icon(
-                  Icons.calendar_month_outlined,
-                  size: 18,
-                  color: kInkSecondary,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ExportSwitchTile extends StatelessWidget {
-  final bool value;
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool enabled;
-  final ValueChanged<bool>? onChanged;
-
-  const _ExportSwitchTile({
-    required this.value,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.enabled = true,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final effectiveOnChanged = enabled ? onChanged : null;
-
-    return Semantics(
-      container: true,
-      button: true,
-      toggled: value,
-      enabled: effectiveOnChanged != null,
-      label: title,
-      value: value ? '已开启' : '已关闭',
-      hint: effectiveOnChanged == null
-          ? subtitle
-          : (value ? '轻触关闭。$subtitle' : '轻触开启。$subtitle'),
-      onTap: effectiveOnChanged == null
-          ? null
-          : () => effectiveOnChanged(!value),
-      child: ExcludeSemantics(
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
-          clipBehavior: Clip.antiAlias,
-          child: Ink(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: enabled ? 0.54 : 0.4),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: kInkSecondary.withValues(alpha: 0.14)),
-            ),
-            child: InkWell(
-              onTap: effectiveOnChanged == null
-                  ? null
-                  : () => effectiveOnChanged(!value),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 360;
-                  final iconColor = enabled ? kPrimaryBlue : kInkSecondary;
-                  final titleStyle = theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: enabled ? null : kInkSecondary,
-                  );
-                  final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
-                    color: enabled ? null : kInkSecondary,
-                  );
-                  final content = Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: iconColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(icon, color: iconColor),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(title, style: titleStyle),
-                            const SizedBox(height: 4),
-                            Text(subtitle, style: subtitleStyle),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                  final switchControl = IgnorePointer(
-                    child: Switch(value: value, onChanged: effectiveOnChanged),
-                  );
-
-                  return compact
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            content,
-                            const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: switchControl,
-                            ),
-                          ],
-                        )
-                      : Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: content),
-                            const SizedBox(width: 12),
-                            switchControl,
-                          ],
-                        );
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

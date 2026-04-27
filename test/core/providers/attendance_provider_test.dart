@@ -4,8 +4,21 @@ import 'package:moyun/core/database/dao/attendance_dao.dart';
 import 'package:moyun/core/database/database_helper.dart';
 import 'package:moyun/core/models/attendance.dart';
 import 'package:moyun/core/providers/attendance_provider.dart';
+import 'package:moyun/core/providers/clock_provider.dart';
+import 'package:moyun/core/services/app_clock.dart';
 
 void main() {
+  test('selected date and month default to injected app clock', () {
+    final container = _container(
+      _FakeAttendanceDao(rangeRecords: const [], dateRecords: const []),
+      clock: AppClock.fixed(DateTime(2026, 4, 27, 10, 30)),
+    );
+    addTearDown(container.dispose);
+
+    expect(container.read(selectedDateProvider), DateTime(2026, 4, 27, 10, 30));
+    expect(container.read(selectedMonthProvider), DateTime(2026, 4));
+  });
+
   test(
     'selectedDateAttendanceProvider reads same-month records from month data',
     () async {
@@ -93,10 +106,13 @@ void main() {
   );
 }
 
-ProviderContainer _container(_FakeAttendanceDao dao) {
-  return ProviderContainer(
-    overrides: [attendanceDaoProvider.overrideWithValue(dao)],
-  );
+ProviderContainer _container(_FakeAttendanceDao dao, {AppClock? clock}) {
+  final overrides = <Override>[attendanceDaoProvider.overrideWithValue(dao)];
+  if (clock != null) {
+    overrides.add(appClockProvider.overrideWithValue(clock));
+  }
+
+  return ProviderContainer(overrides: overrides);
 }
 
 Attendance _attendance({

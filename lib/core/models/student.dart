@@ -90,8 +90,15 @@ class Student {
 
   @override
   int get hashCode => Object.hash(
-    id, name, parentName, parentPhone,
-    pricePerClass, status, note, createdAt, updatedAt,
+    id,
+    name,
+    parentName,
+    parentPhone,
+    pricePerClass,
+    status,
+    note,
+    createdAt,
+    updatedAt,
   );
 }
 

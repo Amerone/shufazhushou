@@ -22,6 +22,7 @@ class InsightNotifier extends AsyncNotifier<List<Insight>> {
   @override
   Future<List<Insight>> build() async {
     final range = ref.watch(statisticsPeriodProvider);
+    final now = ref.watch(statisticsNowProvider);
     final attendanceDao = ref.read(attendanceDaoProvider);
     final dismissedDao = ref.read(dismissedInsightDaoProvider);
     final insightService = ref.read(insightServiceProvider);
@@ -58,7 +59,6 @@ class InsightNotifier extends AsyncNotifier<List<Insight>> {
     final allPayments = dataResults[2] as Map<String, double>;
     final dismissedKeys = await dismissedKeysFuture;
 
-    final now = DateTime.now();
     final metrics = dataResults[3] as Map<String, dynamic>;
 
     return insightService.buildInsightsFromFacts(

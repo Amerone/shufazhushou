@@ -4,6 +4,7 @@ import '../../shared/constants.dart' show formatDate;
 import '../database/dao/attendance_dao.dart';
 import '../models/attendance.dart';
 import '../models/student_insight_facts.dart';
+import 'clock_provider.dart';
 import 'database_provider.dart';
 
 final attendanceDaoProvider = Provider<AttendanceDao>((ref) {
@@ -22,11 +23,13 @@ final attendanceInsightFactsByStudentProvider =
     });
 
 // Currently selected day.
-final selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+final selectedDateProvider = StateProvider<DateTime>((ref) {
+  return ref.watch(appClockProvider).now();
+});
 
 // Month currently visible in calendar.
 final selectedMonthProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
+  final now = ref.watch(appClockProvider).now();
   return DateTime(now.year, now.month);
 });
 

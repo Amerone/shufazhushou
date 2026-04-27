@@ -119,6 +119,7 @@ void main() {
       expect(spyService.capturedDismissedKeys, const {'renewal:student-1'});
       expect(spyService.capturedActiveStudentCount, 2);
       expect(spyService.capturedActivePeriodLabel, '\u672C\u6708');
+      expect(spyService.capturedNow, DateTime(2026, 3, 27));
       expect(
         spyService.capturedDisplayNames['student-1'],
         'Alex\uFF08Parent A\uFF09',

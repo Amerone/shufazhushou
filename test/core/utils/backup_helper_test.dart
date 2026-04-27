@@ -2,11 +2,17 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moyun/core/services/backup/backup_bundle_codec.dart';
+import 'package:moyun/core/services/backup/backup_crypto_codec.dart';
+import 'package:moyun/core/services/backup/backup_file_naming.dart';
 import 'package:moyun/core/services/attendance_artwork_storage_service.dart';
 import 'package:moyun/core/utils/backup_helper.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
+  const fileNaming = BackupFileNaming();
+  const bundleCodec = BackupBundleCodec();
+  final cryptoCodec = BackupCryptoCodec();
   late Directory tempRoot;
   const artworkStorage = AttendanceArtworkStorageService();
   Map<String, String> restoredSensitiveSettings = const {};
@@ -31,6 +37,10 @@ void main() {
     BackupHelper.externalStorageDirectoryResolver = null;
     BackupHelper.sensitiveSettingsReader = null;
     BackupHelper.sensitiveSettingsWriter = null;
+    BackupHelper.databasePathResolver = null;
+    BackupHelper.databaseSnapshotPreparer = null;
+    BackupHelper.backupFileValidator = null;
+    BackupHelper.restoredArtworkSnapshotApplier = null;
     AttendanceArtworkStorageService.documentsDirectoryResolver = null;
     if (await tempRoot.exists()) {
       await tempRoot.delete(recursive: true);
@@ -42,7 +52,10 @@ void main() {
       DateTime(2026, 4, 1, 9, 5, 7),
     );
 
-    expect(fileName, 'moyun_backup_2026-04-01_09-05-07.db');
+    expect(
+      fileName,
+      fileNaming.buildPlainFileName(DateTime(2026, 4, 1, 9, 5, 7)),
+    );
   });
 
   test('buildEncryptedBackupFileName outputs readable timestamped name', () {
@@ -50,7 +63,10 @@ void main() {
       DateTime(2026, 4, 1, 9, 5, 7),
     );
 
-    expect(fileName, 'moyun_backup_2026-04-01_09-05-07.moyunbak');
+    expect(
+      fileName,
+      fileNaming.buildEncryptedFileName(DateTime(2026, 4, 1, 9, 5, 7)),
+    );
   });
 
   test('hasSupportedBackupExtension validates plain and encrypted formats', () {
@@ -77,8 +93,14 @@ void main() {
   });
 
   test('validatePassphrase requires minimum length', () {
-    expect(BackupHelper.validatePassphrase('1234567'), isNotNull);
-    expect(BackupHelper.validatePassphrase('12345678'), isNull);
+    expect(
+      BackupHelper.validatePassphrase('1234567'),
+      cryptoCodec.validatePassphrase('1234567'),
+    );
+    expect(
+      BackupHelper.validatePassphrase('12345678'),
+      cryptoCodec.validatePassphrase('12345678'),
+    );
   });
 
   test(
@@ -99,6 +121,10 @@ void main() {
 
       expect(encryptedBytes, isNot(equals(plainBytes)));
       expect(decryptedBytes, plainBytes);
+      expect(
+        BackupHelper.payloadIncludesArtworkSnapshot(encryptedBytes),
+        bundleCodec.tryDecode(encryptedBytes) != null,
+      );
     },
   );
 
@@ -132,25 +158,20 @@ void main() {
       );
 
       final decoded = BackupHelper.tryDecodeBackupBundleBytes(bundleBytes);
+      final expected = bundleCodec.tryDecode(bundleBytes);
 
       expect(decoded, isNotNull);
-      expect(
-        decoded!.databaseBytes,
-        Uint8List.fromList('SQLite format 3 sample payload'.codeUnits),
-      );
-      expect(
-        decoded.artworkFiles.keys,
-        containsAll(<String>['calligraphy-1.jpg', 'calligraphy-2.jpg']),
-      );
+      expect(decoded!.databaseBytes, expected!.databaseBytes);
+      expect(decoded.artworkFiles.keys, expected.artworkFiles.keys);
       expect(
         decoded.artworkFiles['calligraphy-1.jpg'],
-        Uint8List.fromList(const [1, 2, 3]),
+        expected.artworkFiles['calligraphy-1.jpg'],
       );
       expect(
         decoded.artworkFiles['calligraphy-2.jpg'],
-        Uint8List.fromList(const [4, 5, 6]),
+        expected.artworkFiles['calligraphy-2.jpg'],
       );
-      expect(decoded.sensitiveSettings, {'qwen_api_key': 'secret-key'});
+      expect(decoded.sensitiveSettings, expected.sensitiveSettings);
     },
   );
 
@@ -191,6 +212,48 @@ void main() {
 
     expect(records, hasLength(1));
     expect(records.single.sizeInBytes, 9);
+  });
+
+  test('backup aborts when database snapshot preparation fails', () async {
+    final databaseFile = File(p.join(tempRoot.path, 'moyun.db'));
+    await databaseFile.writeAsBytes(const [1, 2, 3], flush: true);
+    BackupHelper.databasePathResolver = () async => databaseFile.path;
+    BackupHelper.databaseSnapshotPreparer = () async {
+      throw Exception('checkpoint failed');
+    };
+
+    await expectLater(
+      () => BackupHelper.backup(at: DateTime(2026, 4, 1, 9)),
+      throwsException,
+    );
+
+    final backupDir = Directory(p.join(tempRoot.path, 'moyun_backups'));
+    expect(await backupDir.exists(), isFalse);
+  });
+
+  test('restore rolls back database when artwork restore fails', () async {
+    final currentDatabase = File(p.join(tempRoot.path, 'moyun.db'));
+    await currentDatabase.writeAsBytes(const [1, 2, 3], flush: true);
+    final backupFile = File(p.join(tempRoot.path, 'external_backup.db'));
+    await backupFile.writeAsBytes(const [9, 8, 7], flush: true);
+
+    BackupHelper.databasePathResolver = () async => currentDatabase.path;
+    BackupHelper.databaseSnapshotPreparer = () async {};
+    BackupHelper.backupFileValidator = (_) async {};
+    BackupHelper.restoredArtworkSnapshotApplier =
+        ({
+          required bool includesArtworkSnapshot,
+          Directory? artworkDirectory,
+        }) async {
+          throw Exception('artwork restore failed');
+        };
+
+    await expectLater(
+      () => BackupHelper.restoreFromPath(backupFile.path),
+      throwsException,
+    );
+
+    expect(await currentDatabase.readAsBytes(), const [1, 2, 3]);
   });
 
   test(

@@ -14,7 +14,7 @@
   - `lesson_focus_tags`
   - `home_practice_note`
   - `progress_scores_json`
-- 数据库已升级到 v4，并补齐兼容迁移。
+- 数据库已升级到 v6，并补齐兼容迁移与索引守卫。
 - 洞察层已支持：
   - `debt`
   - `renewal`
@@ -33,10 +33,58 @@
   - `InsightNotifier` 接线
   - 统计卡片跳转 / 忽略交互
 
+### 本轮优化验收（2026-04-27）
+
+- `flutter test --no-pub test/docs/database_design_consistency_test.dart` 已通过，数据库版本与索引文档漂移现在有自动守卫。
+- `flutter test --no-pub test/shared/widgets/attendance_edit_sheet_test.dart` 已通过，相关 widget 测试已通过共享 `FakeSettingsNotifier` 隔离真实 settings 数据库访问。
+- `flutter analyze --no-pub` 已通过，所有并行优化 lane 的符号与导入均已收敛。
+- `flutter test --no-pub` 已通过，当前全量测试为 290 项。
+- `flutter build apk --debug` 已通过，产物路径为 `build/app/outputs/flutter-apk/app-debug.apk`。
+- 已补齐优化执行计划文档：`docs/superpowers/plans/2026-04-27-project-optimization.md` 与 `docs/superpowers/plans/2026-04-27-project-optimization-execution-strategy.md`。
+- 第二轮机械拆分已完成：
+  - `quick_entry_sheet.dart` 抽出快速录课辅助组件。
+  - `export_config_screen.dart` 抽出导出配置展示组件。
+  - `settings_screen.dart` 抽出设置页 tile / banner 组件。
+  - `student_detail_screen.dart` 抽出学生详情展示组件。
+- 第三轮机械拆分已完成：
+  - `home_screen.dart` 抽出首页工作台展示组件。
+  - `backup_screen.dart` 抽出备份页展示组件。
+- 第四轮保守拆分已完成：
+  - `quick_entry_sheet.dart` 抽出冲突处理弹窗，主流程只负责准备冲突数据与消费处理结果。
+  - `pdf_generator.dart` 抽出 PDF 文案格式化 helper，并补充格式化回归测试。
+  - `export_config_screen.dart` 抽出导出概览面板，页面 `build` 方法进一步瘦身。
+  - 代码审阅反馈已处理：PDF 总时长保留旧的部分异常时间解析语义；导出临时文件清理 helper 显式要求传入延迟策略。
+- 第五轮保守拆分已完成：
+  - `quick_entry_sheet.dart` 抽出时间选择、默认值提示、已选学员与确认摘要组件。
+  - `export_config_screen.dart` 抽出日期范围、寄语与导出操作区块。
+  - `student_import_screen.dart` 抽出导入说明、状态、指标、问题行与学生预览组件。
+  - `pdf_generator.dart` 抽出 PDF 导出文件命名 helper，并补充文件名清洗与时间戳回归测试。
+- 第六轮保守拆分已完成：
+  - `quick_entry_sheet.dart` 抽出课堂反馈区块，父组件继续持有输入状态与保存流程。
+  - `export_config_widgets.dart` 收敛为 barrel 文件，导出父级快照、概览、汇总与表单组件分文件维护。
+  - `home_screen_components.dart` 收敛为 barrel 文件，首页重点卡、快捷入口与空状态组件分文件维护。
+  - `backup_screen.dart` 抽出备份列表错误、风险提示、概览、操作与最近记录展示区块。
+  - 第六轮只读代码审阅未发现回归；针对性 widget 测试、全量测试、静态分析、debug APK 构建均已通过。
+- 第七轮保守拆分已完成：
+  - `quick_entry_sheet.dart` 抽出 Step0 学员筛选、空状态、学员列表与底部操作组件，父组件继续持有筛选结果和保存流程。
+  - `settings_screen.dart` 抽出教师资料、资料模板、导出沟通、提醒策略、沉浸反馈、AI 扩展、导入工具、开发者工具与关于应用区块。
+  - `export_config_screen.dart` 抽出弹层头部与模板选择器，导出、分享、预览和设置持久化逻辑仍保留在页面内。
+  - `pdf_generator.dart` 抽出 PDF 印章绘制 helper，并补充多种印章配置的 PDF 渲染 smoke test。
+  - 第七轮代码审阅发现的测试过度绑定内部 widget 树问题已处理；目标测试、全量测试、静态分析、debug APK 构建与 diff 检查均已通过。
+- 第八轮保守拆分已完成：
+  - `quick_entry_sheet_components.dart` 收敛为 barrel 文件，并拆出 common、Step0、Step1 三组快速录入组件。
+  - `export_form_widgets.dart` 收敛为 barrel 文件，并拆出弹层头部/模板、日期范围、寄语、选项与操作面板组件。
+  - `backup_screen_widgets.dart` 收敛为 barrel 文件，并拆出备份状态、操作、记录与公共组件。
+  - 代码审阅发现的备份中文文案迁移损坏已修复；复审确认无残留乱码、无漏导出或循环导入。
+  - 第八轮目标测试、全量测试、静态分析、debug APK 构建与 diff 检查均已通过。
+
 ### 当前仍存在的边界
 
-- 未执行全量 `flutter test`
-- 未执行 `dart analyze`
+- 大型页面与服务仍只是完成阶段性瘦身，`pdf_generator.dart` 约 1096 行，仍需要后续继续拆分 PDF 页面组装；`quick_entry_sheet.dart` 已降至约 818 行，配套组件已拆为 3-379 行的小文件。
+- `export_config_screen.dart` 约 682 行、`settings_screen.dart` 约 561 行、`student_detail_screen.dart` 约 780 行，状态与操作流仍可继续拆出控制器/表单区块。
+- `backup_screen.dart` 已瘦身至约 465 行，`export_config_widgets.dart`、`export_form_widgets.dart`、`home_screen_components.dart`、`quick_entry_sheet_components.dart` 与 `backup_screen_widgets.dart` 已变成 barrel 文件；后续重点应从机械拆分转向提炼页面状态模型和操作服务。
+- PDF 导出、备份恢复、系统分享等平台能力已通过单元/组件测试与 debug 构建，但尚未做真机手工冒烟。
+- `flutter build apk --debug` 提示 34 个依赖存在可升级版本，本轮为降低风险未升级依赖。
 - `progress` 洞察目前只约束为“最近 3 次有效评分”，尚未引入“最近 N 天”窗口
 - `dismissed insight` 的保留期已显式化，但尚未暴露到设置页
 

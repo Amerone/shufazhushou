@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'clock_provider.dart';
+
 enum StatisticsPeriod { week, month, year }
 
 class StatisticsRange {
@@ -43,16 +45,17 @@ StatisticsRange buildStatisticsRange(StatisticsPeriod period) =>
     buildStatisticsRangeForDate(period, DateTime.now());
 
 final statisticsClockProvider = StreamProvider<DateTime>((ref) async* {
-  yield DateTime.now();
+  final clock = ref.watch(appClockProvider);
+  yield clock.now();
   while (true) {
     await Future<void>.delayed(const Duration(minutes: 1));
-    yield DateTime.now();
+    yield clock.now();
   }
 });
 
 final statisticsNowProvider = Provider<DateTime>((ref) {
-  final now = ref.watch(statisticsClockProvider).valueOrNull;
-  return now ?? DateTime.now();
+  ref.watch(statisticsClockProvider);
+  return ref.watch(appClockProvider).now();
 });
 
 final statisticsPeriodSelectionProvider = StateProvider<StatisticsPeriod>(

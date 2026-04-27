@@ -73,52 +73,64 @@ class SettingsNotifier extends AsyncNotifier<Map<String, String>> {
   }
 
   Future<void> set(String key, String value) async {
-    // Optimistic update: immediately reflect the change in UI
     final current = state.valueOrNull;
-    if (current != null) {
-      state = AsyncData({...current, key: value});
-    }
     if (_sensitiveSettingKeys.contains(key)) {
-      final dao = ref.read(settingsDaoProvider);
       try {
-        await ref.read(sensitiveSettingsStoreProvider).set(key, value);
-      } catch (error) {
+        await _persistSensitiveSetting(key, value);
+      } catch (error, stackTrace) {
+        if (current != null) {
+          state = AsyncData(current);
+        }
         debugPrint('Failed to persist sensitive setting "$key": $error');
+        Error.throwWithStackTrace(error, stackTrace);
       }
-      try {
-        await dao.delete(key);
-      } catch (error) {
-        debugPrint('Failed to remove legacy sensitive setting "$key": $error');
+      if (current != null) {
+        state = AsyncData({...current, key: value});
       }
       return;
+    }
+    // Optimistic update: immediately reflect the change in UI for non-sensitive settings.
+    if (current != null) {
+      state = AsyncData({...current, key: value});
     }
     await ref.read(settingsDaoProvider).set(key, value);
   }
 
   Future<void> setAll(Map<String, String> entries) async {
     final current = state.valueOrNull;
+    final dao = ref.read(settingsDaoProvider);
+    try {
+      for (final e in entries.entries) {
+        if (_sensitiveSettingKeys.contains(e.key)) {
+          await _persistSensitiveSetting(e.key, e.value);
+        }
+      }
+      for (final e in entries.entries) {
+        if (_sensitiveSettingKeys.contains(e.key)) {
+          continue;
+        }
+        await dao.set(e.key, e.value);
+      }
+    } catch (error, stackTrace) {
+      if (current != null) {
+        state = AsyncData(current);
+      }
+      debugPrint('Failed to persist settings: $error');
+      Error.throwWithStackTrace(error, stackTrace);
+    }
     if (current != null) {
       state = AsyncData({...current, ...entries});
     }
+  }
+
+  Future<void> _persistSensitiveSetting(String key, String value) async {
     final dao = ref.read(settingsDaoProvider);
-    final sensitiveStore = ref.read(sensitiveSettingsStoreProvider);
-    for (final e in entries.entries) {
-      if (_sensitiveSettingKeys.contains(e.key)) {
-        try {
-          await sensitiveStore.set(e.key, e.value);
-        } catch (error) {
-          debugPrint('Failed to persist sensitive setting "${e.key}": $error');
-        }
-        try {
-          await dao.delete(e.key);
-        } catch (error) {
-          debugPrint(
-            'Failed to remove legacy sensitive setting "${e.key}": $error',
-          );
-        }
-        continue;
-      }
-      await dao.set(e.key, e.value);
+    await ref.read(sensitiveSettingsStoreProvider).set(key, value);
+    try {
+      await dao.delete(key);
+    } catch (error) {
+      debugPrint('Failed to remove legacy sensitive setting "$key": $error');
+      rethrow;
     }
   }
 }

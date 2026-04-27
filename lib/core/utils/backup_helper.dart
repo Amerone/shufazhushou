@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
-import 'package:cryptography/cryptography.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -11,6 +9,9 @@ import 'package:sqflite/sqflite.dart';
 
 import '../database/database_helper.dart';
 import '../services/attendance_artwork_storage_service.dart';
+import '../services/backup/backup_bundle_codec.dart';
+import '../services/backup/backup_crypto_codec.dart';
+import '../services/backup/backup_file_naming.dart';
 import '../services/sensitive_settings_store.dart';
 
 class BackupRecord {
@@ -30,31 +31,15 @@ class BackupRecord {
 class BackupHelper {
   static const _backupDirectoryName = 'moyun_backups';
   static const _legacyBackupDirectoryName = 'calligraphy_assistant_backups';
-  static const _backupFilePrefix = 'moyun_backup';
-  static const encryptedBackupExtension = 'moyunbak';
-  static const _minimumPassphraseLength = 8;
-  static const minimumPassphraseLength = _minimumPassphraseLength;
-  static const _encryptedBackupFormat = 'moyun_encrypted_backup';
-  static const _encryptedBackupVersion = 1;
-  static const _backupBundleFormat = 'moyun_backup_bundle';
-  static const _backupBundleVersion = 1;
+  static const encryptedBackupExtension =
+      BackupFileNaming.encryptedBackupExtension;
+  static const minimumPassphraseLength =
+      BackupCryptoCodec.minimumPassphraseLength;
   static const _artworkSnapshotDirectorySuffix = '.artworks';
   static const _sensitiveSettingsSnapshotSuffix = '.sensitive.json';
-  static const _pbkdf2Iterations = 120000;
-  static const _kdfSaltLength = 16;
-  static const _gcmNonceLength = 12;
-  static const _snapshotExtensions = <String>{'db', 'sqlite', 'sqlite3'};
-  static const _restoreExtensions = <String>{
-    ..._snapshotExtensions,
-    encryptedBackupExtension,
-  };
-
-  static final _cipher = AesGcm.with256bits();
-  static final _kdf = Pbkdf2(
-    macAlgorithm: Hmac.sha256(),
-    iterations: _pbkdf2Iterations,
-    bits: 256,
-  );
+  static const _fileNaming = BackupFileNaming();
+  static const _bundleCodec = BackupBundleCodec();
+  static final _cryptoCodec = BackupCryptoCodec();
 
   @visibleForTesting
   static Future<Directory> Function()? applicationSupportDirectoryResolver;
@@ -71,13 +56,25 @@ class BackupHelper {
   @visibleForTesting
   static Future<void> Function(Map<String, String>)? sensitiveSettingsWriter;
 
-  static Future<String> backup({DateTime? at}) async {
-    try {
-      final db = await DatabaseHelper.instance.database;
-      await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
-    } catch (_) {}
+  @visibleForTesting
+  static Future<String> Function()? databasePathResolver;
 
-    final dbPath = await DatabaseHelper.resolveDatabasePath();
+  @visibleForTesting
+  static Future<void> Function()? databaseSnapshotPreparer;
+
+  @visibleForTesting
+  static Future<void> Function(File file)? backupFileValidator;
+
+  @visibleForTesting
+  static Future<void> Function({
+    required bool includesArtworkSnapshot,
+    Directory? artworkDirectory,
+  })?
+  restoredArtworkSnapshotApplier;
+
+  static Future<String> backup({DateTime? at}) async {
+    await _prepareDatabaseSnapshot();
+    final dbPath = await _resolveDatabasePath();
     final backupDir = await _resolveBackupDirectory();
     final destination = p.join(backupDir.path, buildBackupFileName(at));
     await File(dbPath).copy(destination);
@@ -97,7 +94,6 @@ class BackupHelper {
     }
 
     final normalizedPassphrase = passphrase.trim();
-
     final resolvedSourcePath = sourcePath?.trim();
     final rawBackupPath =
         resolvedSourcePath == null || resolvedSourcePath.isEmpty
@@ -105,7 +101,9 @@ class BackupHelper {
         : resolvedSourcePath;
     final rawBackupFile = File(rawBackupPath);
     if (!await rawBackupFile.exists()) {
-      throw Exception('未找到待导出的备份文件，请重新生成后再试。');
+      throw Exception(
+        '\u672A\u627E\u5230\u5F85\u5BFC\u51FA\u7684\u5907\u4EFD\u6587\u4EF6\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u540E\u518D\u8BD5\u3002',
+      );
     }
 
     final encryptedBytes = await encryptBackupBytes(
@@ -152,7 +150,7 @@ class BackupHelper {
   static Future<String?> pickRestoreSourcePath() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: _restoreExtensions.toList(growable: false),
+      allowedExtensions: _fileNaming.supportedRestoreExtensions(),
     );
     if (result == null) return null;
 
@@ -181,13 +179,15 @@ class BackupHelper {
     if (normalizedPath.isEmpty) return false;
     if (!hasSupportedBackupExtension(normalizedPath)) {
       throw Exception(
-        '请选择 .db、.sqlite、.sqlite3 或 .$encryptedBackupExtension 备份文件。',
+        '\u8BF7\u9009\u62E9 .db\u3001.sqlite\u3001.sqlite3 \u6216 .$encryptedBackupExtension \u5907\u4EFD\u6587\u4EF6\u3002',
       );
     }
 
     final sourceFile = File(normalizedPath);
     if (!await sourceFile.exists()) {
-      throw Exception('未找到备份文件，请重新选择。');
+      throw Exception(
+        '\u672A\u627E\u5230\u5907\u4EFD\u6587\u4EF6\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002',
+      );
     }
 
     String? decryptedTempPath;
@@ -202,32 +202,26 @@ class BackupHelper {
       );
       await _validateBackupFile(restoreSource.databaseFile);
 
-      final dbPath = await DatabaseHelper.resolveDatabasePath();
+      final dbPath = await _resolveDatabasePath();
       final dbDir = Directory(p.dirname(dbPath));
       if (!await dbDir.exists()) {
         await dbDir.create(recursive: true);
       }
 
+      await _prepareDatabaseSnapshot();
+      final rollbackSnapshot = await _captureRestoreRollbackSnapshot(dbPath);
       try {
-        final db = await DatabaseHelper.instance.database;
-        await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
-        await db.close();
-      } catch (_) {}
-      DatabaseHelper.instance.resetForRestore();
-
-      for (final suffix in ['-wal', '-shm', '-journal']) {
-        final sidecar = File('$dbPath$suffix');
-        if (await sidecar.exists()) {
-          await sidecar.delete();
-        }
+        await applyRestoredSensitiveSettings(restoreSource.sensitiveSettings);
+        await applyRestoredArtworkSnapshot(
+          includesArtworkSnapshot: restoreSource.includesArtworkSnapshot,
+          artworkDirectory: restoreSource.artworkDirectory,
+        );
+        await _replaceDatabaseFile(dbPath, restoreSource.databaseFile);
+        DatabaseHelper.instance.resetForRestore();
+      } catch (error, stackTrace) {
+        await _tryRollbackRestore(dbPath, rollbackSnapshot);
+        Error.throwWithStackTrace(error, stackTrace);
       }
-
-      await restoreSource.databaseFile.copy(dbPath);
-      await applyRestoredArtworkSnapshot(
-        includesArtworkSnapshot: restoreSource.includesArtworkSnapshot,
-        artworkDirectory: restoreSource.artworkDirectory,
-      );
-      await applyRestoredSensitiveSettings(restoreSource.sensitiveSettings);
       return true;
     } finally {
       if (decryptedTempPath != null) {
@@ -247,12 +241,12 @@ class BackupHelper {
 
   @visibleForTesting
   static String buildBackupFileName([DateTime? at]) {
-    return '${_backupFilePrefix}_${_formatTimestamp(at ?? DateTime.now())}.db';
+    return _fileNaming.buildPlainFileName(at ?? DateTime.now());
   }
 
   @visibleForTesting
   static String buildEncryptedBackupFileName([DateTime? at]) {
-    return '${_backupFilePrefix}_${_formatTimestamp(at ?? DateTime.now())}.$encryptedBackupExtension';
+    return _fileNaming.buildEncryptedFileName(at ?? DateTime.now());
   }
 
   static bool hasSupportedBackupExtension(String filePath) {
@@ -260,21 +254,14 @@ class BackupHelper {
   }
 
   static bool isEncryptedBackupPath(String filePath) {
-    final extension = p.extension(filePath).toLowerCase().replaceFirst('.', '');
-    return extension == encryptedBackupExtension;
+    return _fileNaming.isEncryptedPath(filePath);
   }
 
   static String? validatePassphrase(String passphrase, {String? confirmation}) {
-    final normalizedPassphrase = _normalizePassphrase(passphrase);
-    if (normalizedPassphrase == null) {
-      return '备份口令至少需要 $_minimumPassphraseLength 个字符。';
-    }
-
-    if (confirmation != null && confirmation.trim() != normalizedPassphrase) {
-      return '两次输入的口令不一致。';
-    }
-
-    return null;
+    return _cryptoCodec.validatePassphrase(
+      passphrase,
+      confirmation: confirmation,
+    );
   }
 
   static Future<String> backupDirectoryPath() async {
@@ -286,64 +273,16 @@ class BackupHelper {
   static Future<Uint8List> encryptBackupBytes(
     List<int> bytes, {
     required String passphrase,
-  }) async {
-    final validationMessage = validatePassphrase(passphrase);
-    if (validationMessage != null) {
-      throw Exception(validationMessage);
-    }
-    final normalizedPassphrase = passphrase.trim();
-
-    final salt = _randomBytes(_kdfSaltLength);
-    final nonce = _randomBytes(_gcmNonceLength);
-    final secretKey = await _kdf.deriveKeyFromPassword(
-      password: normalizedPassphrase,
-      nonce: salt,
-    );
-    final secretBox = await _cipher.encrypt(
-      bytes,
-      secretKey: secretKey,
-      nonce: nonce,
-    );
-
-    final envelope = _EncryptedBackupEnvelope(
-      salt: salt,
-      nonce: secretBox.nonce,
-      mac: secretBox.mac.bytes,
-      cipherText: secretBox.cipherText,
-    );
-    return envelope.toBytes();
+  }) {
+    return _cryptoCodec.encrypt(bytes, passphrase: passphrase);
   }
 
   @visibleForTesting
   static Future<Uint8List> decryptBackupBytes(
     List<int> bytes, {
     required String passphrase,
-  }) async {
-    final validationMessage = validatePassphrase(passphrase);
-    if (validationMessage != null) {
-      throw Exception(validationMessage);
-    }
-    final normalizedPassphrase = passphrase.trim();
-
-    final envelope = _EncryptedBackupEnvelope.fromBytes(bytes);
-    final secretKey = await _kdf.deriveKeyFromPassword(
-      password: normalizedPassphrase,
-      nonce: envelope.salt,
-    );
-
-    try {
-      final clearBytes = await _cipher.decrypt(
-        SecretBox(
-          envelope.cipherText,
-          nonce: envelope.nonce,
-          mac: Mac(envelope.mac),
-        ),
-        secretKey: secretKey,
-      );
-      return Uint8List.fromList(clearBytes);
-    } on SecretBoxAuthenticationError {
-      throw Exception('备份口令错误，或备份文件已损坏。');
-    }
+  }) {
+    return _cryptoCodec.decrypt(bytes, passphrase: passphrase);
   }
 
   @visibleForTesting
@@ -352,21 +291,10 @@ class BackupHelper {
     Map<String, List<int>> artworkFiles = const <String, List<int>>{},
     Map<String, String> sensitiveSettings = const <String, String>{},
   }) {
-    final normalizedArtworkFiles = <String, String>{};
-    for (final entry in artworkFiles.entries) {
-      normalizedArtworkFiles[p.basename(entry.key)] = base64Encode(entry.value);
-    }
-
-    return Uint8List.fromList(
-      utf8.encode(
-        jsonEncode({
-          'format': _backupBundleFormat,
-          'version': _backupBundleVersion,
-          'database': base64Encode(databaseBytes),
-          'artwork_files': normalizedArtworkFiles,
-          'sensitive_settings': sensitiveSettings,
-        }),
-      ),
+    return _bundleCodec.encode(
+      databaseBytes: databaseBytes,
+      artworkFiles: artworkFiles,
+      sensitiveSettings: sensitiveSettings,
     );
   }
 
@@ -377,51 +305,21 @@ class BackupHelper {
     Map<String, String> sensitiveSettings,
   })?
   tryDecodeBackupBundleBytes(List<int> bytes) {
-    try {
-      final decoded = jsonDecode(utf8.decode(bytes));
-      if (decoded is! Map<String, dynamic>) {
-        return null;
-      }
-      if (decoded['format'] != _backupBundleFormat ||
-          decoded['version'] != _backupBundleVersion) {
-        return null;
-      }
-
-      final rawArtworkFiles =
-          decoded['artwork_files'] as Map<String, dynamic>? ?? const {};
-      final rawSensitiveSettings =
-          decoded['sensitive_settings'] as Map<String, dynamic>? ?? const {};
-      final artworkFiles = <String, Uint8List>{};
-      for (final entry in rawArtworkFiles.entries) {
-        artworkFiles[p.basename(entry.key)] = Uint8List.fromList(
-          base64Decode(entry.value as String),
-        );
-      }
-      final sensitiveSettings = <String, String>{};
-      for (final entry in rawSensitiveSettings.entries) {
-        final key = entry.key.trim();
-        final value = (entry.value as String).trim();
-        if (key.isEmpty || value.isEmpty) continue;
-        sensitiveSettings[key] = value;
-      }
-
-      return (
-        databaseBytes: Uint8List.fromList(
-          base64Decode(decoded['database'] as String),
-        ),
-        artworkFiles: artworkFiles,
-        sensitiveSettings: sensitiveSettings,
-      );
-    } on FormatException {
-      return null;
-    } on TypeError {
+    final decoded = _bundleCodec.tryDecode(bytes);
+    if (decoded == null) {
       return null;
     }
+
+    return (
+      databaseBytes: decoded.databaseBytes,
+      artworkFiles: decoded.artworkFiles,
+      sensitiveSettings: decoded.sensitiveSettings,
+    );
   }
 
   @visibleForTesting
   static bool payloadIncludesArtworkSnapshot(List<int> bytes) {
-    return tryDecodeBackupBundleBytes(bytes) != null;
+    return _bundleCodec.tryDecode(bytes) != null;
   }
 
   @visibleForTesting
@@ -429,6 +327,14 @@ class BackupHelper {
     required bool includesArtworkSnapshot,
     Directory? artworkDirectory,
   }) async {
+    if (restoredArtworkSnapshotApplier != null) {
+      await restoredArtworkSnapshotApplier!(
+        includesArtworkSnapshot: includesArtworkSnapshot,
+        artworkDirectory: artworkDirectory,
+      );
+      return;
+    }
+
     const storage = AttendanceArtworkStorageService();
     if (includesArtworkSnapshot) {
       await storage.restoreArtworkSnapshotFrom(artworkDirectory!);
@@ -474,9 +380,11 @@ class BackupHelper {
       );
     }
 
-    final normalizedPassphrase = _normalizePassphrase(passphrase ?? '');
-    if (normalizedPassphrase == null) {
-      throw Exception('请输入加密备份口令。');
+    final normalizedPassphrase = passphrase?.trim() ?? '';
+    if (normalizedPassphrase.length < minimumPassphraseLength) {
+      throw Exception(
+        '\u8BF7\u8F93\u5165\u52A0\u5BC6\u5907\u4EFD\u53E3\u4EE4\u3002',
+      );
     }
 
     final decryptedBytes = await decryptBackupBytes(
@@ -489,14 +397,14 @@ class BackupHelper {
     }
     final tempPath = p.join(tempDir.path, buildBackupFileName(DateTime.now()));
     final tempFile = File(tempPath);
-    final decodedBundle = tryDecodeBackupBundleBytes(decryptedBytes);
+    final decodedBundle = _bundleCodec.tryDecode(decryptedBytes);
     if (decodedBundle == null) {
       await tempFile.writeAsBytes(decryptedBytes, flush: true);
       onPreparedDatabase(tempPath);
       return _PreparedRestoreSource(
         databaseFile: tempFile,
         includesArtworkSnapshot: false,
-        sensitiveSettings: const <String, String>{},
+        sensitiveSettings: <String, String>{},
       );
     }
 
@@ -519,12 +427,19 @@ class BackupHelper {
   }
 
   static Future<void> _validateBackupFile(File file) async {
+    if (backupFileValidator != null) {
+      await backupFileValidator!(file);
+      return;
+    }
+
     final raf = await file.open(mode: FileMode.read);
     try {
       final header = await raf.read(16);
       if (header.length < 16 ||
           !String.fromCharCodes(header).startsWith('SQLite format 3')) {
-        throw Exception('选择的文件不是有效的数据库备份。');
+        throw Exception(
+          '\u9009\u62E9\u7684\u6587\u4EF6\u4E0D\u662F\u6709\u6548\u7684\u6570\u636E\u5E93\u5907\u4EFD\u3002',
+        );
       }
     } finally {
       await raf.close();
@@ -541,13 +456,17 @@ class BackupHelper {
           ? null
           : integrityRows.first.values.firstOrNull?.toString().toLowerCase();
       if (integrityValue != 'ok') {
-        throw Exception('备份文件已损坏或未完整保存，无法恢复。');
+        throw Exception(
+          '\u5907\u4EFD\u6587\u4EF6\u5DF2\u635F\u574F\u6216\u672A\u5B8C\u6574\u4FDD\u5B58\uFF0C\u65E0\u6CD5\u6062\u590D\u3002',
+        );
       }
 
       final versionRows = await db.rawQuery('PRAGMA user_version');
       final schemaVersion = Sqflite.firstIntValue(versionRows) ?? 0;
       if (schemaVersion < 1 || schemaVersion > DatabaseHelper.databaseVersion) {
-        throw Exception('该备份文件版本与当前应用不兼容，无法恢复。');
+        throw Exception(
+          '\u8BE5\u5907\u4EFD\u6587\u4EF6\u7248\u672C\u4E0E\u5F53\u524D\u5E94\u7528\u4E0D\u517C\u5BB9\uFF0C\u65E0\u6CD5\u6062\u590D\u3002',
+        );
       }
 
       final tableRows = await db.rawQuery(
@@ -565,7 +484,9 @@ class BackupHelper {
         'settings',
       };
       if (!tableNames.containsAll(requiredTables)) {
-        throw Exception('备份文件缺少必要数据表，无法恢复当前应用数据。');
+        throw Exception(
+          '\u5907\u4EFD\u6587\u4EF6\u7F3A\u5C11\u5FC5\u8981\u6570\u636E\u8868\uFF0C\u65E0\u6CD5\u6062\u590D\u5F53\u524D\u5E94\u7528\u6570\u636E\u3002',
+        );
       }
     } finally {
       await db.close();
@@ -573,13 +494,11 @@ class BackupHelper {
   }
 
   static bool _isSupportedRestoreFile(String filePath) {
-    final extension = p.extension(filePath).toLowerCase().replaceFirst('.', '');
-    return _restoreExtensions.contains(extension);
+    return _fileNaming.hasSupportedExtension(filePath);
   }
 
   static bool _isSnapshotBackupFile(String filePath) {
-    final extension = p.extension(filePath).toLowerCase().replaceFirst('.', '');
-    return _snapshotExtensions.contains(extension);
+    return _fileNaming.isSnapshotPath(filePath);
   }
 
   static Future<Directory> _resolveBackupDirectory() async {
@@ -827,6 +746,15 @@ class BackupHelper {
     return temporaryDirectoryResolver?.call() ?? getTemporaryDirectory();
   }
 
+  static Future<String> _resolveDatabasePath() {
+    return databasePathResolver?.call() ?? DatabaseHelper.resolveDatabasePath();
+  }
+
+  static Future<void> _prepareDatabaseSnapshot() {
+    return databaseSnapshotPreparer?.call() ??
+        DatabaseHelper.instance.prepareForFileSnapshot();
+  }
+
   static Future<Map<String, String>> _readSensitiveSettings() async {
     if (sensitiveSettingsReader != null) {
       return sensitiveSettingsReader!();
@@ -834,29 +762,61 @@ class BackupHelper {
     return SensitiveSettingsStore().readAll();
   }
 
-  static String _formatTimestamp(DateTime timestamp) {
-    final year = timestamp.year.toString().padLeft(4, '0');
-    final month = timestamp.month.toString().padLeft(2, '0');
-    final day = timestamp.day.toString().padLeft(2, '0');
-    final hour = timestamp.hour.toString().padLeft(2, '0');
-    final minute = timestamp.minute.toString().padLeft(2, '0');
-    final second = timestamp.second.toString().padLeft(2, '0');
-    return '$year-$month-${day}_$hour-$minute-$second';
-  }
-
-  static String? _normalizePassphrase(String passphrase) {
-    final normalized = passphrase.trim();
-    if (normalized.length < _minimumPassphraseLength) {
-      return null;
-    }
-    return normalized;
-  }
-
-  static Uint8List _randomBytes(int length) {
-    final random = Random.secure();
-    return Uint8List.fromList(
-      List<int>.generate(length, (_) => random.nextInt(256)),
+  static Future<_RestoreRollbackSnapshot> _captureRestoreRollbackSnapshot(
+    String dbPath,
+  ) async {
+    final currentDatabase = File(dbPath);
+    final databaseBytes = await currentDatabase.exists()
+        ? await currentDatabase.readAsBytes()
+        : null;
+    final artworkFiles = await const AttendanceArtworkStorageService()
+        .readArtworkSnapshot();
+    final sensitiveSettings = await _readSensitiveSettings();
+    return _RestoreRollbackSnapshot(
+      databaseBytes: databaseBytes,
+      artworkFiles: artworkFiles,
+      sensitiveSettings: sensitiveSettings,
     );
+  }
+
+  static Future<void> _replaceDatabaseFile(String dbPath, File source) async {
+    for (final suffix in ['-wal', '-shm', '-journal']) {
+      final sidecar = File('$dbPath$suffix');
+      if (await sidecar.exists()) {
+        await sidecar.delete();
+      }
+    }
+    await source.copy(dbPath);
+  }
+
+  static Future<void> _tryRollbackRestore(
+    String dbPath,
+    _RestoreRollbackSnapshot snapshot,
+  ) async {
+    try {
+      for (final suffix in ['-wal', '-shm', '-journal']) {
+        final sidecar = File('$dbPath$suffix');
+        if (await sidecar.exists()) {
+          await sidecar.delete();
+        }
+      }
+
+      final databaseFile = File(dbPath);
+      if (snapshot.databaseBytes == null) {
+        if (await databaseFile.exists()) {
+          await databaseFile.delete();
+        }
+      } else {
+        await databaseFile.writeAsBytes(snapshot.databaseBytes!, flush: true);
+      }
+      await const AttendanceArtworkStorageService().restoreArtworkSnapshot(
+        snapshot.artworkFiles,
+      );
+      await applyRestoredSensitiveSettings(snapshot.sensitiveSettings);
+      DatabaseHelper.instance.resetForRestore();
+    } catch (error) {
+      debugPrint('Failed to rollback restore: $error');
+    }
   }
 }
 
@@ -874,59 +834,14 @@ class _PreparedRestoreSource {
   });
 }
 
-class _EncryptedBackupEnvelope {
-  final List<int> salt;
-  final List<int> nonce;
-  final List<int> mac;
-  final List<int> cipherText;
+class _RestoreRollbackSnapshot {
+  final Uint8List? databaseBytes;
+  final Map<String, Uint8List> artworkFiles;
+  final Map<String, String> sensitiveSettings;
 
-  const _EncryptedBackupEnvelope({
-    required this.salt,
-    required this.nonce,
-    required this.mac,
-    required this.cipherText,
+  const _RestoreRollbackSnapshot({
+    required this.databaseBytes,
+    required this.artworkFiles,
+    required this.sensitiveSettings,
   });
-
-  Uint8List toBytes() {
-    return Uint8List.fromList(
-      utf8.encode(
-        jsonEncode({
-          'format': BackupHelper._encryptedBackupFormat,
-          'version': BackupHelper._encryptedBackupVersion,
-          'algorithm': 'aes-256-gcm',
-          'kdf': 'pbkdf2-hmac-sha256',
-          'iterations': BackupHelper._pbkdf2Iterations,
-          'salt': base64Encode(salt),
-          'nonce': base64Encode(nonce),
-          'mac': base64Encode(mac),
-          'ciphertext': base64Encode(cipherText),
-        }),
-      ),
-    );
-  }
-
-  factory _EncryptedBackupEnvelope.fromBytes(List<int> bytes) {
-    try {
-      final decoded = jsonDecode(utf8.decode(bytes));
-      if (decoded is! Map<String, dynamic>) {
-        throw const FormatException();
-      }
-
-      if (decoded['format'] != BackupHelper._encryptedBackupFormat ||
-          decoded['version'] != BackupHelper._encryptedBackupVersion) {
-        throw const FormatException();
-      }
-
-      return _EncryptedBackupEnvelope(
-        salt: base64Decode(decoded['salt'] as String),
-        nonce: base64Decode(decoded['nonce'] as String),
-        mac: base64Decode(decoded['mac'] as String),
-        cipherText: base64Decode(decoded['ciphertext'] as String),
-      );
-    } on FormatException {
-      throw Exception('选择的文件不是有效的加密备份。');
-    } on TypeError {
-      throw Exception('选择的文件不是有效的加密备份。');
-    }
-  }
 }

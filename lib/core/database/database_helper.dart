@@ -22,6 +22,13 @@ class DatabaseHelper {
     _dbFuture = null;
   }
 
+  Future<void> prepareForFileSnapshot() async {
+    final db = await database;
+    await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+    await db.close();
+    _dbFuture = null;
+  }
+
   Future<Database> _initDB() async {
     final path = await resolveDatabasePath();
     return openDatabase(
