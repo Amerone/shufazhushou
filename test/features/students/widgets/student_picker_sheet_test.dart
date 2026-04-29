@@ -230,6 +230,61 @@ void main() {
     expect(find.text('Suspended Student'), findsNothing);
   });
 
+  testWidgets('student picker empty search can be cleared inline', (
+    tester,
+  ) async {
+    _FakeStudentNotifier.seededStudents = [
+      StudentWithMeta(
+        const Student(
+          id: 'student-a',
+          name: 'Alice',
+          pricePerClass: 180,
+          status: 'active',
+          createdAt: 1,
+          updatedAt: 1,
+        ),
+        null,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_FakeStudentNotifier.new),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: const Scaffold(
+            body: StudentPickerSheet(
+              title: '选择学生',
+              subtitle: '选择一名学生',
+              actionLabel: '选择',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Missing');
+    await tester.pump();
+
+    expect(find.text('没有匹配学生。'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '清空搜索'), findsOneWidget);
+    expect(find.text('Alice'), findsNothing);
+
+    await tester.tap(find.widgetWithText(TextButton, '清空搜索'));
+    await tester.pump();
+
+    expect(find.text('Alice'), findsOneWidget);
+    expect(find.text('没有匹配学生。'), findsNothing);
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+      isEmpty,
+    );
+  });
+
   testWidgets('student picker error state exposes retry action', (
     tester,
   ) async {

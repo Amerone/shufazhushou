@@ -124,6 +124,12 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
     router.push(route);
   }
 
+  void _clearSearch() {
+    if (_query.isEmpty) return;
+    _searchController.clear();
+    setState(() => _query = '');
+  }
+
   @override
   Widget build(BuildContext context) {
     final asyncStudents = ref.watch(studentProvider);
@@ -184,10 +190,7 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                           tooltip: '清空搜索',
                           onPressed: () {
                             unawaited(InteractionFeedback.selection(context));
-                            setState(() {
-                              _searchController.clear();
-                              _query = '';
-                            });
+                            _clearSearch();
                           },
                           icon: const Icon(Icons.close),
                         ),
@@ -257,6 +260,22 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                             ),
                           ),
                         ),
+                        if (_query.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: () {
+                                unawaited(
+                                  InteractionFeedback.selection(context),
+                                );
+                                _clearSearch();
+                              },
+                              icon: const Icon(Icons.close, size: 18),
+                              label: const Text('清空搜索'),
+                            ),
+                          ),
+                        ],
                         if (_query.isEmpty) ...[
                           const SizedBox(height: 12),
                           LayoutBuilder(
