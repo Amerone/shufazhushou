@@ -177,6 +177,59 @@ void main() {
     expect(selected?.student.id, 'student-a');
   });
 
+  testWidgets('student picker activeOnly hides suspended students', (
+    tester,
+  ) async {
+    _FakeStudentNotifier.seededStudents = [
+      StudentWithMeta(
+        const Student(
+          id: 'student-active',
+          name: 'Active Student',
+          pricePerClass: 180,
+          status: 'active',
+          createdAt: 1,
+          updatedAt: 1,
+        ),
+        null,
+      ),
+      StudentWithMeta(
+        const Student(
+          id: 'student-suspended',
+          name: 'Suspended Student',
+          pricePerClass: 180,
+          status: 'suspended',
+          createdAt: 2,
+          updatedAt: 2,
+        ),
+        null,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_FakeStudentNotifier.new),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: const Scaffold(
+            body: StudentPickerSheet(
+              title: '选择学生',
+              subtitle: '选择一名在读学生',
+              activeOnly: true,
+              actionLabel: '选择',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Active Student'), findsOneWidget);
+    expect(find.text('Suspended Student'), findsNothing);
+  });
+
   testWidgets('student picker error state exposes retry action', (
     tester,
   ) async {

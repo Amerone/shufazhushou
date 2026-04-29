@@ -34,6 +34,10 @@ class StudentPickerSheet extends ConsumerStatefulWidget {
 class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  List<StudentWithMeta>? _visibleStudentsCache;
+  List<StudentWithMeta>? _visibleStudentsSource;
+  String? _visibleStudentsQuery;
+  bool? _visibleStudentsActiveOnly;
   static const List<String> _errorPrefixes = <String>[
     'Exception: ',
     'FormatException: ',
@@ -55,6 +59,12 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
   }
 
   List<StudentWithMeta> _visibleStudents(List<StudentWithMeta> students) {
+    if (identical(_visibleStudentsSource, students) &&
+        _visibleStudentsQuery == _query &&
+        _visibleStudentsActiveOnly == widget.activeOnly) {
+      return _visibleStudentsCache ?? const <StudentWithMeta>[];
+    }
+
     final visible = <StudentWithMeta>[];
     for (final item in students) {
       if (widget.activeOnly && item.student.status != 'active') continue;
@@ -62,6 +72,10 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
       visible.add(item);
     }
     visible.sort(_compareStudents);
+    _visibleStudentsSource = students;
+    _visibleStudentsQuery = _query;
+    _visibleStudentsActiveOnly = widget.activeOnly;
+    _visibleStudentsCache = visible;
     return visible;
   }
 
