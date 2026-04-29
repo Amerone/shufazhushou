@@ -15,6 +15,19 @@ class RevenueChart extends ConsumerStatefulWidget {
 class _RevenueChartState extends ConsumerState<RevenueChart> {
   bool _showReceivable = true;
   bool _showReceived = true;
+  RevenueData? _cachedRevenueData;
+  _RevenueChartSnapshot? _cachedSnapshot;
+
+  _RevenueChartSnapshot _snapshotFor(RevenueData data) {
+    final cached = _cachedSnapshot;
+    if (cached != null && identical(_cachedRevenueData, data)) {
+      return cached;
+    }
+    final snapshot = _RevenueChartSnapshot.fromData(data);
+    _cachedRevenueData = data;
+    _cachedSnapshot = snapshot;
+    return snapshot;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,12 +58,9 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
         ),
       ),
       data: (data) {
-        final months = <String>{
-          ...data.monthlyReceivable.map((m) => m['month'] as String),
-          ...data.monthlyReceived.map((m) => m['month'] as String),
-        }.toList()..sort();
+        final snapshot = _snapshotFor(data);
 
-        if (months.isEmpty) {
+        if (snapshot.months.isEmpty) {
           return Semantics(
             container: true,
             liveRegion: true,
@@ -75,7 +85,7 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '当前周期暂无收入记录',
+                    '暂无收入记录',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: kInkSecondary,
                     ),
@@ -86,39 +96,11 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
           );
         }
 
-        final receivableMap = {
-          for (final m in data.monthlyReceivable)
-            m['month'] as String: ((m['totalFee'] as num?) ?? 0).toDouble(),
-        };
-        final receivedMap = {
-          for (final m in data.monthlyReceived)
-            m['month'] as String: ((m['totalReceived'] as num?) ?? 0)
-                .toDouble(),
-        };
-
-        final spots1 = months
-            .asMap()
-            .entries
-            .map((e) => FlSpot(e.key.toDouble(), receivableMap[e.value] ?? 0))
-            .toList();
-        final spots2 = months
-            .asMap()
-            .entries
-            .map((e) => FlSpot(e.key.toDouble(), receivedMap[e.value] ?? 0))
-            .toList();
         final chartSeries = _buildRevenueSeries(
           showReceivable: _showReceivable,
           showReceived: _showReceived,
-          receivableSpots: spots1,
-          receivedSpots: spots2,
-        );
-        final totalReceivable = receivableMap.values.fold<double>(
-          0,
-          (sum, item) => sum + item,
-        );
-        final totalReceived = receivedMap.values.fold<double>(
-          0,
-          (sum, item) => sum + item,
+          receivableSpots: snapshot.receivableSpots,
+          receivedSpots: snapshot.receivedSpots,
         );
 
         return Column(
@@ -130,12 +112,12 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
               children: [
                 _RevenueSummary(
                   label: '累计应收',
-                  value: '¥${totalReceivable.toStringAsFixed(0)}',
+                  value: '¥${snapshot.totalReceivable.toStringAsFixed(0)}',
                   color: kPrimaryBlue,
                 ),
                 _RevenueSummary(
                   label: '累计实收',
-                  value: '¥${totalReceived.toStringAsFixed(0)}',
+                  value: '¥${snapshot.totalReceived.toStringAsFixed(0)}',
                   color: kGreen,
                 ),
               ],
@@ -186,16 +168,16 @@ class _RevenueChartState extends ConsumerState<RevenueChart> {
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          interval: months.length > 6 ? 2 : 1,
+                          interval: snapshot.months.length > 6 ? 2 : 1,
                           getTitlesWidget: (v, _) {
                             final i = v.toInt();
-                            if (i < 0 || i >= months.length) {
+                            if (i < 0 || i >= snapshot.months.length) {
                               return const SizedBox();
                             }
                             return Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Text(
-                                months[i].substring(5),
+                                snapshot.months[i].substring(5),
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   fontSize: 10,
                                 ),
@@ -282,6 +264,63 @@ class _RevenueSeries {
     required this.color,
     required this.spots,
   });
+}
+
+class _RevenueChartSnapshot {
+  final List<String> months;
+  final List<FlSpot> receivableSpots;
+  final List<FlSpot> receivedSpots;
+  final double totalReceivable;
+  final double totalReceived;
+
+  const _RevenueChartSnapshot({
+    required this.months,
+    required this.receivableSpots,
+    required this.receivedSpots,
+    required this.totalReceivable,
+    required this.totalReceived,
+  });
+
+  factory _RevenueChartSnapshot.fromData(RevenueData data) {
+    final receivableMap = <String, double>{};
+    for (final monthData in data.monthlyReceivable) {
+      receivableMap[monthData['month'] as String] =
+          ((monthData['totalFee'] as num?) ?? 0).toDouble();
+    }
+
+    final receivedMap = <String, double>{};
+    for (final monthData in data.monthlyReceived) {
+      receivedMap[monthData['month'] as String] =
+          ((monthData['totalReceived'] as num?) ?? 0).toDouble();
+    }
+
+    final months = <String>{
+      ...receivableMap.keys,
+      ...receivedMap.keys,
+    }.toList(growable: false)..sort();
+    final receivableSpots = <FlSpot>[];
+    final receivedSpots = <FlSpot>[];
+    var totalReceivable = 0.0;
+    var totalReceived = 0.0;
+
+    for (var index = 0; index < months.length; index++) {
+      final month = months[index];
+      final receivable = receivableMap[month] ?? 0;
+      final received = receivedMap[month] ?? 0;
+      totalReceivable += receivable;
+      totalReceived += received;
+      receivableSpots.add(FlSpot(index.toDouble(), receivable));
+      receivedSpots.add(FlSpot(index.toDouble(), received));
+    }
+
+    return _RevenueChartSnapshot(
+      months: months,
+      receivableSpots: receivableSpots,
+      receivedSpots: receivedSpots,
+      totalReceivable: totalReceivable,
+      totalReceived: totalReceived,
+    );
+  }
 }
 
 List<_RevenueSeries> _buildRevenueSeries({

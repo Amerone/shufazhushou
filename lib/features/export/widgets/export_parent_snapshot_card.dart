@@ -31,7 +31,7 @@ class ExportParentSnapshotCard extends StatelessWidget {
           return Semantics(
             container: true,
             liveRegion: true,
-            label: '正在整理家长首屏摘要，可继续配置导出选项',
+            label: '正在整理家长摘要',
             child: ExcludeSemantics(
               child: Container(
                 padding: const EdgeInsets.all(16),
@@ -50,7 +50,7 @@ class ExportParentSnapshotCard extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     const SizedBox(width: 12),
-                    Text('正在整理家长首屏摘要...', style: theme.textTheme.bodySmall),
+                    Text('整理摘要...', style: theme.textTheme.bodySmall),
                   ],
                 ),
               ),
@@ -62,7 +62,7 @@ class ExportParentSnapshotCard extends StatelessWidget {
           return Semantics(
             container: true,
             liveRegion: true,
-            label: '家长端摘要加载失败，不影响 PDF 预览、分享 PDF 或导出 Excel，可直接继续导出，或稍后重试',
+            label: '家长摘要加载失败，可继续导出',
             child: ExcludeSemantics(
               child: Container(
                 width: double.infinity,
@@ -73,7 +73,7 @@ class ExportParentSnapshotCard extends StatelessWidget {
                   border: Border.all(color: kRed.withValues(alpha: 0.12)),
                 ),
                 child: Text(
-                  '家长端摘要加载失败，不影响导出。可直接继续预览、分享 PDF 或导出 Excel，或稍后重试。',
+                  '摘要加载失败，可继续导出。',
                   style: theme.textTheme.bodySmall?.copyWith(color: kRed),
                 ),
               ),

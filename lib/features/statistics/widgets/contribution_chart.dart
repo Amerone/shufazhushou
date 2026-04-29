@@ -13,6 +13,8 @@ import '../../../shared/theme.dart';
 import '../../../shared/widgets/empty_state.dart';
 import 'statistics_load_error.dart';
 
+const int _topContributionLimit = 10;
+
 class ContributionChart extends ConsumerStatefulWidget {
   const ContributionChart({super.key});
 
@@ -62,7 +64,7 @@ class _ContributionChartState extends ConsumerState<ContributionChart> {
               builder: (context, constraints) {
                 final compact = constraints.maxWidth < 380;
                 final description = Text(
-                  _byFee ? '按金额查看前 10 名学员贡献' : '按课次查看前 10 名学员贡献',
+                  _byFee ? '金额前 10' : '节数前 10',
                   style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
                 );
                 final selector = Semantics(
@@ -326,22 +328,29 @@ List<_ContributionEntry> _rankContributions(
   List<Map<String, dynamic>> list, {
   required bool byFee,
 }) {
-  final sorted = [...list]
-    ..sort(
-      (a, b) =>
-          _contributionValue(b, byFee).compareTo(_contributionValue(a, byFee)),
-    );
+  final top = <({Map<String, dynamic> item, double value})>[];
+  for (final item in list) {
+    final value = _contributionValue(item, byFee);
+    var insertAt = 0;
+    while (insertAt < top.length && top[insertAt].value >= value) {
+      insertAt++;
+    }
+    if (insertAt >= _topContributionLimit) continue;
+    top.insert(insertAt, (item: item, value: value));
+    if (top.length > _topContributionLimit) {
+      top.removeLast();
+    }
+  }
 
-  final top = sorted.take(10).toList(growable: false);
   if (top.isEmpty) {
     return const <_ContributionEntry>[];
   }
 
-  final maxValue = _contributionValue(top.first, byFee);
+  final maxValue = top.first.value;
   final entries = <_ContributionEntry>[];
   for (var i = 0; i < top.length; i++) {
-    final item = top[i];
-    final value = _contributionValue(item, byFee);
+    final item = top[i].item;
+    final value = top[i].value;
     entries.add(
       _ContributionEntry(
         rank: i + 1,
@@ -448,6 +457,10 @@ class StatusFilteredList extends ConsumerWidget {
     if (selected == null) return const SizedBox();
 
     final nameMap = ref.watch(studentDisplayNameMapProvider);
+    final totalCount = _statusRecordTotal(
+      ref.watch(statusDistributionProvider).valueOrNull,
+      selected,
+    );
 
     final asyncRecords = ref.watch(filteredAttendanceProvider);
 
@@ -467,54 +480,132 @@ class StatusFilteredList extends ConsumerWidget {
           return const EmptyState(message: '\u6682\u65e0\u8bb0\u5f55');
         }
 
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: records.length,
-          itemBuilder: (_, i) {
-            final r = records[i];
-            final color = statusColor(selected);
-            return Container(
-              margin: EdgeInsets.only(bottom: i == records.length - 1 ? 0 : 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.56),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _StatusFilteredListSummary(
+              status: selected,
+              shownCount: records.length,
+              totalCount: totalCount,
+            ),
+            const SizedBox(height: 8),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: records.length,
+              itemBuilder: (_, i) {
+                final r = records[i];
+                final color = statusColor(selected);
+                return Container(
+                  margin: EdgeInsets.only(
+                    bottom: i == records.length - 1 ? 0 : 8,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          nameMap[r.studentId] ?? r.studentId,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${r.date}  ${r.startTime}-${r.endTime}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.56),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ],
-              ),
-            );
-          },
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              nameMap[r.studentId] ?? r.studentId,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${r.date}  ${r.startTime}-${r.endTime}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
         );
       },
     );
   }
+}
+
+class _StatusFilteredListSummary extends StatelessWidget {
+  final String status;
+  final int shownCount;
+  final int? totalCount;
+
+  const _StatusFilteredListSummary({
+    required this.status,
+    required this.shownCount,
+    required this.totalCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = statusColor(status);
+    final effectiveTotal = totalCount ?? shownCount;
+    final countLabel = effectiveTotal > shownCount
+        ? '最近 $shownCount / $effectiveTotal 条'
+        : '$shownCount 条';
+
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '${statusLabel(status)}记录，$countLabel',
+      child: ExcludeSemantics(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.14)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.filter_alt_outlined, size: 18, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${statusLabel(status)} · $countLabel',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+int? _statusRecordTotal(
+  List<Map<String, dynamic>>? distribution,
+  String status,
+) {
+  if (distribution == null) return null;
+  for (final item in distribution) {
+    if (item['status'] == status) {
+      return ((item['count'] as num?) ?? 0).toInt();
+    }
+  }
+  return null;
 }

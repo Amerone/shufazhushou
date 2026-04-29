@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../core/models/student.dart' show buildDisplayNameMap;
+import '../../../core/models/attendance.dart';
+import '../../../core/models/student.dart' show Student, buildDisplayNameMap;
 import '../../../core/providers/attendance_provider.dart';
 import '../../../core/providers/invalidation_helper.dart';
 import '../../../core/providers/statistics_period_provider.dart';
@@ -41,6 +42,8 @@ class StatisticsScreen extends ConsumerStatefulWidget {
 }
 
 class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
+  static const double _anchorResolveOffsetDelta = 16;
+
   final ScrollController _scrollController = ScrollController();
   final Map<_StatisticsAnchor, GlobalKey> _sectionKeys = {
     for (final anchor in _StatisticsAnchor.values) anchor: GlobalKey(),
@@ -50,6 +53,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
   bool _showScrollToTop = false;
   bool _exporting = false;
   _StatisticsAnchor? _lastFocusedAnchor;
+  double? _lastAnchorResolveOffset;
 
   @override
   void initState() {
@@ -67,8 +71,17 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
 
   void _handleScroll() {
     if (!_scrollController.hasClients) return;
-    final shouldShow = _scrollController.offset > 280;
-    final activeAnchor = _resolveVisibleAnchor();
+    final offset = _scrollController.offset;
+    final shouldShow = offset > 280;
+    final lastAnchorOffset = _lastAnchorResolveOffset;
+    final shouldResolveAnchor =
+        lastAnchorOffset == null ||
+        (offset - lastAnchorOffset).abs() >= _anchorResolveOffsetDelta;
+    final activeAnchor = shouldResolveAnchor ? _resolveVisibleAnchor() : null;
+    if (shouldResolveAnchor) {
+      _lastAnchorResolveOffset = offset;
+    }
+
     if (shouldShow == _showScrollToTop &&
         (activeAnchor == null || activeAnchor == _lastFocusedAnchor)) {
       return;
@@ -148,10 +161,16 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
     setState(() => _exporting = true);
     try {
       await InteractionFeedback.selection(context);
-      final records = await ref
+      final recordsFuture = ref
           .read(attendanceDaoProvider)
           .getByDateRange(range.from, range.to);
-      final students = await ref.read(studentDaoProvider).getAll();
+      final studentsFuture = ref.read(studentDaoProvider).getAll();
+      final exportData = await Future.wait<Object>([
+        recordsFuture,
+        studentsFuture,
+      ]);
+      final records = exportData[0] as List<Attendance>;
+      final students = exportData[1] as List<Student>;
       final nameMap = buildDisplayNameMap(students);
 
       final path = await ExcelExporter.exportAllAttendance(
@@ -196,11 +215,11 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
           padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
           child: Semantics(
             button: true,
-            label: '\u8fd4\u56de\u7edf\u8ba1\u9875\u9876\u90e8',
+            label: '返回顶部',
             child: FloatingActionButton.small(
               heroTag: 'statistics-scroll-top',
               onPressed: _scrollToTop,
-              tooltip: '回到顶部',
+              tooltip: '返回顶部',
               backgroundColor: Colors.white.withValues(alpha: 0.92),
               foregroundColor: kPrimaryBlue,
               elevation: 0,

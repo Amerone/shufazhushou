@@ -57,7 +57,7 @@ void main() {
 
       expect(renewal.studentId, 'student-1');
       expect(renewal.message, contains('\u4f59\u989d'));
-      expect(renewal.calcLogic, contains('\u4f59\u989d\u5c0f\u4e8e'));
+      expect(renewal.calcLogic, contains('\u4f59\u989d <'));
     });
 
     test('creates progress insight after three consecutive improvements', () {
@@ -147,7 +147,7 @@ void main() {
         progress.message,
         contains('\u8fd1 3 \u6b21\u8bc4\u5206\u6301\u7eed\u63d0\u5347'),
       );
-      expect(progress.suggestion, contains('\u6210\u957f\u5feb\u7167'));
+      expect(progress.suggestion, contains('\u6708\u62a5'));
     });
 
     test('uses only the latest three scoring records for progress insight', () {

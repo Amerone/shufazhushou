@@ -21,7 +21,7 @@ class BackupListErrorCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              '备份列表加载失败，请稍后重试。',
+              '备份列表加载失败。',
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: kRed),
@@ -180,7 +180,7 @@ class BackupOverviewCard extends StatelessWidget {
                   SizedBox(
                     width: itemWidth,
                     child: const BackupMetricCard(
-                      label: '建议周期',
+                      label: '周期',
                       value: '7 天',
                       color: kGreen,
                     ),
@@ -202,7 +202,7 @@ class BackupOverviewCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '应用内备份位置',
+                  '备份位置',
                   style: Theme.of(
                     context,
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),

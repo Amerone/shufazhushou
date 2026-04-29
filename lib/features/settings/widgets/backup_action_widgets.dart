@@ -23,10 +23,7 @@ class BackupActionsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const BackupSectionHeader(
-            title: '立即操作',
-            subtitle: '常用流程只保留两步：生成加密备份并分享，或从已有备份恢复。',
-          ),
+          const BackupSectionHeader(title: '立即操作', subtitle: '生成备份，或从文件恢复。'),
           const SizedBox(height: 14),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -46,7 +43,7 @@ class BackupActionsCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       icon: const Icon(Icons.backup_outlined),
-                      label: const Text('生成加密备份并分享'),
+                      label: const Text('生成并分享'),
                     ),
                   ),
                   SizedBox(

@@ -24,7 +24,7 @@ class StudentPickerSheet extends ConsumerStatefulWidget {
     required this.subtitle,
     required this.actionLabel,
     this.activeOnly = false,
-    this.emptyMessage = '还没有学生档案，请先新增或导入学生。',
+    this.emptyMessage = '先新增或导入学生。',
   });
 
   @override
@@ -52,6 +52,17 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
     return student.name.contains(_query) ||
         (student.parentName?.contains(_query) ?? false) ||
         (student.parentPhone?.contains(_query) ?? false);
+  }
+
+  List<StudentWithMeta> _visibleStudents(List<StudentWithMeta> students) {
+    final visible = <StudentWithMeta>[];
+    for (final item in students) {
+      if (widget.activeOnly && item.student.status != 'active') continue;
+      if (!_matchesQuery(item.student)) continue;
+      visible.add(item);
+    }
+    visible.sort(_compareStudents);
+    return visible;
   }
 
   int _compareStudents(StudentWithMeta a, StudentWithMeta b) {
@@ -151,7 +162,7 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                 controller: _searchController,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: '搜索学生姓名、家长或电话',
+                  hintText: '姓名、家长或电话',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _query.isEmpty
                       ? null
@@ -209,16 +220,7 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                   ),
                 ),
                 data: (students) {
-                  final visibleStudents =
-                      students
-                          .where(
-                            (item) =>
-                                !widget.activeOnly ||
-                                item.student.status == 'active',
-                          )
-                          .where((item) => _matchesQuery(item.student))
-                          .toList()
-                        ..sort(_compareStudents);
+                  final visibleStudents = _visibleStudents(students);
                   final displayNames = ref.watch(studentDisplayNameMapProvider);
 
                   if (visibleStudents.isEmpty) {
@@ -235,9 +237,7 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                             ),
                           ),
                           child: Text(
-                            _query.isEmpty
-                                ? widget.emptyMessage
-                                : '没有找到符合条件的学生。',
+                            _query.isEmpty ? widget.emptyMessage : '没有匹配学生。',
                             style: theme.textTheme.bodySmall?.copyWith(
                               height: 1.5,
                             ),
@@ -303,7 +303,7 @@ class _StudentPickerSheetState extends ConsumerState<StudentPickerSheet> {
                             ),
                           ),
                           child: Text(
-                            '已按最近上课排序，今天刚上课或最近常上的学生会排在前面。',
+                            '最近上课优先。',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: kPrimaryBlue,
                               fontWeight: FontWeight.w600,

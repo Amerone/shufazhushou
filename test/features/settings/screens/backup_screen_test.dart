@@ -5,6 +5,25 @@ import 'package:moyun/core/utils/backup_helper.dart';
 import 'package:moyun/features/settings/screens/backup_screen.dart';
 
 void main() {
+  test('backup risk copy keeps passphrase and restore requirements', () {
+    expect(backupCreateConfirmMessage, contains('口令'));
+    expect(backupCreatePassphraseDescription, contains('同一口令'));
+    expect(backupCreateSuccessMessage, contains('同一口令'));
+    expect(
+      backupExistingSharePassphraseDescription,
+      allOf(contains('加密分享文件'), contains('恢复需同一口令')),
+    );
+    expect(backupExistingShareSuccessMessage, contains('恢复需同一口令'));
+    expect(
+      backupRestoreFromPickerConfirmMessage,
+      allOf(contains('覆盖'), contains('不可撤销'), contains('自动生成本机备份')),
+    );
+    expect(
+      backupRestoreRecordConfirmMessage('backup.db'),
+      allOf(contains('backup.db'), contains('覆盖'), contains('不可撤销')),
+    );
+  });
+
   testWidgets('passphrase visibility control exposes stateful semantics', (
     tester,
   ) async {
@@ -85,7 +104,7 @@ void main() {
       expect(node.hint, '会先显示确认提示，确认后覆盖当前全部数据');
       expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, '恢复此备份'));
+      await tester.tap(find.widgetWithText(OutlinedButton, '恢复'));
 
       expect(restoreCount, 1);
     } finally {

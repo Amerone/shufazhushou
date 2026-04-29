@@ -3,6 +3,8 @@ import '../models/attendance.dart';
 import 'attendance_provider.dart';
 import 'statistics_period_provider.dart';
 
+const filteredAttendancePreviewLimit = 30;
+
 // null = 未筛选（显示全部）
 final statusFilterProvider = StateProvider<String?>((ref) => null);
 
@@ -17,5 +19,10 @@ final filteredAttendanceProvider = FutureProvider<List<Attendance>>((
 
   final range = ref.watch(statisticsPeriodProvider);
   final dao = ref.read(attendanceDaoProvider);
-  return dao.getByDateRangeAndStatus(range.from, range.to, status);
+  return dao.getByDateRangeAndStatus(
+    range.from,
+    range.to,
+    status,
+    limit: filteredAttendancePreviewLimit,
+  );
 });

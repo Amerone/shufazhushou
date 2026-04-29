@@ -164,16 +164,52 @@ void main() {
     await _settleUi(tester);
 
     expect(find.text('恢复上次同班（2人）'), findsOneWidget);
-    expect(find.textContaining('当前默认：18:00-19:30 / 迟到'), findsOneWidget);
+    expect(find.textContaining('默认：18:00-19:30 / 迟到'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(ActionChip, '恢复上次同班（2人）'));
     await _settleUi(tester);
 
     expect(find.text('已选 2'), findsOneWidget);
     expect(
-      find.widgetWithText(OutlinedButton, '直接保存（2人 / ¥380）'),
+      find.widgetWithText(OutlinedButton, '保存默认（2人 / ¥380）'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('search filter can be cleared from the quick entry field', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_FakeSettingsNotifier.new),
+          studentProvider.overrideWith(_FakeStudentNotifier.new),
+          classTemplateProvider.overrideWith(_FakeClassTemplateNotifier.new),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: const Scaffold(body: QuickEntrySheet()),
+        ),
+      ),
+    );
+    await _settleUi(tester);
+
+    final searchField = find.byType(TextField);
+    await tester.enterText(searchField, 'Alice');
+    await tester.pump();
+
+    expect(find.text('Alice'), findsWidgets);
+    expect(find.text('Bob'), findsNothing);
+    expect(find.byTooltip('\u6e05\u7a7a\u641c\u7d22'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('\u6e05\u7a7a\u641c\u7d22'));
+    await tester.pump();
+
+    final editableText = tester.widget<EditableText>(find.byType(EditableText));
+    expect(editableText.controller.text, isEmpty);
+    expect(find.text('Bob'), findsOneWidget);
   });
 
   testWidgets('date and time pickers expose selector semantics', (
@@ -282,7 +318,7 @@ void main() {
     expect(find.text('发现时段冲突'), findsOneWidget);
     expect(find.textContaining('已有记录：18:00-19:30'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, '覆盖并保存'));
+    await tester.tap(find.widgetWithText(FilledButton, '覆盖保存'));
     await _settleUi(tester);
 
     expect(fakeDao.savedConflictIds, {'student-1': 'attendance-old'});
@@ -348,7 +384,7 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, '确认保存'));
     await _settleUi(tester);
 
-    await tester.tap(find.widgetWithText(OutlinedButton, '返回改时间'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '改时间'));
     await _settleUi(tester);
 
     expect(fakeDao.savedRecords, isEmpty);

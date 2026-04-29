@@ -23,7 +23,7 @@ class SettingsTeacherProfileSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SettingsSectionBlock(
       title: '教师资料',
-      subtitle: '影响首页抬头、导出报告与对外展示的基础信息。',
+      subtitle: '首页与报告抬头。',
       child: GlassCard(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
@@ -74,7 +74,7 @@ class SettingsAssetsTemplatesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SettingsSectionBlock(
       title: '资料与模板',
-      subtitle: '维护备份、课堂模板、签名和印章等常用资产。',
+      subtitle: '备份、模板、签名、印章。',
       child: GlassCard(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
@@ -90,14 +90,14 @@ class SettingsAssetsTemplatesSection extends StatelessWidget {
             SettingsTile(
               icon: Icons.view_quilt_outlined,
               title: '课堂模板',
-              subtitle: '管理常用课程模板和上课时段',
+              subtitle: '常用时段',
               onTap: onOpenTemplates,
             ),
             _tileDivider,
             SettingsTile(
               icon: Icons.draw_outlined,
               title: '签名管理',
-              subtitle: '维护导出报告中的签名图片',
+              subtitle: '报告签名',
               onTap: onOpenSignature,
             ),
             _tileDivider,
@@ -132,7 +132,7 @@ class SettingsExportCommunicationSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SettingsSectionBlock(
       title: '导出与沟通',
-      subtitle: '决定 PDF 报告的默认效果，以及家长沟通文案的起点。',
+      subtitle: '报告默认项。',
       child: GlassCard(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
@@ -141,7 +141,7 @@ class SettingsExportCommunicationSection extends StatelessWidget {
               value: watermarkEnabled,
               icon: Icons.water_drop_outlined,
               title: '默认启用 PDF 水印',
-              subtitle: '导出报告时自动附加印章与标识',
+              subtitle: '自动附加标识',
               onChanged: onWatermarkChanged,
             ),
             _tileDivider,
@@ -178,14 +178,14 @@ class SettingsReminderStrategySection extends StatelessWidget {
             SettingsTile(
               icon: Icons.notifications_active_outlined,
               title: '恢复已忽略提醒',
-              subtitle: '清空已忽略的经营提醒，欠费、续费、流失和进步提醒会重新计算。',
+              subtitle: '重新计算已忽略提醒。',
               onTap: onRestoreDismissedInsights,
             ),
             _tileDivider,
             const SettingsInfoTile(
               icon: Icons.info_outline,
-              title: '提醒恢复规则',
-              subtitle: '欠费/续费默认 3 天后恢复，流失/试听/高峰 7 天后恢复，进步提醒 14 天后恢复。',
+              title: '恢复规则',
+              subtitle: '欠费/续费 3 天，流失/试听/高峰 7 天，进步 14 天。',
             ),
           ],
         ),
@@ -212,7 +212,7 @@ class SettingsImmersiveFeedbackSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SettingsSectionBlock(
       title: '沉浸反馈',
-      subtitle: '让翻页、保存与导出在视觉之外，也保留一点纸墨手感。',
+      subtitle: '保存与切换反馈。',
       child: GlassCard(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
@@ -221,7 +221,7 @@ class SettingsImmersiveFeedbackSection extends StatelessWidget {
               value: hapticsEnabled,
               icon: Icons.vibration_outlined,
               title: '启用触感反馈',
-              subtitle: '保存、确认、时间滚轮和关键选择时给出轻微震动。',
+              subtitle: '关键操作轻震',
               onChanged: onHapticsChanged,
             ),
             _tileDivider,
@@ -229,7 +229,7 @@ class SettingsImmersiveFeedbackSection extends StatelessWidget {
               value: soundEnabled,
               icon: Icons.music_note_outlined,
               title: '启用轻音反馈',
-              subtitle: '页面切换与导出完成时播放极轻的系统提示音。',
+              subtitle: '导出完成提示音',
               onChanged: onSoundChanged,
             ),
           ],
@@ -253,7 +253,7 @@ class SettingsAiExtensionSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SettingsSectionBlock(
       title: 'AI 扩展',
-      subtitle: '预留视觉模型与远端能力配置，保持 UI 与远端网关解耦。',
+      subtitle: '模型与远端配置。',
       child: GlassCard(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
@@ -283,7 +283,7 @@ class SettingsImportToolsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SettingsSectionBlock(
       title: '导入工具',
-      subtitle: '批量录入前可先下载标准模板，减少字段缺失或顺序错误。',
+      subtitle: '学生名单模板。',
       child: GlassCard(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
@@ -291,7 +291,7 @@ class SettingsImportToolsSection extends StatelessWidget {
             SettingsTile(
               icon: Icons.download_outlined,
               title: '下载学生导入模板',
-              subtitle: '生成一个 Excel 模板，方便批量录入学生信息。',
+              subtitle: '生成 Excel 模板',
               onTap: onDownloadTemplate,
             ),
           ],
@@ -315,7 +315,7 @@ class SettingsDeveloperToolsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SettingsSectionBlock(
       title: '开发者工具',
-      subtitle: '用于本地演示、压测和初始化环境，操作前请确认风险。',
+      subtitle: '本地演示与压测。',
       child: GlassCard(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
@@ -323,14 +323,14 @@ class SettingsDeveloperToolsSection extends StatelessWidget {
             SettingsTile(
               icon: Icons.science_outlined,
               title: '生成测试数据',
-              subtitle: '插入 20 名学生与大量出勤记录，用于压力验证。',
+              subtitle: '20 名学生和出勤记录',
               onTap: onSeedTestData,
             ),
             _tileDivider,
             SettingsTile(
               icon: Icons.delete_forever_outlined,
               title: '清空全部数据',
-              subtitle: '删除学生、出勤、缴费和模板等所有本地记录。',
+              subtitle: '删除所有本地记录。',
               titleColor: kRed,
               iconColor: kRed,
               onTap: onClearAllData,

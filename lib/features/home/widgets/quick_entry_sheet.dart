@@ -219,11 +219,11 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
         .toList(growable: false);
   }
 
-  List<String> _selectedStudentNamesFrom(
+  List<String> _studentNamesFrom(
     List<StudentWithMeta> students,
     Map<String, String> displayNames,
   ) {
-    return _selectedStudentsFrom(students)
+    return students
         .map((item) => displayNames[item.student.id] ?? item.student.name)
         .toList(growable: false);
   }
@@ -422,13 +422,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     }
     final totalFee = _estimatedTotalFee(selectedStudents);
     final statusLabel = quickEntryStatusLabel(_status);
-    final selectedNames = _selectedStudentNamesFrom(
-      students,
+    final selectedNames = _studentNamesFrom(
+      selectedStudents,
       ref.read(studentDisplayNameMapProvider),
     );
     final confirmed = await AppToast.showConfirm(
       context,
-      '将直接记课：${_dateStr()} $_startTime-$_endTime，状态“$statusLabel”，共 ${selectedStudents.length} 人，预计扣费 ¥${_formatAmount(totalFee)}。\n学员：${_studentNamePreview(selectedNames)}\n是否继续？',
+      '按默认记课：${_dateStr()} $_startTime-$_endTime · $statusLabel · ${selectedStudents.length}人 · ¥${_formatAmount(totalFee)}\n${_studentNamePreview(selectedNames)}',
     );
     if (!confirmed) return;
     await _save();
@@ -484,7 +484,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      ['搜索并批量勾选本次需要记课的学员。', '设置日期、时间和出勤状态，确认后直接保存。'][_step],
+                      ['选择本次学员。', '确认时间与状态。'][_step],
                       style: theme.textTheme.bodySmall,
                       textAlign: TextAlign.center,
                     ),
@@ -512,7 +512,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                   ),
                 ),
               ),
-              Expanded(child: [_buildStep0(controller), _buildStep1()][_step]),
+              Expanded(
+                child: _step == 0 ? _buildStep0(controller) : _buildStep1(),
+              ),
             ],
           ),
         ),
@@ -554,16 +556,21 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     final canContinue =
         !studentsLoading && !studentsLoadFailed && selectedStudents.isNotEmpty;
     final emptyMessage = students.isEmpty
-        ? '还没有学生档案，先新增或导入学生，之后就能直接记课。'
+        ? '先新增或导入学生。'
         : _searchQuery.isEmpty
-        ? '当前没有可记课的学员，可切换“显示休学”或先新增学生。'
-        : '没有找到符合条件的学员。';
+        ? '没有可记课学员。'
+        : '没有匹配学员。';
     final showStudentActions = students.isEmpty || _searchQuery.isEmpty;
 
     return Column(
       children: [
         QuickEntryStudentFilterBar(
+          searchQuery: _searchQuery,
           onSearchChanged: (value) => setState(() => _searchQuery = value),
+          onClearSearch: () {
+            if (_searchQuery.isEmpty) return;
+            setState(() => _searchQuery = '');
+          },
           allFilteredSelected: allFilteredSelected,
           onToggleAllFiltered: filtered.isEmpty
               ? null
@@ -606,7 +613,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
                 border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.12)),
               ),
               child: Text(
-                '当前默认：$_startTime-$_endTime / ${quickEntryStatusLabel(_status)}，可直接用“按当前默认直接保存”。',
+                '默认：$_startTime-$_endTime / ${quickEntryStatusLabel(_status)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: kPrimaryBlue,
                   height: 1.45,
@@ -670,7 +677,11 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
     final templates = ref.watch(classTemplateProvider).valueOrNull ?? [];
     final students = ref.watch(studentProvider).valueOrNull ?? const [];
     final displayNames = ref.watch(studentDisplayNameMapProvider);
-    final selectedNames = _selectedStudentNamesFrom(students, displayNames);
+    final selectedStudents = _selectedStudentsFrom(students);
+    final selectedNames = _studentNamesFrom(selectedStudents, displayNames);
+    final estimatedTotalFeeLabel = _formatAmount(
+      _estimatedTotalFee(selectedStudents),
+    );
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -814,8 +825,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> {
           statusLabel: quickEntryStatusLabel(_status),
           statusColor: statusColor(_status),
           selectedCount: _selectedIds.length,
-          estimatedFeeLabel:
-              '\u9884\u8ba1 \u00a5${_formatAmount(_estimatedTotalFee(_selectedStudentsFrom(ref.read(studentProvider).valueOrNull ?? [])))}',
+          estimatedFeeLabel: '\u9884\u8ba1 \u00a5$estimatedTotalFeeLabel',
         ),
         const SizedBox(height: 24),
         LayoutBuilder(

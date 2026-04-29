@@ -340,9 +340,7 @@ class _StudentListToolbar extends StatelessWidget {
             controller: searchController,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
-              hintText: '搜索姓名、家长姓名或电话',
-              helperText: '支持姓名、家长姓名、手机号关键词',
-              helperMaxLines: 2,
+              hintText: '姓名、家长或电话',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: query.text.isEmpty
                   ? null

@@ -334,14 +334,16 @@ class AttendanceDao {
   Future<List<Attendance>> getByDateRangeAndStatus(
     String from,
     String to,
-    String status,
-  ) async {
+    String status, {
+    int? limit,
+  }) async {
     final db = await _db.database;
     final rows = await db.query(
       'attendance',
       where: 'date >= ? AND date <= ? AND status = ?',
       whereArgs: [from, to, status],
-      orderBy: 'date DESC',
+      orderBy: 'date DESC, start_time DESC, created_at DESC',
+      limit: limit,
     );
     return rows.map(Attendance.fromMap).toList();
   }

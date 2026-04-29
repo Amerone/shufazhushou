@@ -120,7 +120,7 @@ class _AttendanceListState extends ConsumerState<AttendanceList> {
               ),
               const SizedBox(height: 8),
               Text(
-                '记完后，这里会直接出现当天出勤名单。',
+                '保存后显示当天名单。',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall,
               ),

@@ -240,7 +240,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     if (_deletingPaymentIds.contains(payment.id)) return;
     final ok = await AppToast.showConfirm(
       context,
-      '确认删除这笔缴费记录吗？金额为 ¥${payment.amount.toStringAsFixed(2)}。',
+      '删除这笔 ¥${payment.amount.toStringAsFixed(2)} 缴费？',
     );
     if (!ok || !mounted) return;
 
@@ -252,10 +252,10 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       if (!mounted) return;
       await InteractionFeedback.seal(context);
       if (!mounted) return;
-      AppToast.showSuccess(context, '缴费记录已删除');
+      AppToast.showSuccess(context, '缴费已删除');
     } catch (error) {
       if (!mounted) return;
-      AppToast.showError(context, '删除缴费记录失败：${_formatError(error)}');
+      AppToast.showError(context, '删除失败：${_formatError(error)}');
     } finally {
       if (mounted) {
         setState(() => _deletingPaymentIds.remove(payment.id));
@@ -398,11 +398,11 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
           padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
           child: Semantics(
             button: true,
-            label: '返回学员详情页顶部',
+            label: '返回顶部',
             child: FloatingActionButton.small(
               heroTag: 'student-detail-scroll-top',
               onPressed: _scrollToTop,
-              tooltip: '\u56de\u5230\u9876\u90e8',
+              tooltip: '返回顶部',
               backgroundColor: Colors.white.withValues(alpha: 0.92),
               foregroundColor: kPrimaryBlue,
               elevation: 0,
@@ -460,7 +460,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       const SizedBox(height: 10),
                       StudentDetailRefreshErrorCard(
                         title: '账本刷新失败',
-                        message: '当前费用概览和沟通摘要可能是上次加载的数据。',
+                        message: '费用概览可能是旧数据。',
                         errorText: _formatError(allTimeFeeAsync.error!),
                         retryLabel: '重试账本',
                         onRetry: () => unawaited(_retryAllTimeFee()),
@@ -576,7 +576,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     else if (allTimeFeeAsync.hasError)
                       StudentDetailRefreshErrorCard(
                         title: '学员账本加载失败',
-                        message: '无法刷新学员账本，当前页面的费用信息可能不完整。',
+                        message: '费用信息可能不完整。',
                         errorText: _formatError(allTimeFeeAsync.error!),
                         retryLabel: '重试账本',
                         onRetry: () => unawaited(_retryAllTimeFee()),
@@ -605,8 +605,8 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             StudentDetailRefreshErrorCard(
                               title: '缴费记录刷新失败',
                               message: payments.isEmpty
-                                  ? '暂时无法加载缴费记录，当前页面可能只显示旧数据。'
-                                  : '当前缴费记录可能是上次加载的数据。',
+                                  ? '暂时无法加载缴费记录。'
+                                  : '缴费记录可能是旧数据。',
                               errorText: _formatError(paymentsAsync.error!),
                               retryLabel: '重试缴费',
                               onRetry: () => unawaited(_retryPayments()),
@@ -627,8 +627,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             GlassCard(
                               padding: const EdgeInsets.all(18),
                               child: EmptyState(
-                                message:
-                                    '\u6682\u65f6\u8fd8\u6ca1\u6709\u7f34\u8d39\u8bb0\u5f55\u3002',
+                                message: '\u6682\u65e0\u7f34\u8d39\u8bb0\u5f55',
                                 actionLabel: '\u65b0\u589e\u7f34\u8d39',
                                 onAction: () => _openPaymentSheet(student),
                               ),
@@ -660,7 +659,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                           StudentDetailSectionHeader(
                             title: '\u51fa\u52e4\u8bb0\u5f55',
                             subtitle:
-                                '\u70b9\u51fb\u8bb0\u5f55\u53ef\u7f16\u8f91\u51fa\u52e4\u72b6\u6001\u3001\u5907\u6ce8\u548c\u8bfe\u5802\u53cd\u9988\u3002',
+                                '\u70b9\u8bb0\u5f55\u53ef\u7f16\u8f91\u3002',
                             trailing: attendanceCountLabel,
                           ),
                           const SizedBox(height: 10),
@@ -677,8 +676,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                             GlassCard(
                               padding: const EdgeInsets.all(18),
                               child: EmptyState(
-                                message:
-                                    '\u6682\u65f6\u8fd8\u6ca1\u6709\u51fa\u52e4\u8bb0\u5f55\u3002',
+                                message: '\u6682\u65e0\u51fa\u52e4\u8bb0\u5f55',
                                 actionLabel: '\u53bb\u9996\u9875\u8bb0\u8bfe',
                                 onAction: () => context.go('/'),
                               ),
@@ -728,9 +726,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                     color: kOrange,
                                   ),
                                   const SizedBox(width: 8),
-                                  const Expanded(
-                                    child: Text('更多出勤记录加载失败，可稍后重试。'),
-                                  ),
+                                  const Expanded(child: Text('更多记录加载失败。')),
                                   TextButton(
                                     onPressed: _reloadAttendanceRecords,
                                     child: const Text('重试'),

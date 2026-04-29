@@ -34,7 +34,7 @@ void main() {
     await _pumpScreen(tester);
 
     expect(find.text('配置完成度'), findsOneWidget);
-    expect(find.text('4/4 项已就绪'), findsOneWidget);
+    expect(find.text('4/4'), findsOneWidget);
     expect(find.byIcon(Icons.backup_outlined), findsWidgets);
     expect(find.byIcon(Icons.draw_outlined), findsWidgets);
     expect(find.byIcon(Icons.view_quilt_outlined), findsWidgets);

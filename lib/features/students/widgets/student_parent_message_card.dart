@@ -84,10 +84,7 @@ class _StudentParentMessageCardState extends State<StudentParentMessageCard> {
           children: [
             Text('家长沟通话术', style: theme.textTheme.titleMedium),
             const SizedBox(height: 6),
-            Text(
-              '暂时还没有可用话术，请先补充课堂记录或生成 AI 洞察。',
-              style: theme.textTheme.bodySmall,
-            ),
+            Text('先补课堂记录，再生成可发话术。', style: theme.textTheme.bodySmall),
           ],
         ),
       );
@@ -134,7 +131,7 @@ class _StudentParentMessageCardState extends State<StudentParentMessageCard> {
           ),
           const SizedBox(height: 6),
           Text(
-            '把课堂观察拆成多个常用沟通场景，老师按当前目的直接复制，不需要每次重新改口径。',
+            '按场景复制给家长。',
             style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
           ),
           const SizedBox(height: 14),
@@ -188,15 +185,15 @@ class _StudentParentMessageCardState extends State<StudentParentMessageCard> {
                   children: [
                     FilledButton.icon(
                       onPressed: () =>
-                          _copyText(recommendedTemplate.fullText, '推荐微信整段已复制'),
+                          _copyText(recommendedTemplate.fullText, '推荐话术已复制'),
                       icon: const Icon(Icons.copy_all_outlined, size: 18),
-                      label: const Text('复制推荐微信整段'),
+                      label: const Text('复制推荐'),
                     ),
                     OutlinedButton.icon(
                       onPressed: () =>
-                          _copyText(recommendedTemplate.shortText, '推荐短信短版已复制'),
+                          _copyText(recommendedTemplate.shortText, '短信已复制'),
                       icon: const Icon(Icons.textsms_outlined, size: 18),
-                      label: const Text('复制推荐短信'),
+                      label: const Text('复制短信'),
                     ),
                     if (showRecommendedPaymentShortcut)
                       OutlinedButton.icon(
@@ -268,14 +265,14 @@ class _StudentParentMessageCardState extends State<StudentParentMessageCard> {
           const SizedBox(height: 12),
           _MessagePanel(
             title: '短信短版',
-            hint: '适合快速提醒或当面转述',
+            hint: '快速提醒',
             color: kPrimaryBlue,
             content: selectedTemplate.shortText,
           ),
           const SizedBox(height: 10),
           _MessagePanel(
-            title: '微信整段版',
-            hint: '适合直接复制发送给家长',
+            title: '微信整段',
+            hint: '直接发送',
             color: kGreen,
             content: selectedTemplate.fullText,
           ),
@@ -288,18 +285,18 @@ class _StudentParentMessageCardState extends State<StudentParentMessageCard> {
                 width: 170,
                 child: FilledButton.tonalIcon(
                   onPressed: () =>
-                      _copyText(selectedTemplate.shortText, '短信短版已复制'),
+                      _copyText(selectedTemplate.shortText, '短信已复制'),
                   icon: const Icon(Icons.textsms_outlined, size: 18),
-                  label: const Text('复制短信短版'),
+                  label: const Text('复制短信'),
                 ),
               ),
               SizedBox(
                 width: 170,
                 child: FilledButton.icon(
                   onPressed: () =>
-                      _copyText(selectedTemplate.fullText, '微信整段已复制，可直接发给家长'),
+                      _copyText(selectedTemplate.fullText, '微信话术已复制'),
                   icon: const Icon(Icons.copy_all_outlined, size: 18),
-                  label: const Text('复制微信整段'),
+                  label: const Text('复制微信'),
                 ),
               ),
               if (showPaymentShortcut)

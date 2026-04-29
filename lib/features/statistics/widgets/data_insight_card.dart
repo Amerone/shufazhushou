@@ -72,10 +72,7 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
   Future<void> _runAnalysis() async {
     final service = ref.read(dataInsightServiceProvider);
     if (service == null) {
-      AppToast.showError(
-        context,
-        '\u8bf7\u5148\u5728\u8bbe\u7f6e\u4e2d\u5b8c\u6210 AI \u914d\u7f6e\u3002',
-      );
+      AppToast.showError(context, '\u5148\u914d\u7f6e AI\u3002');
       return;
     }
 
@@ -292,7 +289,7 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '\u57fa\u4e8e\u5f53\u524d\u7edf\u8ba1\u5468\u671f\u7684\u6d3b\u8dc3\u5ea6\u3001\u8425\u6536\u4e0e\u63d0\u9192\u751f\u6210\u7ecf\u8425\u5206\u6790\u3002',
+                          '\u6c47\u603b\u5f53\u524d\u5468\u671f\u7684\u7ecf\u8425\u6570\u636e\u3002',
                           style: theme.textTheme.bodySmall?.copyWith(
                             height: 1.45,
                           ),
@@ -314,7 +311,7 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
                 ? '\u0041\u0049 \u7ecf\u8425\u6d1e\u5bdf\u5206\u6790\u4e2d'
                 : service == null
                 ? '\u5148\u5b8c\u6210 \u0041\u0049 \u914d\u7f6e'
-                : '\u83b7\u53d6\u6570\u636e\u6d1e\u5bdf',
+                : '\u751f\u6210\u6570\u636e\u6d1e\u5bdf',
             onTap: canRun ? _runAnalysis : null,
             child: ExcludeSemantics(
               child: SizedBox(
@@ -333,7 +330,7 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
                         ? '\u5206\u6790\u4e2d...'
                         : service == null
                         ? '\u5148\u5b8c\u6210 AI \u914d\u7f6e'
-                        : '\u83b7\u53d6\u6570\u636e\u6d1e\u5bdf',
+                        : '\u751f\u6210\u6570\u636e\u6d1e\u5bdf',
                   ),
                 ),
               ),
@@ -342,7 +339,7 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
           if (service == null) ...[
             const SizedBox(height: 10),
             Text(
-              '\u672a\u914d\u7f6e\u65f6\u4e0d\u4f1a\u53d1\u8d77 AI \u8bf7\u6c42\uff0c\u8bf7\u5148\u5728\u8bbe\u7f6e\u9875\u5b8c\u6210 AI \u914d\u7f6e\u3002',
+              '\u672a\u914d\u7f6e\uff0c\u4e0d\u4f1a\u53d1\u8d77 AI \u8bf7\u6c42\u3002',
               style: theme.textTheme.bodySmall?.copyWith(color: kOrange),
             ),
             const SizedBox(height: 8),
@@ -351,7 +348,7 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
               child: TextButton.icon(
                 onPressed: () => context.push('/settings/ai'),
                 icon: const Icon(Icons.settings_outlined, size: 18),
-                label: const Text('\u53bb\u914d\u7f6e AI'),
+                label: const Text('\u914d\u7f6e AI'),
               ),
             ),
           ],
@@ -368,28 +365,25 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
             const SizedBox(height: 12),
             if (_analyzedAt != null)
               Text(
-                '\u751f\u6210\u65f6\u95f4\uff1a${_formatTime(_analyzedAt!)}',
+                '\u751f\u6210\uff1a${_formatTime(_analyzedAt!)}',
                 style: theme.textTheme.bodySmall,
               ),
             const SizedBox(height: 10),
-            _InsightBlock(
-              title: '\u7ecf\u8425\u6982\u51b5',
-              content: result.summary,
-            ),
+            _InsightBlock(title: '\u6982\u51b5', content: result.summary),
             const SizedBox(height: 10),
             _InsightBlock(
-              title: '\u8425\u6536\u6d1e\u5bdf',
+              title: '\u8425\u6536',
               content: result.revenueInsight,
             ),
             const SizedBox(height: 10),
             _InsightBlock(
-              title: '\u6d3b\u8dc3\u5ea6\u5206\u6790',
+              title: '\u6d3b\u8dc3\u5ea6',
               content: result.engagementInsight,
             ),
             if (result.riskAlerts.isNotEmpty) ...[
               const SizedBox(height: 10),
               _ListBlock(
-                title: '\u98ce\u9669\u63d0\u9192',
+                title: '\u98ce\u9669',
                 items: result.riskAlerts,
                 color: kSealRed,
               ),
@@ -397,17 +391,14 @@ class _DataInsightCardState extends ConsumerState<DataInsightCard> {
             if (result.recommendations.isNotEmpty) ...[
               const SizedBox(height: 10),
               _ListBlock(
-                title: '\u7ecf\u8425\u5efa\u8bae',
+                title: '\u5efa\u8bae',
                 items: result.recommendations,
                 color: kGreen,
               ),
             ],
             if (!result.isStructured && result.rawText.trim().isNotEmpty) ...[
               const SizedBox(height: 10),
-              _InsightBlock(
-                title: '\u539f\u59cb\u7ed3\u679c',
-                content: result.rawText,
-              ),
+              _InsightBlock(title: '\u539f\u6587', content: result.rawText),
             ],
           ],
         ],
@@ -476,7 +467,7 @@ class _InsightBlock extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            text.isEmpty ? '\u6682\u65e0\u5185\u5bb9\u3002' : text,
+            text.isEmpty ? '\u6682\u65e0\u5185\u5bb9' : text,
             style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
           ),
         ],

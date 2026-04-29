@@ -48,12 +48,12 @@ class InsightList extends ConsumerWidget {
   };
 
   static const _typeHint = {
-    InsightType.debt: '优先核对欠费并提醒续费',
-    InsightType.renewal: '建议尽快确认续费时间',
-    InsightType.churn: '建议尽快回访，确认学习节奏',
-    InsightType.peak: '关注高峰时段，提前调整排课',
-    InsightType.trial: '尽快跟进试听反馈与转化',
-    InsightType.progress: '建议生成成长快照并同步家长',
+    InsightType.debt: '核对欠费',
+    InsightType.renewal: '确认续费',
+    InsightType.churn: '尽快回访',
+    InsightType.peak: '调整排课',
+    InsightType.trial: '跟进试听',
+    InsightType.progress: '同步进步',
   };
 
   Future<void> _handlePrimaryAction(
@@ -169,193 +169,231 @@ class InsightList extends ConsumerWidget {
           );
         }
 
-        return Column(
-          children: insights.map((insight) {
-            final color = _typeColor[insight.type] ?? kPrimaryBlue;
-            final icon =
-                _typeIcon[insight.type] ?? Icons.notifications_outlined;
-            final typeLabel = _typeLabel[insight.type] ?? '经营提醒';
-            final title = insight.studentName.isEmpty
-                ? typeLabel
-                : insight.studentName;
-            final snoozeDays = DismissedInsightPolicy.retentionForInsight(
-              insight.type,
-            ).inDays;
-
-            return RepaintBoundary(
-              child: Container(
-                margin: EdgeInsets.only(
-                  bottom: insight == insights.last ? 0 : 10,
-                ),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.56),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: color.withValues(alpha: 0.14)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(icon, color: color, size: 20),
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: insights.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
+          itemBuilder: (context, index) {
+            final insight = insights[index];
+            return _InsightCard(
+              insight: insight,
+              typeLabel: _typeLabel[insight.type] ?? '经营提醒',
+              typeHint: _typeHint[insight.type] ?? '尽快处理',
+              icon: _typeIcon[insight.type] ?? Icons.notifications_outlined,
+              color: _typeColor[insight.type] ?? kPrimaryBlue,
+              primaryLabel: _primaryLabelFor(insight),
+              onPrimaryTap: insight.studentId == null
+                  ? null
+                  : () => _handlePrimaryAction(context, insight),
+              onDismissTap: () async {
+                final dismissedDao = ref.read(dismissedInsightDaoProvider);
+                final insightType = insight.type.name;
+                final typeLabel = _typeLabel[insight.type] ?? '经营提醒';
+                final snoozeDays = DismissedInsightPolicy.retentionForInsight(
+                  insight.type,
+                ).inDays;
+                await dismissedDao.insert(
+                  DismissedInsight(
+                    id: const Uuid().v4(),
+                    insightType: insightType,
+                    studentId: insight.studentId,
+                    dismissedAt: DateTime.now().millisecondsSinceEpoch,
+                  ),
+                );
+                if (context.mounted) {
+                  AppToast.showSuccessWithAction(
+                    context,
+                    '$typeLabel已暂停 $snoozeDays 天',
+                    actionLabel: '撤销',
+                    onAction: () {
+                      unawaited(
+                        _restoreDismissedInsight(
+                          context,
+                          ref,
+                          insightType,
+                          insight.studentId,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  _InsightMetaChip(
-                                    icon: icon,
-                                    label: typeLabel,
-                                    color: color,
-                                  ),
-                                  _InsightMetaChip(
-                                    icon: Icons.flag_outlined,
-                                    label: _typeHint[insight.type] ?? '建议尽快处理',
-                                    color: kPrimaryBlue,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                insight.message,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  height: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: kPrimaryBlue.withValues(alpha: 0.06),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(
-                                      Icons.lightbulb_outline,
-                                      size: 16,
-                                      color: kPrimaryBlue,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        insight.suggestion,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              color: kInkSecondary,
-                                              height: 1.4,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '计算逻辑：${insight.calcLogic}',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: kInkSecondary,
-                                  height: 1.35,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  _InsightMetaChip(
-                                    icon: Icons.update_outlined,
-                                    label: '数据截至 ${insight.dataFreshness}',
-                                    color: kInkSecondary,
-                                  ),
-                                  _InsightMetaChip(
-                                    icon: Icons.visibility_off_outlined,
-                                    label: '$snoozeDays 天后自动恢复',
-                                    color: kOrange,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    _InsightActions(
-                      primaryLabel: _primaryLabelFor(insight),
-                      onPrimaryTap: insight.studentId == null
-                          ? null
-                          : () => _handlePrimaryAction(context, insight),
-                      onDismissTap: () async {
-                        final dismissedDao = ref.read(
-                          dismissedInsightDaoProvider,
-                        );
-                        final insightType = insight.type.name;
-                        await dismissedDao.insert(
-                          DismissedInsight(
-                            id: const Uuid().v4(),
-                            insightType: insightType,
-                            studentId: insight.studentId,
-                            dismissedAt: DateTime.now().millisecondsSinceEpoch,
-                          ),
-                        );
-                        if (context.mounted) {
-                          AppToast.showSuccessWithAction(
-                            context,
-                            '$typeLabel已暂停 $snoozeDays 天',
-                            actionLabel: '撤销',
-                            onAction: () {
-                              unawaited(
-                                _restoreDismissedInsight(
-                                  context,
-                                  ref,
-                                  insightType,
-                                  insight.studentId,
-                                ),
-                              );
-                            },
-                          );
-                        }
-                        ref.invalidate(insightProvider);
-                        ref.invalidate(homeWorkbenchProvider);
-                      },
-                      snoozeLabel: '稍后 $snoozeDays 天提醒',
-                    ),
-                  ],
-                ),
-              ),
+                      );
+                    },
+                  );
+                }
+                ref.invalidate(insightProvider);
+                ref.invalidate(homeWorkbenchProvider);
+              },
             );
-          }).toList(),
+          },
         );
       },
+    );
+  }
+}
+
+class _InsightCard extends StatelessWidget {
+  final Insight insight;
+  final String typeLabel;
+  final String typeHint;
+  final IconData icon;
+  final Color color;
+  final String? primaryLabel;
+  final VoidCallback? onPrimaryTap;
+  final VoidCallback onDismissTap;
+
+  const _InsightCard({
+    required this.insight,
+    required this.typeLabel,
+    required this.typeHint,
+    required this.icon,
+    required this.color,
+    required this.primaryLabel,
+    required this.onPrimaryTap,
+    required this.onDismissTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final title = insight.studentName.isEmpty ? typeLabel : insight.studentName;
+    final snoozeDays = DismissedInsightPolicy.retentionForInsight(
+      insight.type,
+    ).inDays;
+
+    return RepaintBoundary(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.56),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: color.withValues(alpha: 0.14)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _InsightMetaChip(
+                            icon: icon,
+                            label: typeLabel,
+                            color: color,
+                          ),
+                          _InsightMetaChip(
+                            icon: Icons.flag_outlined,
+                            label: typeHint,
+                            color: kPrimaryBlue,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        insight.message,
+                        style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
+                      ),
+                      const SizedBox(height: 8),
+                      _InsightSuggestion(text: insight.suggestion),
+                      const SizedBox(height: 8),
+                      Text(
+                        '依据：${insight.calcLogic}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: kInkSecondary,
+                          height: 1.35,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _InsightMetaChip(
+                            icon: Icons.update_outlined,
+                            label: '截至 ${insight.dataFreshness}',
+                            color: kInkSecondary,
+                          ),
+                          _InsightMetaChip(
+                            icon: Icons.visibility_off_outlined,
+                            label: '$snoozeDays 天后恢复',
+                            color: kOrange,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _InsightActions(
+              primaryLabel: primaryLabel,
+              onPrimaryTap: onPrimaryTap,
+              onDismissTap: onDismissTap,
+              snoozeLabel: '$snoozeDays 天后提醒',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InsightSuggestion extends StatelessWidget {
+  final String text;
+
+  const _InsightSuggestion({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: kPrimaryBlue.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.lightbulb_outline, size: 16, color: kPrimaryBlue),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: kInkSecondary,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

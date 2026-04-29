@@ -31,10 +31,7 @@ class BackupRecentRecordsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const BackupSectionHeader(
-            title: '最近备份',
-            subtitle: '即使你上次没有保存到外部文件，也可以直接在这里重新生成加密分享文件，或恢复应用内副本。',
-          ),
+          const BackupSectionHeader(title: '最近备份', subtitle: '可加密分享或恢复。'),
           const SizedBox(height: 14),
           if (connectionState == ConnectionState.waiting && backups.isEmpty)
             const Center(
@@ -55,7 +52,7 @@ class BackupRecentRecordsSection extends StatelessWidget {
                 ),
               ),
               child: Text(
-                '还没有应用内备份，先生成一份。',
+                '暂无应用内备份。',
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(height: 1.5),
@@ -97,7 +94,7 @@ class BackupRestoreAction extends StatelessWidget {
         child: OutlinedButton.icon(
           onPressed: onRestore,
           icon: const Icon(Icons.restore_outlined),
-          label: const Text('恢复此备份'),
+          label: const Text('恢复'),
         ),
       ),
     );

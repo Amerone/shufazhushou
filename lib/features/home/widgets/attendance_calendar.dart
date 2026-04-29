@@ -61,7 +61,7 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '点击日期查看当天课堂记录。',
+                      '点日期看记录。',
                       style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
                     ),
                   ],
@@ -99,7 +99,7 @@ class _AttendanceCalendarState extends ConsumerState<AttendanceCalendar> {
           ),
           const SizedBox(height: 14),
           Semantics(
-            label: '出勤月历，选择日期查看当天课堂记录',
+            label: '出勤月历，点日期查看记录',
             child: RepaintBoundary(
               child: TableCalendar(
                 locale: 'zh_CN',

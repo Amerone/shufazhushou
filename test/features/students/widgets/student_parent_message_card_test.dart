@@ -93,11 +93,11 @@ void main() {
 
     expect(find.text('家长沟通话术'), findsOneWidget);
     expect(find.text('当前建议'), findsOneWidget);
-    expect(find.text('复制推荐微信整段'), findsOneWidget);
-    expect(find.text('复制推荐短信'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '复制推荐'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '复制短信'), findsOneWidget);
     expect(find.text('去记录缴费'), findsWidgets);
 
-    await tester.tap(find.text('复制推荐微信整段'));
+    await tester.tap(find.widgetWithText(FilledButton, '复制推荐'));
     await tester.pumpAndSettle();
     expect(copiedTexts.last, '家长您好，和您同步一下孩子最近的课堂情况，也顺手确认一下后续课次安排。');
 
@@ -105,7 +105,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('练习起收笔和中宫'), findsOneWidget);
 
-    final copyShortButton = find.widgetWithText(FilledButton, '复制短信短版');
+    final copyShortButton = find.widgetWithText(FilledButton, '复制短信');
     final copyShort = tester.widget<FilledButton>(copyShortButton);
     copyShort.onPressed!.call();
     await tester.pumpAndSettle();

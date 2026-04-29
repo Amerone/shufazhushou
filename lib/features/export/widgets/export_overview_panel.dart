@@ -83,10 +83,7 @@ class ExportOverviewPanel extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          '确认导出对象、日期范围与寄语后，再进行预览或分享。',
-                          style: theme.textTheme.bodySmall,
-                        ),
+                        Text('检查对象、范围与寄语。', style: theme.textTheme.bodySmall),
                       ],
                     ),
                   ),

@@ -80,13 +80,13 @@ class SettingsOverviewPanel extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '当前配置概览',
+                          '配置状态',
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '先看关键状态，再进入对应分区调整教师资料、模板和备份。',
+                          '先处理影响导出和备份的项。',
                           style: Theme.of(
                             context,
                           ).textTheme.bodySmall?.copyWith(height: 1.45),
@@ -195,7 +195,7 @@ class SettingsOverviewPanel extends StatelessWidget {
                     ),
                     const Spacer(),
                     Text(
-                      '$setupReadyCount/4 项已就绪',
+                      '$setupReadyCount/4',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: kPrimaryBlue,
                         fontWeight: FontWeight.w700,
@@ -221,10 +221,7 @@ class SettingsOverviewPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const SettingsSectionTitle(
-            title: '常用入口',
-            subtitle: '把最常打开的设置集中放在顶部，减少来回查找。',
-          ),
+          const SettingsSectionTitle(title: '常用入口', subtitle: '高频设置。'),
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -244,7 +241,7 @@ class SettingsOverviewPanel extends StatelessWidget {
                     width: itemWidth,
                     child: SettingsShortcutCard(
                       icon: Icons.backup_outlined,
-                      title: '数据备份',
+                      title: '备份',
                       subtitle: isBackupOverdue ? '建议更新' : '查看记录',
                       color: isBackupOverdue ? kOrange : kPrimaryBlue,
                       onTap: onOpenBackup,
@@ -254,7 +251,7 @@ class SettingsOverviewPanel extends StatelessWidget {
                     width: itemWidth,
                     child: SettingsShortcutCard(
                       icon: Icons.draw_outlined,
-                      title: '签名管理',
+                      title: '签名',
                       subtitle: hasSignature ? '已配置' : '待上传',
                       color: hasSignature ? kGreen : kSealRed,
                       onTap: onOpenSignature,
@@ -264,8 +261,8 @@ class SettingsOverviewPanel extends StatelessWidget {
                     width: itemWidth,
                     child: SettingsShortcutCard(
                       icon: Icons.view_quilt_outlined,
-                      title: '课堂模板',
-                      subtitle: '时段与课程',
+                      title: '模板',
+                      subtitle: '时段',
                       color: kPrimaryBlue,
                       onTap: onOpenTemplates,
                     ),
@@ -274,7 +271,7 @@ class SettingsOverviewPanel extends StatelessWidget {
                     width: itemWidth,
                     child: SettingsShortcutCard(
                       icon: Icons.approval_outlined,
-                      title: '印章样式',
+                      title: '印章',
                       subtitle: hasSeal ? '已设置' : '待配置',
                       color: kSealRed,
                       onTap: onOpenSeal,
@@ -284,7 +281,7 @@ class SettingsOverviewPanel extends StatelessWidget {
                     width: itemWidth,
                     child: SettingsShortcutCard(
                       icon: Icons.psychology_alt_outlined,
-                      title: 'AI 视觉',
+                      title: 'AI',
                       subtitle: hasAiConfig ? 'Qwen 已配置' : '待接入',
                       color: hasAiConfig ? kGreen : kPrimaryBlue,
                       onTap: onOpenAi,

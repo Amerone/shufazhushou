@@ -52,8 +52,8 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '缴费'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '出勤'), findsOneWidget);
     expect(find.text('学员账本加载失败'), findsOneWidget);
+    expect(find.text('费用信息可能不完整。'), findsOneWidget);
     expect(find.text('重试账本'), findsOneWidget);
-    expect(find.textContaining('可能'), findsAtLeastNWidgets(1));
 
     final ledgerCalls = paymentDao.allTimeSummaryCalls;
     await tester.tap(find.widgetWithText(TextButton, '重试账本'));
@@ -69,7 +69,7 @@ void main() {
 
     expect(find.text('缴费记录刷新失败'), findsOneWidget);
     expect(find.text('重试缴费'), findsOneWidget);
-    expect(find.textContaining('可能'), findsWidgets);
+    expect(find.text('暂时无法加载缴费记录。'), findsOneWidget);
 
     final paymentCalls = paymentDao.paymentListCalls;
     await tester.tap(find.widgetWithText(TextButton, '重试缴费'));

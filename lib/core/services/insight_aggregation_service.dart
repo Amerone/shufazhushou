@@ -93,8 +93,8 @@ class InsightAggregationService {
             studentId: student.id,
             studentName: studentName,
             message: '欠费 ¥${ledger.balance.abs().toStringAsFixed(2)}',
-            suggestion: '建议优先核对账单，并尽快联系家长确认补缴或续费安排。',
-            calcLogic: '累计余额 = 累计已收 - 累计应收；当余额小于 0 时触发欠费提醒。',
+            suggestion: '核对账单，联系家长补缴。',
+            calcLogic: '余额小于 0',
             dataFreshness: dataFreshness,
           ),
         );
@@ -112,9 +112,9 @@ class InsightAggregationService {
             studentId: student.id,
             studentName: studentName,
             message: '余额 ¥${ledger.balance.toStringAsFixed(2)}，$lessonText',
-            suggestion: '建议本周内发起续费沟通，并同步下一阶段课程安排建议。',
+            suggestion: '确认续费与下阶段排课。',
             calcLogic:
-                '当余额小于 ¥${kBalanceAlertAmountThreshold.toStringAsFixed(0)} 或剩余课次少于 ${kBalanceAlertLessonThreshold.toStringAsFixed(1)} 节时触发。',
+                '余额 < ¥${kBalanceAlertAmountThreshold.toStringAsFixed(0)} 或课次 < ${kBalanceAlertLessonThreshold.toStringAsFixed(1)}',
             dataFreshness: dataFreshness,
           ),
         );
@@ -134,8 +134,8 @@ class InsightAggregationService {
                 studentId: student.id,
                 studentName: studentName,
                 message: '$inactiveDays 天未出勤',
-                suggestion: '建议尽快回访，确认近期学习节奏并安排补课或复习。',
-                calcLogic: '最近一次正式出勤距离当前超过 $kChurnDays 天时触发流失预警。',
+                suggestion: '回访并安排补课。',
+                calcLogic: '超过 $kChurnDays 天未正式出勤',
                 dataFreshness: dataFreshness,
               ),
             );
@@ -151,8 +151,8 @@ class InsightAggregationService {
               studentId: student.id,
               studentName: studentName,
               message: '已有试听记录，尚未转为正式课程',
-              suggestion: '建议在 7 天内完成试听复盘，并给出首月课包建议。',
-              calcLogic: '存在试听记录且暂时无正式出勤记录时触发试听转化提醒。',
+              suggestion: '跟进试听反馈。',
+              calcLogic: '有试听记录，暂无正式出勤',
               dataFreshness: dataFreshness,
             ),
           );
@@ -178,8 +178,8 @@ class InsightAggregationService {
           type: InsightType.peak,
           studentName: '',
           message: '$activePeriodLabel活跃学员较多（$activeStudentCount 人）',
-          suggestion: '建议提前预留高峰时段补课窗口，并确认近期排课余量。',
-          calcLogic: '$activePeriodLabel活跃学员数达到高峰阈值时触发提示。',
+          suggestion: '预留补课窗口。',
+          calcLogic: '$activePeriodLabel活跃学员达到高峰阈值',
           dataFreshness: _formatTimestamp(currentTime.millisecondsSinceEpoch),
         ),
       );
@@ -235,8 +235,8 @@ class InsightAggregationService {
       studentId: studentId,
       studentName: studentName,
       message: '近 3 次评分持续提升：${improvedDimensions.join('、')}',
-      suggestion: '建议生成成长快照并同步家长，延续当前训练节奏。',
-      calcLogic: '在最近 3 次有效评分记录中，至少一个维度连续递增时触发。',
+      suggestion: '生成月报，同步家长。',
+      calcLogic: '近 3 次评分连续提升',
       dataFreshness: _formatTimestamp(trendRecord.updatedAt),
     );
   }

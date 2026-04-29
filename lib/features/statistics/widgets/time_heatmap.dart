@@ -14,6 +14,8 @@ class TimeHeatmap extends ConsumerStatefulWidget {
 
 class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
   String? _tooltip;
+  List<Map<String, dynamic>>? _cachedHeatmapData;
+  _HeatmapSnapshot? _cachedHeatmapSnapshot;
 
   static const _hours = [
     6,
@@ -66,32 +68,19 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
       data: (data) {
         if (data.isEmpty) {
           return const EmptyState(
-            message:
-                '\u5f53\u524d\u5468\u671f\u6682\u65e0\u4e0a\u8bfe\u65f6\u6bb5\u6570\u636e',
+            message: '\u6682\u65e0\u65f6\u6bb5\u6570\u636e',
             icon: Icons.grid_view_outlined,
-            semanticLabel:
-                '\u5f53\u524d\u5468\u671f\u6682\u65e0\u4e0a\u8bfe\u65f6\u6bb5\u6570\u636e',
+            semanticLabel: '\u6682\u65e0\u65f6\u6bb5\u6570\u636e',
           );
         }
 
-        final map = <String, int>{};
-        var maxCount = 1;
-
-        for (final row in data) {
-          final wd = row['weekday'] as int;
-          final dayIdx = wd == 0 ? 6 : wd - 1;
-          final hour = row['hour'] as int;
-          final count = row['count'] as int;
-          map['$dayIdx-$hour'] = count;
-          if (count > maxCount) maxCount = count;
-        }
+        final snapshot = _snapshotFor(data);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _tooltip ??
-                  '\u70b9\u51fb\u4efb\u4e00\u8272\u5757\u53ef\u67e5\u770b\u5bf9\u5e94\u661f\u671f\u548c\u5c0f\u65f6\u7684\u4eba\u6b21\u5206\u5e03\u3002',
+              _tooltip ?? '\u70b9\u8272\u5757\u67e5\u770b\u4eba\u6b21\u3002',
               style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
             ),
             const SizedBox(height: 10),
@@ -144,10 +133,10 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
                             ),
                           ),
                           ..._hours.map((h) {
-                            final count = map['$dayIdx-$h'] ?? 0;
+                            final count = snapshot.count(dayIdx, h);
                             final opacity = count == 0
                                 ? 0.05
-                                : count / maxCount;
+                                : count / snapshot.maxCount;
                             final cellLabel =
                                 '\u5468${_days[dayIdx]} $h:00\uff0c$count \u4eba\u6b21';
                             void selectCell() {
@@ -201,6 +190,38 @@ class _TimeHeatmapState extends ConsumerState<TimeHeatmap> {
       },
     );
   }
+
+  _HeatmapSnapshot _snapshotFor(List<Map<String, dynamic>> data) {
+    final cached = _cachedHeatmapSnapshot;
+    if (identical(_cachedHeatmapData, data) && cached != null) {
+      return cached;
+    }
+
+    final counts = <String, int>{};
+    var maxCount = 1;
+    for (final row in data) {
+      final wd = row['weekday'] as int;
+      final dayIdx = wd == 0 ? 6 : wd - 1;
+      final hour = row['hour'] as int;
+      final count = row['count'] as int;
+      counts['$dayIdx-$hour'] = count;
+      if (count > maxCount) maxCount = count;
+    }
+
+    final snapshot = _HeatmapSnapshot(counts, maxCount);
+    _cachedHeatmapData = data;
+    _cachedHeatmapSnapshot = snapshot;
+    return snapshot;
+  }
+}
+
+class _HeatmapSnapshot {
+  final Map<String, int> counts;
+  final int maxCount;
+
+  const _HeatmapSnapshot(this.counts, this.maxCount);
+
+  int count(int dayIdx, int hour) => counts['$dayIdx-$hour'] ?? 0;
 }
 
 class _HeatLevelChip extends StatelessWidget {

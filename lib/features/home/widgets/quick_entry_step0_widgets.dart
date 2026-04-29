@@ -4,8 +4,10 @@ import '../../../core/database/dao/student_dao.dart';
 import '../../../shared/theme.dart';
 import 'quick_entry_common_widgets.dart';
 
-class QuickEntryStudentFilterBar extends StatelessWidget {
+class QuickEntryStudentFilterBar extends StatefulWidget {
+  final String searchQuery;
   final ValueChanged<String> onSearchChanged;
+  final VoidCallback onClearSearch;
   final bool allFilteredSelected;
   final VoidCallback? onToggleAllFiltered;
   final bool showSuspended;
@@ -17,7 +19,9 @@ class QuickEntryStudentFilterBar extends StatelessWidget {
 
   const QuickEntryStudentFilterBar({
     super.key,
+    required this.searchQuery,
     required this.onSearchChanged,
+    required this.onClearSearch,
     required this.allFilteredSelected,
     required this.onToggleAllFiltered,
     required this.showSuspended,
@@ -29,20 +33,66 @@ class QuickEntryStudentFilterBar extends StatelessWidget {
   });
 
   @override
+  State<QuickEntryStudentFilterBar> createState() =>
+      _QuickEntryStudentFilterBarState();
+}
+
+class _QuickEntryStudentFilterBarState
+    extends State<QuickEntryStudentFilterBar> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(text: widget.searchQuery);
+  }
+
+  @override
+  void didUpdateWidget(covariant QuickEntryStudentFilterBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.searchQuery == _searchController.text) return;
+    _searchController.value = TextEditingValue(
+      text: widget.searchQuery,
+      selection: TextSelection.collapsed(offset: widget.searchQuery.length),
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    widget.onClearSearch();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final hasSearchQuery = _searchController.text.trim().isNotEmpty;
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: TextField(
+            controller: _searchController,
             decoration: InputDecoration(
               hintText: '搜索学生姓名或手机号',
               prefixIcon: const Icon(Icons.search),
+              suffixIcon: hasSearchQuery
+                  ? IconButton(
+                      tooltip: '\u6e05\u7a7a\u641c\u7d22',
+                      onPressed: _clearSearch,
+                      icon: const Icon(Icons.close),
+                    )
+                  : null,
               isDense: true,
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.56),
             ),
-            onChanged: (value) => onSearchChanged(value.trim()),
+            onChanged: (value) => widget.onSearchChanged(value.trim()),
           ),
         ),
         Padding(
@@ -53,26 +103,30 @@ class QuickEntryStudentFilterBar extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               QuickActionChip(
-                icon: allFilteredSelected ? Icons.deselect : Icons.select_all,
-                label: allFilteredSelected ? '取消全选' : '全选',
-                onTap: onToggleAllFiltered,
+                icon: widget.allFilteredSelected
+                    ? Icons.deselect
+                    : Icons.select_all,
+                label: widget.allFilteredSelected ? '取消全选' : '全选',
+                onTap: widget.onToggleAllFiltered,
               ),
               QuickActionChip(
-                icon: showSuspended ? Icons.visibility_off : Icons.visibility,
-                label: showSuspended ? '隐藏休学' : '显示休学',
-                onTap: onToggleShowSuspended,
+                icon: widget.showSuspended
+                    ? Icons.visibility_off
+                    : Icons.visibility,
+                label: widget.showSuspended ? '隐藏休学' : '显示休学',
+                onTap: widget.onToggleShowSuspended,
               ),
-              if (restorableRecentCount > 0)
+              if (widget.restorableRecentCount > 0)
                 QuickActionChip(
-                  icon: restoredRecentGroup
+                  icon: widget.restoredRecentGroup
                       ? Icons.checklist_rtl_outlined
                       : Icons.history_outlined,
-                  label: restoredRecentGroup
+                  label: widget.restoredRecentGroup
                       ? '上次同班已恢复'
-                      : '恢复上次同班（$restorableRecentCount人）',
-                  onTap: onRestoreRecentGroup,
+                      : '恢复上次同班（${widget.restorableRecentCount}人）',
+                  onTap: widget.onRestoreRecentGroup,
                 ),
-              _QuickEntrySelectedCountPill(selectedCount: selectedCount),
+              _QuickEntrySelectedCountPill(selectedCount: widget.selectedCount),
             ],
           ),
         ),
@@ -264,17 +318,12 @@ class QuickEntryStep0Actions extends StatelessWidget {
               ),
               icon: const Icon(Icons.flash_on_outlined),
               label: Text(
-                '直接保存（$quickSaveStudentCount人 / ¥$estimatedFeeLabel）',
+                '保存默认（$quickSaveStudentCount人 / ¥$estimatedFeeLabel）',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '直接保存会按当前日期、时间和状态记课，预计扣费 ¥$estimatedFeeLabel。',
-            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ),

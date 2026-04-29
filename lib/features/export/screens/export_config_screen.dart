@@ -299,7 +299,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                                   ),
                                 ),
                                 child: IconButton(
-                                  tooltip: '返回',
+                                  tooltip: '返回导出设置',
                                   onPressed: () =>
                                       Navigator.of(previewCtx).pop(),
                                   icon: const Icon(
@@ -544,15 +544,54 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     onPicked(date);
   }
 
+  Widget _buildExportOverviewPanel({
+    required Student? student,
+    required int rangeDays,
+    required String rangeLabel,
+    required bool includeAiAnalysis,
+    required bool hasSavedAiAnalysis,
+  }) {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _msgCtrl,
+      builder: (context, value, _) {
+        final messageLength = value.text.trim().length;
+        return ExportOverviewPanel(
+          templateLabel: _template.label,
+          studentName: student?.name ?? '\u5f53\u524d\u5b66\u751f',
+          rangeDays: rangeDays,
+          rangeLabel: rangeLabel,
+          hasMessage: messageLength > 0,
+          messageLength: messageLength,
+          watermarkEnabled: _watermark,
+          includeAiAnalysis: includeAiAnalysis,
+          hasSavedAiAnalysis: hasSavedAiAnalysis,
+        );
+      },
+    );
+  }
+
+  Widget _buildMessageSectionHeader() {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _msgCtrl,
+      builder: (context, value, _) {
+        final messageLength = value.text.trim().length;
+        return ExportSectionHeader(
+          title: '\u5bc4\u8bed\u5185\u5bb9',
+          subtitle: 'PDF 结尾页文案。',
+          trailing: messageLength > 0
+              ? '$messageLength / 200'
+              : '\u672a\u8bbe\u7f6e',
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final student = _latestStudentSnapshot ?? _findStudent();
     final rangeLabel = '${_fmt(_from)} - ${_fmt(_to)}';
     final rangeDays = _to.difference(_from).inDays + 1;
-    final message = _msgCtrl.text.trim();
-    final hasMessage = message.isNotEmpty;
-    final messageLength = message.length;
     final savedAiAnalysis = _extractSavedAiAnalysis(student?.note);
     final hasSavedAiAnalysis = savedAiAnalysis != null;
     final includeAiAnalysis = _includeAiAnalysis && hasSavedAiAnalysis;
@@ -578,27 +617,21 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
             children: [
               ExportConfigSheetHeader(
                 title: '\u5bfc\u51fa\u5b66\u4e60\u62a5\u544a',
-                subtitle:
-                    '\u53ef\u9884\u89c8 PDF\u3001\u76f4\u63a5\u5206\u4eab\uff0c\u6216\u5bfc\u51fa Excel \u8bb0\u5f55\u3002',
+                subtitle: '预览、分享或导出记录。',
                 onClose: () => Navigator.of(context).pop(),
               ),
               const SizedBox(height: 16),
-              ExportOverviewPanel(
-                templateLabel: templateLabel,
-                studentName: student?.name ?? '\u5f53\u524d\u5b66\u751f',
+              _buildExportOverviewPanel(
+                student: student,
                 rangeDays: rangeDays,
                 rangeLabel: rangeLabel,
-                hasMessage: hasMessage,
-                messageLength: messageLength,
-                watermarkEnabled: _watermark,
                 includeAiAnalysis: includeAiAnalysis,
                 hasSavedAiAnalysis: hasSavedAiAnalysis,
               ),
               const SizedBox(height: 24),
               ExportSectionHeader(
                 title: '\u5bb6\u957f\u9996\u5c4f\u6458\u8981',
-                subtitle:
-                    '\u9884\u89c8\u5bb6\u957f\u6253\u5f00\u62a5\u544a\u65f6\u6700\u5148\u770b\u5230\u7684\u4fe1\u606f\uff0c\u4fbf\u4e8e\u5206\u4eab\u524d\u68c0\u67e5\u91cd\u70b9\u3002',
+                subtitle: '分享前检查重点。',
                 trailing: '5 \u9879',
               ),
               const SizedBox(height: 12),
@@ -617,8 +650,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
               const SizedBox(height: 24),
               ExportSectionHeader(
                 title: '\u5bfc\u51fa\u8303\u56f4',
-                subtitle:
-                    '\u65e5\u671f\u8303\u56f4\u4f1a\u5f71\u54cd PDF \u9884\u89c8\u3001\u5206\u4eab\u548c Excel \u5bfc\u51fa\u3002',
+                subtitle: '影响 PDF 和 Excel。',
                 trailing: '$rangeDays\u5929',
               ),
               const SizedBox(height: 12),
@@ -651,33 +683,26 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              ExportSectionHeader(
-                title: '\u5bc4\u8bed\u5185\u5bb9',
-                subtitle:
-                    '\u663e\u793a\u5728 PDF \u7ed3\u5c3e\u9875\uff0c\u53ef\u901a\u8fc7\u9884\u8bbe\u5feb\u901f\u586b\u5145\u3002',
-                trailing: hasMessage
-                    ? '$messageLength / 200'
-                    : '\u672a\u8bbe\u7f6e',
-              ),
+              _buildMessageSectionHeader(),
               const SizedBox(height: 12),
               ExportMessageSection(
                 controller: _msgCtrl,
-                onChanged: (_) => setState(() {}),
                 labelText: '\u5bc4\u8bed',
                 hintText:
                     '\u4f8b\u5982\uff1a\u672c\u6708\u8fdb\u6b65\u660e\u663e\uff0c\u8bf7\u7ee7\u7eed\u4fdd\u6301\u3002',
                 presetMessages: _presetMessages,
                 onPresetSelected: (message) {
                   unawaited(InteractionFeedback.selection(context));
-                  _msgCtrl.text = message;
-                  setState(() {});
+                  _msgCtrl.value = TextEditingValue(
+                    text: message,
+                    selection: TextSelection.collapsed(offset: message.length),
+                  );
                 },
               ),
               const SizedBox(height: 24),
               ExportSectionHeader(
                 title: '\u5bfc\u51fa\u9009\u9879',
-                subtitle:
-                    '\u8fd9\u4e9b\u9009\u9879\u4f1a\u5f71\u54cd PDF \u7684\u5185\u5bb9\u4e0e\u6837\u5f0f\uff0cExcel \u5bfc\u51fa\u4e0d\u53d7\u5f71\u54cd\u3002',
+                subtitle: '仅影响 PDF。',
                 trailing: _watermark
                     ? '\u6c34\u5370\u5df2\u5f00\u542f'
                     : '\u6c34\u5370\u5df2\u5173\u95ed',
@@ -687,9 +712,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                 value: _watermark,
                 icon: Icons.water_drop_outlined,
                 title: '\u542f\u7528\u6c34\u5370',
-                subtitle: _watermark
-                    ? 'PDF \u5c06\u5305\u542b\u6c34\u5370\u4e0e\u5370\u7ae0\u3002'
-                    : '\u5bfc\u51fa\u4e3a\u4e0d\u5e26\u6c34\u5370\u7684 PDF\u3002',
+                subtitle: _watermark ? 'PDF 包含水印。' : 'PDF 不带水印。',
                 onChanged: (value) {
                   _toggleWatermark(value);
                 },
@@ -700,10 +723,8 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                 icon: Icons.psychology_alt_outlined,
                 title: '\u5305\u542b AI \u5206\u6790',
                 subtitle: hasSavedAiAnalysis
-                    ? (includeAiAnalysis
-                          ? '\u4f1a\u4ece\u5b66\u751f\u5907\u6ce8\u4e2d\u63d0\u53d6\u5df2\u4fdd\u5b58\u7684 AI \u5206\u6790\uff0c\u5e76\u63d2\u5165 PDF\u3002'
-                          : '\u5173\u95ed\u540e\uff0cPDF \u4e0d\u4f1a\u5305\u542b AI \u5206\u6790\u9875\u3002')
-                    : '\u6682\u65e0\u5df2\u4fdd\u5b58\u7684 AI \u5206\u6790\uff0c\u8bf7\u5148\u5728\u5b66\u751f\u8be6\u60c5\u9875\u4fdd\u5b58\u5206\u6790\u7ed3\u679c\u3002',
+                    ? (includeAiAnalysis ? '已加入 PDF。' : 'PDF 不含 AI 分析。')
+                    : '暂无已保存分析。',
                 enabled: hasSavedAiAnalysis,
                 onChanged: (value) {
                   unawaited(InteractionFeedback.selection(context));
@@ -713,8 +734,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
               const SizedBox(height: 24),
               ExportSectionHeader(
                 title: '\u5bfc\u51fa\u64cd\u4f5c',
-                subtitle:
-                    '\u53ef\u5148\u9884\u89c8 PDF\uff0c\u518d\u5206\u4eab\uff0c\u6216\u76f4\u63a5\u5bfc\u51fa Excel\u3002',
+                subtitle: '选择输出方式。',
                 trailing: _exportStatusLabel,
               ),
               const SizedBox(height: 12),

@@ -87,7 +87,7 @@ class _QuickEntryConflictDialog extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '本次将保存 $currentSlot。以下学员该时段已有记录，请选择处理方式。',
+                          '$currentSlot 已有记录。',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: kInkSecondary,
                             height: 1.45,
@@ -152,7 +152,7 @@ class _QuickEntryConflictDialog extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                '覆盖会保留旧记录中的课堂反馈、课后练习和作品照片，除非本次填写了新的内容。',
+                '覆盖时会保留旧反馈、练习和照片，除非本次已填写新内容。',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: kInkSecondary,
                   height: 1.4,
@@ -175,14 +175,14 @@ class _QuickEntryConflictDialog extends StatelessWidget {
                       context,
                     ).pop(QuickEntryConflictResolution.changeTime),
                     icon: const Icon(Icons.schedule_rounded, size: 18),
-                    label: const Text('返回改时间'),
+                    label: const Text('改时间'),
                   ),
                   FilledButton.icon(
                     onPressed: () => Navigator.of(
                       context,
                     ).pop(QuickEntryConflictResolution.overwrite),
                     icon: const Icon(Icons.check_rounded, size: 18),
-                    label: const Text('覆盖并保存'),
+                    label: const Text('覆盖保存'),
                   ),
                 ],
               ),

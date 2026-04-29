@@ -25,6 +25,29 @@ class BackupScreen extends ConsumerStatefulWidget {
 }
 
 @visibleForTesting
+const backupCreateConfirmMessage = '生成完整备份，并导出需口令恢复的加密文件？';
+
+@visibleForTesting
+const backupCreatePassphraseDescription = '恢复时需要同一口令。';
+
+@visibleForTesting
+const backupCreateSuccessMessage = '加密备份已生成，恢复需同一口令。';
+
+@visibleForTesting
+const backupExistingSharePassphraseDescription = '将生成加密分享文件，恢复需同一口令。';
+
+@visibleForTesting
+const backupExistingShareSuccessMessage = '加密分享文件已生成，恢复需同一口令。';
+
+@visibleForTesting
+const backupRestoreFromPickerConfirmMessage = '恢复会覆盖当前数据且不可撤销。继续前会自动生成本机备份。';
+
+@visibleForTesting
+String backupRestoreRecordConfirmMessage(String fileName) {
+  return '用 $fileName 覆盖当前数据？此操作不可撤销。';
+}
+
+@visibleForTesting
 Widget buildBackupPassphraseVisibilityToggleForTesting({
   required bool obscure,
   required String showTooltip,
@@ -63,9 +86,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     _backupDirectoryFuture = BackupHelper.backupDirectoryPath();
   }
 
-  String _lastBackupLabel(DateTime? lastBackup) {
+  String _lastBackupLabel(DateTime? lastBackup, DateTime now) {
     if (lastBackup == null) return '未创建';
-    final days = DateTime.now().difference(lastBackup).inDays;
+    final days = now.difference(lastBackup).inDays;
     if (days <= 0) return '今天';
     return '$days 天前';
   }
@@ -222,7 +245,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
     return _promptBackupPassphrase(
       title: '输入备份口令',
-      description: '该备份文件已加密。继续恢复前，请输入创建备份时设置的口令。',
+      description: '输入创建备份时的口令。',
       actionLabel: '继续恢复',
       confirmEntry: false,
     );
@@ -232,13 +255,13 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     if (_submitting) return;
     final confirmed = await AppToast.showConfirm(
       context,
-      '备份包含学员、家长、课时、收费和课堂作品图片等完整数据。继续后会先生成应用内副本，再导出一个需要口令才能恢复的加密备份文件。确认继续吗？',
+      backupCreateConfirmMessage,
     );
     if (!confirmed || !mounted) return;
 
     final passphrase = await _promptBackupPassphrase(
       title: '设置备份口令',
-      description: '分享出去的备份文件会先加密。之后在另一台设备恢复时，需要输入同一口令。',
+      description: backupCreatePassphraseDescription,
       actionLabel: '生成并分享',
     );
     if (passphrase == null || !mounted) return;
@@ -262,7 +285,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       setState(_refreshBackupState);
       await _shareEncryptedFile(encryptedPath);
       if (!mounted) return;
-      AppToast.showSuccess(context, '备份已生成，并已按口令加密后打开分享面板。恢复这个文件时需要输入同一口令。');
+      AppToast.showSuccess(context, backupCreateSuccessMessage);
     } catch (error) {
       if (!mounted) return;
       AppToast.showError(context, error.toString());
@@ -284,7 +307,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
     final passphrase = await _promptBackupPassphrase(
       title: '设置分享口令',
-      description: '这份应用内备份会先转换为加密文件，再通过系统分享面板发送出去。',
+      description: backupExistingSharePassphraseDescription,
       actionLabel: '加密并分享',
     );
     if (passphrase == null || !mounted) return;
@@ -297,7 +320,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       );
       await _shareEncryptedFile(encryptedPath);
       if (!mounted) return;
-      AppToast.showSuccess(context, '已生成加密分享文件。之后恢复这份外部备份时，需要输入同一口令。');
+      AppToast.showSuccess(context, backupExistingShareSuccessMessage);
     } catch (error) {
       if (!mounted) return;
       AppToast.showError(context, error.toString());
@@ -312,7 +335,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     if (_submitting) return;
     final confirmed = await AppToast.showConfirm(
       context,
-      '恢复会覆盖当前全部数据，且无法撤销。建议你先生成一份新的应用内备份，再从外部备份文件恢复。确认继续吗？',
+      backupRestoreFromPickerConfirmMessage,
     );
     if (!confirmed || !mounted) return;
 
@@ -345,7 +368,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     if (_submitting) return;
     final confirmed = await AppToast.showConfirm(
       context,
-      '将使用 ${record.fileName} 覆盖当前全部数据，且无法撤销。确认继续恢复吗？',
+      backupRestoreRecordConfirmMessage(record.fileName),
     );
     if (!confirmed) return;
 
@@ -418,7 +441,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           children: [
             PageHeader(
               title: '数据备份与恢复',
-              subtitle: '备份后可加密分享，恢复时需口令。',
+              subtitle: '加密分享，口令恢复。',
               onBack: () => context.pop(),
             ),
             Expanded(
@@ -432,13 +455,13 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                   final lastBackup = lastBackupMs == null
                       ? null
                       : DateTime.fromMillisecondsSinceEpoch(lastBackupMs);
+                  final now = DateTime.now();
                   final isOverdue =
                       lastBackup == null ||
-                      DateTime.now().difference(lastBackup).inDays >=
-                          kBackupWarningDays;
+                      now.difference(lastBackup).inDays >= kBackupWarningDays;
                   final warningMessage = lastBackup == null
-                      ? '还没有创建过备份，建议先生成第一份完整副本。'
-                      : '距离上次备份已超过 $kBackupWarningDays 天，建议现在更新一份新的副本。';
+                      ? '还没有备份，先生成一份。'
+                      : '已超过 $kBackupWarningDays 天，建议更新。';
                   final statusColor = isOverdue ? kOrange : kGreen;
                   final statusLabel = isOverdue ? '建议更新' : '状态正常';
 
@@ -467,7 +490,10 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                               return BackupOverviewCard(
                                 statusColor: statusColor,
                                 statusLabel: statusLabel,
-                                lastBackupLabel: _lastBackupLabel(lastBackup),
+                                lastBackupLabel: _lastBackupLabel(
+                                  lastBackup,
+                                  now,
+                                ),
                                 lastBackupTime: _lastBackupTime(lastBackup),
                                 backupCount: backups.length,
                                 directoryPath:

@@ -266,9 +266,9 @@ enum ExportActionType { previewPdf, sharePdf, exportExcel }
 extension _ExportActionTypeCopy on ExportActionType {
   String get _noticeTitle {
     return switch (this) {
-      ExportActionType.previewPdf => '正在准备 PDF 预览，请稍候',
-      ExportActionType.sharePdf => '正在准备 PDF 分享，请稍候',
-      ExportActionType.exportExcel => '正在导出 Excel，请稍候',
+      ExportActionType.previewPdf => '准备 PDF 预览',
+      ExportActionType.sharePdf => '准备 PDF 分享',
+      ExportActionType.exportExcel => '正在导出 Excel',
     };
   }
 
@@ -289,8 +289,8 @@ class _ExportLoadingNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final title = activeAction?._noticeTitle ?? '正在生成导出文件，请稍候';
-    const subtitle = '预览、分享和 Excel 导出会在当前任务完成后恢复。';
+    final title = activeAction?._noticeTitle ?? '正在生成导出文件';
+    const subtitle = '请稍候。';
 
     return Semantics(
       container: true,

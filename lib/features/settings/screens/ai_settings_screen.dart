@@ -39,7 +39,7 @@ class AiSettingsScreen extends ConsumerWidget {
           children: [
             PageHeader(
               title: 'AI 视觉',
-              subtitle: '默认走最保守的远端发送策略，只有显式开启后才放宽边界。',
+              subtitle: '默认最小外发。',
               onBack: () => context.pop(),
             ),
             Expanded(
@@ -60,8 +60,8 @@ class AiSettingsScreen extends ConsumerWidget {
                         '当前端点：${_endpointLabel(config.baseUrl)}\n'
                         '模型：${config.model}\n'
                         'API Key：${_maskApiKey(settings[QwenVisionConfig.settingApiKey] ?? '')}\n'
-                        '学生姓名外发：${includeStudentName ? '已开启' : '默认关闭'}\n'
-                        '自定义端点：${config.allowCustomEndpoint ? '高级模式已开启' : '仅官方 DashScope'}',
+                        '姓名外发：${includeStudentName ? '已开启' : '默认关闭'}\n'
+                        '端点模式：${config.allowCustomEndpoint ? '高级' : '官方'}',
                         style: Theme.of(
                           context,
                         ).textTheme.bodyMedium?.copyWith(height: 1.6),
@@ -86,7 +86,7 @@ class AiSettingsScreen extends ConsumerWidget {
                               initialValue:
                                   settings[QwenVisionConfig.settingApiKey] ??
                                   '',
-                              hintText: '请输入 DashScope / 百炼侧的 API Key',
+                              hintText: 'DashScope API Key',
                               keyName: QwenVisionConfig.settingApiKey,
                               obscureText: true,
                             ),
@@ -97,10 +97,10 @@ class AiSettingsScreen extends ConsumerWidget {
                               'ai_allow_custom_endpoint_switch',
                             ),
                             icon: Icons.tune_outlined,
-                            title: '自定义 HTTPS 端点（高级）',
+                            title: '自定义端点（高级）',
                             subtitle: config.allowCustomEndpoint
-                                ? '已开启，可保存自定义 HTTPS 代理或中转网关。'
-                                : '默认关闭，仅允许官方 DashScope 端点。',
+                                ? '已开启'
+                                : '仅官方端点',
                             value: config.allowCustomEndpoint,
                             onChanged: (value) => ref
                                 .read(settingsProvider.notifier)
@@ -160,7 +160,7 @@ class AiSettingsScreen extends ConsumerWidget {
                                   settings[QwenVisionConfig
                                       .settingSystemPrompt] ??
                                   config.systemPrompt,
-                              hintText: '请输入默认系统提示词',
+                              hintText: '系统提示词',
                               keyName: QwenVisionConfig.settingSystemPrompt,
                               maxLines: 5,
                             ),
@@ -172,9 +172,7 @@ class AiSettingsScreen extends ConsumerWidget {
                             ),
                             icon: Icons.privacy_tip_outlined,
                             title: '分析时发送学生姓名',
-                            subtitle: includeStudentName
-                                ? '已开启，学生姓名会作为附加上下文发给远端。'
-                                : '默认关闭，仅发送图片和提示词。',
+                            subtitle: includeStudentName ? '会外发姓名' : '仅图片和提示词',
                             value: includeStudentName,
                             onChanged: (value) => ref
                                 .read(settingsProvider.notifier)
@@ -241,8 +239,8 @@ class AiSettingsScreen extends ConsumerWidget {
                     hintText: hintText,
                     helperText: keyName == QwenVisionConfig.settingBaseUrl
                         ? (allowCustomEndpoint
-                              ? '当前已允许自定义 HTTPS 地址。'
-                              : '如需自定义 HTTPS 地址，请先开启高级模式。')
+                              ? '可保存自定义 HTTPS 地址。'
+                              : '先开启高级模式。')
                         : null,
                   ),
                 ),
@@ -430,8 +428,8 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
     final confirmed = await AppToast.showConfirm(
       context,
       localFile
-          ? '将向 $endpointLabel 发送$outboundDetails进行分析。本地图片会先转换为 data URL 再上传，请确认你已获得授权并接受外发。'
-          : '将向 $endpointLabel 发送$outboundDetails进行分析，请确认你已获得授权并接受外发。',
+          ? '将向 $endpointLabel 发送$outboundDetails。本地图片会转为 data URL。确认已授权？'
+          : '将向 $endpointLabel 发送$outboundDetails。确认已授权？',
     );
     if (!confirmed) return;
 
@@ -495,7 +493,7 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
             enabled: !_submitting,
             decoration: InputDecoration(
               labelText: '学生姓名（可选）',
-              helperText: includeStudentName ? '开启后会外发。' : '默认只在本地显示。',
+              helperText: includeStudentName ? '会外发。' : '仅本地。',
             ),
           ),
           const SizedBox(height: 12),
@@ -539,7 +537,7 @@ class _AiWorkbenchState extends ConsumerState<_AiWorkbench> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.auto_awesome_outlined, size: 18),
-              label: Text(_submitting ? '分析中…' : '调用视觉分析'),
+              label: Text(_submitting ? '分析中…' : '运行分析'),
             ),
           ),
           if (_errorText != null) ...[

@@ -4,7 +4,7 @@ import '../../../shared/theme.dart';
 
 class ExportMessageSection extends StatelessWidget {
   final TextEditingController controller;
-  final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onChanged;
   final String labelText;
   final String hintText;
   final List<String> presetMessages;
@@ -13,7 +13,7 @@ class ExportMessageSection extends StatelessWidget {
   const ExportMessageSection({
     super.key,
     required this.controller,
-    required this.onChanged,
+    this.onChanged,
     required this.labelText,
     required this.hintText,
     required this.presetMessages,

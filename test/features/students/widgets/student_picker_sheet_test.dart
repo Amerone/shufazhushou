@@ -76,7 +76,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('已按最近上课排序，今天刚上课或最近常上的学生会排在前面。'), findsOneWidget);
+    expect(find.text('最近上课优先。'), findsOneWidget);
     expect(find.text('最近上课 2026-04-01'), findsOneWidget);
     expect(find.text('未记过课'), findsOneWidget);
 

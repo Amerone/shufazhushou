@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/models/student.dart';
 import '../../../core/models/export_template.dart';
 import '../../../core/providers/student_provider.dart';
 import '../../export/screens/export_config_screen.dart';
@@ -15,21 +16,34 @@ Future<void> showStudentPaymentSheet(
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (_) => Consumer(
-      builder: (context, ref, _) {
-        final students = ref.watch(studentProvider).valueOrNull ?? const [];
-        final currentStudent = students
-            .where((item) => item.student.id == studentId)
-            .map((item) => item.student)
-            .firstOrNull;
-
+    builder: (_) {
+      if (studentName != null && pricePerClass != null) {
         return PaymentBottomSheet(
           studentId: studentId,
-          studentName: studentName ?? currentStudent?.name,
-          pricePerClass: pricePerClass ?? currentStudent?.pricePerClass,
+          studentName: studentName,
+          pricePerClass: pricePerClass,
         );
-      },
-    ),
+      }
+
+      return Consumer(
+        builder: (context, ref, _) {
+          final students = ref.watch(studentProvider).valueOrNull ?? const [];
+          Student? currentStudent;
+          for (final item in students) {
+            if (item.student.id == studentId) {
+              currentStudent = item.student;
+              break;
+            }
+          }
+
+          return PaymentBottomSheet(
+            studentId: studentId,
+            studentName: studentName ?? currentStudent?.name,
+            pricePerClass: pricePerClass ?? currentStudent?.pricePerClass,
+          );
+        },
+      );
+    },
   );
 }
 

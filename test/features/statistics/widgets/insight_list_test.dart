@@ -50,11 +50,11 @@ void main() {
     await _settleUi(tester);
 
     expect(find.text('Alex'), findsOneWidget);
-    expect(find.textContaining('\u7a0d\u540e'), findsOneWidget);
+    expect(find.text('3 天后提醒'), findsOneWidget);
     expect(find.text('home-workbench:1'), findsOneWidget);
     expect(_FakeHomeWorkbenchProvider.buildCount, 1);
 
-    await tester.tap(find.textContaining('\u7a0d\u540e'));
+    await tester.tap(find.text('3 天后提醒'));
     await _settleUi(tester);
 
     expect(fakeDao.inserted, hasLength(1));
@@ -103,7 +103,7 @@ void main() {
     );
     await _settleUi(tester);
 
-    await tester.tap(find.textContaining('\u7a0d\u540e'));
+    await tester.tap(find.text('3 天后提醒'));
     await _settleUi(tester);
     expect(
       find.text('\u7b14\u58a8\u5b89\u7136\uff0c\u6682\u65e0\u63d0\u9192'),
@@ -171,7 +171,7 @@ void main() {
     await _settleUi(tester);
 
     expect(find.text('记录缴费'), findsNWidgets(2));
-    expect(find.textContaining('当前学员：Alex'), findsOneWidget);
+    expect(find.text('Alex · 自动刷新余额'), findsOneWidget);
   });
 }
 

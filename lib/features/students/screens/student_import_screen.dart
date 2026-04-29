@@ -91,19 +91,19 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
         : preview.skipped - preview.errors.length;
     final issueCount = preview?.errors.length ?? 0;
     final confirmDisabledReason = _loading
-        ? '正在处理导入，请稍候'
+        ? '正在处理'
         : preview == null
-        ? '请先选择 Excel 文件并查看预览'
+        ? '先选择 Excel 文件'
         : preview.toInsert.isEmpty
-        ? '当前没有可导入的学生记录，请重新选择文件或修正 Excel 内容'
+        ? '没有可导入记录'
         : null;
     final importState = preview == null
-        ? ('等待选择文件', '先选择 Excel 文件，再查看导入预览。', kPrimaryBlue)
+        ? ('等待文件', '选择后先预览。', kPrimaryBlue)
         : preview.toInsert.isEmpty
-        ? ('暂不可导入', '当前没有可写入的学生记录，请先处理问题项。', kOrange)
+        ? ('暂不可导入', '没有可写入记录。', kOrange)
         : issueCount > 0
-        ? ('可导入但需留意', '存在需要校对的行，确认后只会导入有效记录。', kSealRed)
-        : ('可以直接导入', '预览通过，可以一次性写入本次有效学生档案。', kGreen);
+        ? ('可导入', '只写入有效记录。', kSealRed)
+        : ('可导入', '预览已通过。', kGreen);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -112,7 +112,7 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
           children: [
             PageHeader(
               title: '批量导入学生',
-              subtitle: '选择 Excel 文件后先预览，再一次性写入学生档案。',
+              subtitle: '预览后写入学生档案。',
               onBack: () => context.pop(),
             ),
             Expanded(
@@ -155,7 +155,7 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '先选文件，再看预览，最后确认入库。同名且家长信息一致会自动跳过，错误行不会写入。',
+                                    '选文件、看预览、确认导入。',
                                     style: theme.textTheme.bodySmall,
                                   ),
                                 ],
@@ -168,23 +168,23 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            ImportStepChip(index: '1', text: '选择模板文件'),
-                            ImportStepChip(index: '2', text: '核对预览结果'),
-                            ImportStepChip(index: '3', text: '确认批量导入'),
+                            ImportStepChip(index: '1', text: '选文件'),
+                            ImportStepChip(index: '2', text: '看预览'),
+                            ImportStepChip(index: '3', text: '导入'),
                           ],
                         ),
                         const SizedBox(height: 16),
                         const GuideLine(
                           icon: Icons.table_view_outlined,
-                          text: '建议使用系统模板整理列顺序，尤其确认“姓名”列存在。',
+                          text: '建议使用系统模板，确认“姓名”列存在。',
                         ),
                         const GuideLine(
                           icon: Icons.rule_folder_outlined,
-                          text: '预览会优先拦截空姓名和同名同家长信息的重复记录，避免直接写入脏数据。',
+                          text: '空姓名、重复记录不会写入。',
                         ),
                         const GuideLine(
                           icon: Icons.tips_and_updates_outlined,
-                          text: '即使存在问题项，也只会导入有效行，错误记录会保留在预览中提示。',
+                          text: '问题行会留在预览中。',
                         ),
                         const SizedBox(height: 16),
                         SizedBox(
@@ -193,9 +193,7 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                             container: true,
                             button: true,
                             enabled: !_loading,
-                            label: _loading
-                                ? '正在处理文件'
-                                : '选择 Excel 文件，打开文件选择器并生成导入预览',
+                            label: _loading ? '正在处理文件' : '选择 Excel 文件并预览',
                             onTap: _loading
                                 ? null
                                 : () => _pick(
@@ -214,9 +212,7 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                                         clearExistingPreview: preview != null,
                                       ),
                                 icon: const Icon(Icons.upload_file_outlined),
-                                label: Text(
-                                  _loading ? '处理中...' : '选择 Excel 文件',
-                                ),
+                                label: Text(_loading ? '处理中...' : '选文件导入'),
                               ),
                             ),
                           ),
@@ -224,7 +220,7 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                         if (_loading) ...[
                           const SizedBox(height: 8),
                           Text(
-                            '正在读取文件并生成预览，请勿重复操作。',
+                            '正在生成预览。',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: kInkSecondary,
                             ),
@@ -249,7 +245,7 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                         children: [
                           ImportSectionHeader(
                             title: '预览结果',
-                            subtitle: '先确认总量、有效记录和问题数量，再决定是否导入。',
+                            subtitle: '核对后导入。',
                             trailing: '共 ${preview.total} 行',
                           ),
                           const SizedBox(height: 12),
@@ -368,7 +364,7 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: Text(
-                                  '还有 $remainingPreviewCount 位学生将在确认后一起导入。',
+                                  '另有 $remainingPreviewCount 人待导入。',
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
                                         color: kPrimaryBlue,
@@ -388,14 +384,14 @@ class _StudentImportScreenState extends ConsumerState<StudentImportScreen> {
                         children: [
                           ImportSectionHeader(
                             title: '确认导入',
-                            subtitle: '确认按钮只会写入有效学生；重新选择会清空当前预览。',
+                            subtitle: '只写入有效学生。',
                             trailing: preview.toInsert.isEmpty ? '待处理' : '准备就绪',
                           ),
                           const SizedBox(height: 12),
                           Text(
                             preview.toInsert.isEmpty
-                                ? '当前没有可导入的学生记录，请重新检查 Excel 内容。'
-                                : '确认后将一次性写入 ${preview.toInsert.length} 位学生档案。',
+                                ? '没有可导入记录。'
+                                : '将写入 ${preview.toInsert.length} 位学生。',
                             style: theme.textTheme.bodyMedium,
                           ),
                           const SizedBox(height: 12),

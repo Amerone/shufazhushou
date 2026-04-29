@@ -124,24 +124,14 @@ void main() {
 
     await _pumpScreen(tester, student);
 
-    expect(
-      find.text(
-        '\u5173\u95ed\u540e\uff0cPDF \u4e0d\u4f1a\u5305\u542b AI \u5206\u6790\u9875\u3002',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('PDF 不含 AI 分析。'), findsOneWidget);
 
     final aiAnalysisLabel = find.text('\u5305\u542b AI \u5206\u6790');
     await tester.ensureVisible(aiAnalysisLabel);
     await tester.tap(aiAnalysisLabel);
     await _settleUi(tester);
 
-    expect(
-      find.text(
-        '\u4f1a\u4ece\u5b66\u751f\u5907\u6ce8\u4e2d\u63d0\u53d6\u5df2\u4fdd\u5b58\u7684 AI \u5206\u6790\uff0c\u5e76\u63d2\u5165 PDF\u3002',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('已加入 PDF。'), findsOneWidget);
   });
 
   testWidgets('export switches can toggle from the whole row label', (
@@ -169,12 +159,7 @@ void main() {
     await tester.tap(aiAnalysisLabel);
     await _settleUi(tester);
 
-    expect(
-      find.text(
-        '\u4f1a\u4ece\u5b66\u751f\u5907\u6ce8\u4e2d\u63d0\u53d6\u5df2\u4fdd\u5b58\u7684 AI \u5206\u6790\uff0c\u5e76\u63d2\u5165 PDF\u3002',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('已加入 PDF。'), findsOneWidget);
   });
 
   testWidgets('disables AI analysis toggle when note has no saved analysis', (
@@ -192,15 +177,47 @@ void main() {
 
     await _pumpScreen(tester, student);
 
-    expect(
-      find.text(
-        '\u6682\u65e0\u5df2\u4fdd\u5b58\u7684 AI \u5206\u6790\uff0c\u8bf7\u5148\u5728\u5b66\u751f\u8be6\u60c5\u9875\u4fdd\u5b58\u5206\u6790\u7ed3\u679c\u3002',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('暂无已保存分析。'), findsOneWidget);
 
     final aiSwitch = tester.widget<Switch>(find.byType(Switch).last);
     expect(aiSwitch.onChanged, isNull);
+  });
+
+  testWidgets('updates message summary from typing and preset selection', (
+    tester,
+  ) async {
+    const student = Student(
+      id: 'student-message-summary',
+      name: 'Celia',
+      pricePerClass: 180,
+      status: 'active',
+      createdAt: 1,
+      updatedAt: 1,
+    );
+    const presetMessage =
+        '\u672c\u6708\u8fdb\u6b65\u660e\u663e\uff0c\u8bf7\u7ee7\u7eed\u4fdd\u6301\u3002';
+
+    await _pumpScreen(tester, student);
+
+    final messageField = find.byWidgetPredicate(
+      (widget) => widget is TextField && widget.maxLength == 200,
+    );
+    await tester.ensureVisible(messageField);
+    await tester.enterText(messageField, 'hello');
+    await tester.pump();
+
+    expect(find.text('5 / 200'), findsOneWidget);
+
+    final presetChip = find.text(presetMessage);
+    await tester.ensureVisible(presetChip);
+    await tester.tap(presetChip);
+    await tester.pump();
+
+    final editableText = tester.widget<EditableText>(
+      find.descendant(of: messageField, matching: find.byType(EditableText)),
+    );
+    expect(editableText.controller.text, presetMessage);
+    expect(find.text('${presetMessage.length} / 200'), findsOneWidget);
   });
 
   testWidgets('close button exposes an accessible label', (tester) async {
@@ -245,16 +262,8 @@ void main() {
     try {
       await _pumpScreen(tester, student, failParentSnapshot: true);
 
-      expect(
-        find.text('家长端摘要加载失败，不影响导出。可直接继续预览、分享 PDF 或导出 Excel，或稍后重试。'),
-        findsOneWidget,
-      );
-      expect(
-        find.bySemanticsLabel(
-          '家长端摘要加载失败，不影响 PDF 预览、分享 PDF 或导出 Excel，可直接继续导出，或稍后重试',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('摘要加载失败，可继续导出。'), findsOneWidget);
+      expect(find.bySemanticsLabel('家长摘要加载失败，可继续导出'), findsOneWidget);
     } finally {
       semantics.dispose();
     }
@@ -280,8 +289,8 @@ void main() {
     await tester.tap(exportExcelButton);
     await tester.pump();
 
-    expect(find.text('正在导出 Excel，请稍候'), findsOneWidget);
-    expect(find.text('预览、分享和 Excel 导出会在当前任务完成后恢复。'), findsOneWidget);
+    expect(find.text('正在导出 Excel'), findsOneWidget);
+    expect(find.text('请稍候。'), findsOneWidget);
     expect(find.text('Excel 导出中'), findsOneWidget);
     expect(find.text('导出 Excel 中...'), findsOneWidget);
     expect(find.text('等待中...'), findsNWidgets(2));
@@ -371,8 +380,8 @@ void main() {
       ),
     );
 
-    expect(find.text('正在生成导出文件，请稍候'), findsOneWidget);
-    expect(find.text('预览、分享和 Excel 导出会在当前任务完成后恢复。'), findsOneWidget);
+    expect(find.text('正在生成导出文件'), findsOneWidget);
+    expect(find.text('请稍候。'), findsOneWidget);
     expect(find.text('处理中...'), findsNWidgets(3));
   });
 }

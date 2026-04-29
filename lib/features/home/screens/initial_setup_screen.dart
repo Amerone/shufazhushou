@@ -57,7 +57,7 @@ class InitialSetupScreen extends ConsumerWidget {
           children: [
             PageHeader(
               title: '开课前先准备好',
-              subtitle: '把老师信息、首批学生和首页入口都放到顺手的位置。',
+              subtitle: '教师、学生、首页入口。',
               trailing: hasStudents
                   ? TextButton.icon(
                       onPressed: () => _openRoute(context, '/', replace: true),
@@ -72,110 +72,100 @@ class InitialSetupScreen extends ConsumerWidget {
                 children: [
                   GlassCard(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                    child: Stack(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Positioned(
-                          right: -26,
-                          top: -20,
-                          child: Container(
-                            width: 112,
-                            height: 112,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: kSealRed.withValues(alpha: 0.08),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: -20,
-                          bottom: -28,
-                          child: Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: kPrimaryBlue.withValues(alpha: 0.06),
-                            ),
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              crossAxisAlignment: WrapCrossAlignment.center,
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final compact = constraints.maxWidth < 360;
+                            final titleBlock = Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  width: 46,
-                                  height: 46,
-                                  decoration: BoxDecoration(
-                                    color: kPrimaryBlue.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: const Icon(
-                                    Icons.auto_stories_outlined,
-                                    color: kPrimaryBlue,
+                                Text(
+                                  '今天先完成这 3 步',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '今天先完成这 3 步',
-                                      style: theme.textTheme.titleLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '完成后，首页第一屏就能直接记课、查当天出勤和记录缴费。',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(height: 1.45),
-                                    ),
-                                  ],
+                                const SizedBox(height: 4),
+                                Text(
+                                  '完成后即可记课、查出勤、记缴费。',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    height: 1.45,
+                                  ),
                                 ),
                               ],
-                            ),
-                            const SizedBox(height: 18),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
+                            );
+                            final icon = Container(
+                              width: 46,
+                              height: 46,
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.54),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: kInkSecondary.withValues(alpha: 0.1),
+                                color: kPrimaryBlue.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.auto_stories_outlined,
+                                color: kPrimaryBlue,
+                              ),
+                            );
+
+                            if (compact) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  icon,
+                                  const SizedBox(height: 10),
+                                  titleBlock,
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                icon,
+                                const SizedBox(width: 10),
+                                Expanded(child: titleBlock),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 18),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.54),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: kInkSecondary.withValues(alpha: 0.1),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _SetupMetric(
+                                  label: '进度',
+                                  value: '$readyCount/3',
+                                  color: kSealRed,
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: _SetupMetric(
-                                      label: '准备进度',
-                                      value: '$readyCount/3',
-                                      color: kSealRed,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _SetupMetric(
-                                      label: '学生档案',
-                                      value: '$studentCount',
-                                      color: kPrimaryBlue,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _SetupMetric(
-                                      label: '保存方式',
-                                      value: '本机',
-                                      color: kGreen,
-                                    ),
-                                  ),
-                                ],
+                              Expanded(
+                                child: _SetupMetric(
+                                  label: '学生',
+                                  value: '$studentCount',
+                                  color: kPrimaryBlue,
+                                ),
                               ),
-                            ),
-                          ],
+                              Expanded(
+                                child: _SetupMetric(
+                                  label: '保存',
+                                  value: '本机',
+                                  color: kGreen,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -184,9 +174,7 @@ class InitialSetupScreen extends ConsumerWidget {
                   _SetupStepCard(
                     indexLabel: '第一步',
                     title: '设置教师抬头与机构名',
-                    description: teacherReady
-                        ? '教师抬头已经就绪，导出资料和首页信息会直接沿用当前设置。'
-                        : '先把教师名称或机构名改成你自己的，后续导出和首页显示会更清楚。',
+                    description: teacherReady ? '首页和报告会沿用当前抬头。' : '用于首页和导出报告。',
                     statusLabel: teacherReady ? '已就绪' : '待设置',
                     statusColor: teacherReady ? kGreen : kOrange,
                     icon: Icons.edit_note_outlined,
@@ -199,8 +187,8 @@ class InitialSetupScreen extends ConsumerWidget {
                     indexLabel: '第二步',
                     title: '建立首批学生档案',
                     description: hasStudents
-                        ? '已经有 $studentCount 位学生，可以直接开始记课或继续补录学生。'
-                        : '可以先新增第一位学生，也可以直接批量导入 Excel 名单。',
+                        ? '已有 $studentCount 位学生。'
+                        : '新增学生，或批量导入 Excel。',
                     statusLabel: hasStudents ? '已完成' : '待完成',
                     statusColor: hasStudents ? kGreen : kSealRed,
                     icon: Icons.groups_2_outlined,
@@ -215,9 +203,7 @@ class InitialSetupScreen extends ConsumerWidget {
                   _SetupStepCard(
                     indexLabel: '第三步',
                     title: '回到首页开始记课',
-                    description: hasStudents
-                        ? '进入首页后，第一屏就能看到“立即记课、查看当天出勤、记录缴费”等入口。'
-                        : '先准备好学生档案，首页的记课和缴费入口才会真正可用。',
+                    description: hasStudents ? '首页第一屏可直接操作。' : '先准备学生档案。',
                     statusLabel: hasStudents ? '可以开始' : '等待学生',
                     statusColor: hasStudents ? kGreen : kInkSecondary,
                     icon: Icons.dashboard_customize_outlined,
@@ -226,34 +212,6 @@ class InitialSetupScreen extends ConsumerWidget {
                     onTap: hasStudents
                         ? () => _openRoute(context, '/', replace: true)
                         : null,
-                  ),
-                  const SizedBox(height: 16),
-                  GlassCard(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '准备好之后会怎么用',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const _FlowHintRow(
-                          icon: Icons.brush_outlined,
-                          text: '首页第一屏直接点“立即记课”，不用先找学生页面。',
-                        ),
-                        const _FlowHintRow(
-                          icon: Icons.fact_check_outlined,
-                          text: '切日期后就能查看任意一天谁出勤了，不必翻学生详情。',
-                        ),
-                        const _FlowHintRow(
-                          icon: Icons.payments_outlined,
-                          text: '欠费、续费和学生卡片都能直接记录缴费。',
-                        ),
-                      ],
-                    ),
                   ),
                 ],
               ),
@@ -440,38 +398,6 @@ class _SetupStepCard extends StatelessWidget {
                 label: Text(actionLabel ?? '继续'),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FlowHintRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _FlowHintRow({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(icon, size: 16, color: kPrimaryBlue),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(height: 1.45),
-            ),
-          ),
         ],
       ),
     );

@@ -78,6 +78,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settingsAsync = ref.watch(settingsProvider);
     final pkgInfo = ref.watch(packageInfoProvider);
     final versionStr = pkgInfo.whenOrNull(data: (info) => info.version) ?? '';
+    final now = DateTime.now();
     final viewPaddingBottom = MediaQuery.of(context).viewPadding.bottom;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
     final horizontalPadding = MediaQuery.sizeOf(context).width < 390
@@ -123,7 +124,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   );
                   final isOverdue =
                       lastBackupMs == null ||
-                      DateTime.now()
+                      now
                               .difference(
                                 DateTime.fromMillisecondsSinceEpoch(
                                   lastBackupMs,
@@ -164,22 +165,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ].where((item) => item).length;
                   final setupCompletion = setupReadyCount / 4;
                   final priorityHint = priority == null
-                      ? '当前导出与备份配置已经比较完整，可以继续微调细节。'
-                      : '下一步建议先处理“${priority.actionLabel}”，这样后续导出和沟通会更顺手。';
-                  final backupTileSubtitle = isOverdue
-                      ? '建议立即执行一次本地备份'
-                      : '查看最近备份并导出备份文件';
+                      ? '配置完整，可按需微调。'
+                      : '优先处理：${priority.actionLabel}';
+                  final backupTileSubtitle = isOverdue ? '建议更新' : '查看记录';
                   final messageSubtitle =
                       settings['default_message_template']?.isNotEmpty == true
                       ? settings['default_message_template']!
-                      : '尚未设置默认寄语';
+                      : '未设置';
                   final qwenModelSubtitle =
                       settings['qwen_model']?.trim().isNotEmpty == true
                       ? settings['qwen_model']!
-                      : '计划调用 Qwen3-VL-Plus';
+                      : '默认 Qwen3-VL-Plus';
                   const aboutSectionSubtitle = kDebugMode
-                      ? '查看版本信息，并保留隐藏的开发者模式入口。'
-                      : '查看版本信息。';
+                      ? '版本与开发入口。'
+                      : '版本信息。';
                   final aboutVersionSubtitle = !kDebugMode
                       ? '版本 $versionStr'
                       : _devMode
@@ -209,7 +208,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       SettingsOverviewPanel(
                         version: versionStr,
                         teacherName: teacherName,
-                        backupSummary: _backupSummaryLabel(lastBackupMs),
+                        backupSummary: _backupSummaryLabel(lastBackupMs, now),
                         isBackupOverdue: isOverdue,
                         watermarkEnabled: watermarkEnabled,
                         hasDefaultMessage: hasDefaultMessage,
@@ -349,7 +348,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _editTeacherName(String current) {
     _showTextEditSheet(
       title: '教师姓名',
-      hintText: '请输入教师姓名',
+      hintText: '教师姓名',
       initialValue: current,
       maxLines: 1,
       allowEmpty: false,
@@ -361,7 +360,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _editInstitutionName(String current) {
     _showTextEditSheet(
       title: '机构名称',
-      hintText: '请输入机构名称',
+      hintText: '机构名称',
       initialValue: current,
       maxLines: 1,
       allowEmpty: false,
@@ -373,7 +372,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _editMessage(String current) {
     _showTextEditSheet(
       title: '默认寄语',
-      hintText: '请输入导出报告时默认使用的寄语',
+      hintText: '报告寄语',
       initialValue: current,
       maxLines: 4,
       maxLength: 200,
@@ -412,10 +411,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _restoreDismissedInsights() async {
-    final confirmed = await AppToast.showConfirm(
-      context,
-      '将恢复所有已忽略的经营提醒，确定继续吗？',
-    );
+    final confirmed = await AppToast.showConfirm(context, '恢复所有已忽略提醒？');
     if (!confirmed) return;
 
     try {
@@ -425,7 +421,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!mounted) return;
       await InteractionFeedback.seal(context);
       if (!mounted) return;
-      AppToast.showSuccess(context, '已恢复所有经营提醒');
+      AppToast.showSuccess(context, '提醒已恢复');
     } catch (e) {
       if (mounted) AppToast.showError(context, e.toString());
     }
@@ -435,7 +431,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!kDebugMode) return;
     final confirmed = await AppToast.showConfirm(
       context,
-      '将插入 20 名学生和约 5000 条出勤记录，确定继续吗？',
+      '生成 20 名学生和约 5000 条出勤？',
     );
     if (!confirmed) return;
 
@@ -451,10 +447,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _clearAllData() async {
     if (!kDebugMode) return;
-    final confirmed = await AppToast.showConfirm(
-      context,
-      '将删除所有本地数据且不可恢复，确定继续吗？',
-    );
+    final confirmed = await AppToast.showConfirm(context, '清空所有本地数据？此操作不可撤销。');
     if (!confirmed) return;
 
     try {
@@ -499,10 +492,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  String _backupSummaryLabel(int? lastBackupMs) {
+  String _backupSummaryLabel(int? lastBackupMs, DateTime now) {
     if (lastBackupMs == null) return '未创建';
     final lastBackup = DateTime.fromMillisecondsSinceEpoch(lastBackupMs);
-    final days = DateTime.now().difference(lastBackup).inDays;
+    final days = now.difference(lastBackup).inDays;
     if (days <= 0) return '今天';
     return '$days 天前';
   }
@@ -515,26 +508,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }) {
     if (isOverdue) {
       return const _PrioritySuggestion(
-        title: '建议优先更新本地备份',
-        description: '请先生成最新备份。',
-        actionLabel: '前往备份',
+        title: '更新本地备份',
+        description: '生成最新副本。',
+        actionLabel: '去备份',
         action: _PriorityAction.backup,
         color: kOrange,
       );
     }
     if (!hasSignature) {
       return const _PrioritySuggestion(
-        title: '建议补充教师签名',
-        description: '上传后即可用于导出。',
-        actionLabel: '上传签名',
+        title: '补充教师签名',
+        description: '用于报告导出。',
+        actionLabel: '传签名',
         action: _PriorityAction.signature,
         color: kSealRed,
       );
     }
     if (!hasDefaultMessage) {
       return const _PrioritySuggestion(
-        title: '可以补充默认寄语',
-        description: '设置后可直接复用。',
+        title: '补充默认寄语',
+        description: '导出时可复用。',
         actionLabel: '编辑寄语',
         action: _PriorityAction.message,
         color: kPrimaryBlue,
@@ -542,8 +535,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     if (!hasCustomTeacherName) {
       return const _PrioritySuggestion(
-        title: '建议更新教师抬头',
-        description: '使用真实姓名更统一。',
+        title: '更新教师抬头',
+        description: '统一首页与报告。',
         actionLabel: '修改姓名',
         action: _PriorityAction.teacher,
         color: kGreen,
