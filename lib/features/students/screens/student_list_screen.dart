@@ -115,8 +115,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                               searchController: _searchController,
                               activeCount: viewModel.activeCount,
                               suspendedCount: viewModel.suspendedCount,
-                              filteredCount: viewModel.filtered.length,
-                              totalCount: viewModel.totalCount,
+                              resultSummary: viewModel.resultSummary,
                               onQueryChanged: _updateQuery,
                               onClearQuery: _clearQuery,
                               onResetFilters: _resetFilters,
@@ -241,8 +240,7 @@ class _StudentListToolbar extends StatelessWidget {
   final TextEditingController searchController;
   final int activeCount;
   final int suspendedCount;
-  final int filteredCount;
-  final int totalCount;
+  final String resultSummary;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClearQuery;
   final VoidCallback onResetFilters;
@@ -253,8 +251,7 @@ class _StudentListToolbar extends StatelessWidget {
     required this.searchController,
     required this.activeCount,
     required this.suspendedCount,
-    required this.filteredCount,
-    required this.totalCount,
+    required this.resultSummary,
     required this.onQueryChanged,
     required this.onClearQuery,
     required this.onResetFilters,
@@ -263,10 +260,6 @@ class _StudentListToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final resultSummary = query.hasActiveFilter
-        ? '当前显示 $filteredCount / $totalCount 位学生'
-        : '共 $totalCount 位学生';
-
     return GlassCard(
       padding: const EdgeInsets.all(18),
       child: Column(

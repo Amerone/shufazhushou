@@ -67,15 +67,56 @@ void main() {
       expect(displayNames['student-b'], 'Alex\uFF08Parent B\uFF09');
     },
   );
+
+  test(
+    'studentListViewModelProvider filters counts and summary together',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          studentDaoProvider.overrideWithValue(
+            _FakeStudentDao([
+              StudentWithMeta(_student('student-a', name: 'Alice'), null),
+              StudentWithMeta(
+                _student('student-b', name: 'Bob', status: 'suspended'),
+                null,
+              ),
+              StudentWithMeta(_student('student-c', name: 'Carol'), null),
+            ]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(studentProvider.future);
+      container
+          .read(studentListQueryProvider.notifier)
+          .state = const StudentListQuery(
+        text: 'bo',
+        filter: StudentListFilter.suspended,
+      );
+
+      final viewModel = container.read(studentListViewModelProvider);
+
+      expect(viewModel.activeCount, 2);
+      expect(viewModel.suspendedCount, 1);
+      expect(viewModel.filtered.map((item) => item.student.id), ['student-b']);
+      expect(viewModel.resultSummary, '当前显示 1 / 3 位学生');
+    },
+  );
 }
 
-Student _student(String id, {String? name, String? parentName}) {
+Student _student(
+  String id, {
+  String? name,
+  String? parentName,
+  String status = 'active',
+}) {
   return Student(
     id: id,
     name: name ?? id,
     parentName: parentName,
     pricePerClass: 100,
-    status: 'active',
+    status: status,
     createdAt: 1,
     updatedAt: 1,
   );

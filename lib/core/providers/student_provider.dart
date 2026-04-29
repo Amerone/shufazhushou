@@ -173,27 +173,30 @@ final studentListViewModelProvider = Provider<StudentListViewModel>((ref) {
   final query = ref.watch(studentListQueryProvider);
   final normalizedQuery = query.text.trim().toLowerCase();
 
-  final activeCount = students
-      .where((item) => item.student.status == 'active')
-      .length;
-  final filtered = students
-      .where((item) {
-        final student = item.student;
-        final matchesFilter = switch (query.filter) {
-          StudentListFilter.all => true,
-          StudentListFilter.active => student.status == 'active',
-          StudentListFilter.suspended => student.status != 'active',
-        };
-        if (!matchesFilter) return false;
-        if (normalizedQuery.isEmpty) return true;
+  var activeCount = 0;
+  final filtered = <StudentWithMeta>[];
+  for (final item in students) {
+    final student = item.student;
+    final isActive = student.status == 'active';
+    if (isActive) activeCount++;
 
-        return student.name.toLowerCase().contains(normalizedQuery) ||
-            (student.parentPhone?.toLowerCase().contains(normalizedQuery) ??
-                false) ||
-            (student.parentName?.toLowerCase().contains(normalizedQuery) ??
-                false);
-      })
-      .toList(growable: false);
+    final matchesFilter = switch (query.filter) {
+      StudentListFilter.all => true,
+      StudentListFilter.active => isActive,
+      StudentListFilter.suspended => !isActive,
+    };
+    if (!matchesFilter) continue;
+    if (normalizedQuery.isNotEmpty &&
+        !student.name.toLowerCase().contains(normalizedQuery) &&
+        !(student.parentPhone?.toLowerCase().contains(normalizedQuery) ??
+            false) &&
+        !(student.parentName?.toLowerCase().contains(normalizedQuery) ??
+            false)) {
+      continue;
+    }
+
+    filtered.add(item);
+  }
 
   final resultSummary = query.hasActiveFilter
       ? '当前显示 ${filtered.length} / ${students.length} 位学生'
