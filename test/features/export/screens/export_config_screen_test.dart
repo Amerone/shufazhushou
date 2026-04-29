@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ import 'package:moyun/core/providers/settings_provider.dart';
 import 'package:moyun/core/providers/student_provider.dart';
 import 'package:moyun/core/services/ai_analysis_note_codec.dart';
 import 'package:moyun/features/export/screens/export_config_screen.dart';
+import 'package:moyun/features/export/widgets/export_option_action_widgets.dart';
 import 'package:share_plus/share_plus.dart';
 
 void main() {
@@ -257,12 +259,129 @@ void main() {
       semantics.dispose();
     }
   });
+
+  testWidgets('export screen shows loading action notice during export', (
+    tester,
+  ) async {
+    const student = Student(
+      id: 'student-loading',
+      name: 'Erin',
+      pricePerClass: 180,
+      status: 'active',
+      createdAt: 1,
+      updatedAt: 1,
+    );
+    final pendingPayments = Completer<List<Payment>>();
+
+    await _pumpScreen(tester, student, pendingPayments: pendingPayments);
+
+    final exportExcelButton = find.text('导出 Excel');
+    await tester.ensureVisible(exportExcelButton);
+    await tester.tap(exportExcelButton);
+    await tester.pump();
+
+    expect(find.text('正在导出 Excel，请稍候'), findsOneWidget);
+    expect(find.text('预览、分享和 Excel 导出会在当前任务完成后恢复。'), findsOneWidget);
+    expect(find.text('Excel 导出中'), findsOneWidget);
+    expect(find.text('导出 Excel 中...'), findsOneWidget);
+    expect(find.text('等待中...'), findsNWidgets(2));
+    expect(
+      find.descendant(
+        of: find.byType(ExportActionPanel),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
+
+    pendingPayments.completeError(Exception('stop after loading assertion'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('export ignores duplicate taps while an export is active', (
+    tester,
+  ) async {
+    const student = Student(
+      id: 'student-duplicate-export',
+      name: 'Finn',
+      pricePerClass: 180,
+      status: 'active',
+      createdAt: 1,
+      updatedAt: 1,
+    );
+    final pendingPayments = Completer<List<Payment>>();
+
+    await _pumpScreen(tester, student, pendingPayments: pendingPayments);
+    _resetExportCounters();
+
+    final exportExcelButton = find.text('导出 Excel');
+    await tester.ensureVisible(exportExcelButton);
+    await tester.tap(exportExcelButton);
+    await tester.tap(exportExcelButton);
+    await tester.pump();
+
+    expect(_FakePaymentDao.listQueryCount, 1);
+
+    pendingPayments.completeError(Exception('stop after duplicate assertion'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('export Excel starts data student and fee queries together', (
+    tester,
+  ) async {
+    const student = Student(
+      id: 'student-parallel-export',
+      name: 'Gina',
+      pricePerClass: 180,
+      status: 'active',
+      createdAt: 1,
+      updatedAt: 1,
+    );
+    final pendingPayments = Completer<List<Payment>>();
+
+    await _pumpScreen(tester, student, pendingPayments: pendingPayments);
+    _resetExportCounters();
+
+    final exportExcelButton = find.text('导出 Excel');
+    await tester.ensureVisible(exportExcelButton);
+    await tester.tap(exportExcelButton);
+    await tester.pump();
+    await tester.pump();
+
+    expect(_FakePaymentDao.listQueryCount, 1);
+    expect(_FakeStudentDao.getByIdCount, 1);
+    expect(_FakeAttendanceDao.totalFeeQueryCount, greaterThan(0));
+
+    pendingPayments.completeError(Exception('stop after parallel assertion'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('export action panel explains disabled loading state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ExportActionPanel(
+            loading: true,
+            onPreview: () {},
+            onSharePdf: () {},
+            onExportExcel: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('正在生成导出文件，请稍候'), findsOneWidget);
+    expect(find.text('预览、分享和 Excel 导出会在当前任务完成后恢复。'), findsOneWidget);
+    expect(find.text('处理中...'), findsNWidgets(3));
+  });
 }
 
 Future<void> _pumpScreen(
   WidgetTester tester,
   Student student, {
   bool failParentSnapshot = false,
+  Completer<List<Payment>>? pendingPayments,
 }) async {
   _FakeSettingsNotifier.seededSettings = const {
     'default_message_template': '',
@@ -277,7 +396,9 @@ Future<void> _pumpScreen(
         attendanceDaoProvider.overrideWithValue(
           _FakeAttendanceDao(shouldFail: failParentSnapshot),
         ),
-        paymentDaoProvider.overrideWithValue(_FakePaymentDao()),
+        paymentDaoProvider.overrideWithValue(
+          _FakePaymentDao(pendingPayments: pendingPayments),
+        ),
         studentDaoProvider.overrideWithValue(_FakeStudentDao(student)),
         studentProvider.overrideWith(_FakeStudentNotifier.new),
       ],
@@ -289,6 +410,12 @@ Future<void> _pumpScreen(
   await _settleUi(tester);
 }
 
+void _resetExportCounters() {
+  _FakeAttendanceDao.totalFeeQueryCount = 0;
+  _FakePaymentDao.listQueryCount = 0;
+  _FakeStudentDao.getByIdCount = 0;
+}
+
 class _FakeSettingsNotifier extends SettingsNotifier {
   static Map<String, String> seededSettings = const {};
 
@@ -297,18 +424,23 @@ class _FakeSettingsNotifier extends SettingsNotifier {
 }
 
 class _FakeStudentDao extends StudentDao {
+  static int getByIdCount = 0;
+
   final Student student;
 
   _FakeStudentDao(this.student) : super(DatabaseHelper.instance);
 
   @override
   Future<Student?> getById(String id) async {
+    getByIdCount++;
     if (id != student.id) return null;
     return student;
   }
 }
 
 class _FakeAttendanceDao extends AttendanceDao {
+  static int totalFeeQueryCount = 0;
+
   final bool shouldFail;
 
   _FakeAttendanceDao({this.shouldFail = false})
@@ -335,12 +467,17 @@ class _FakeAttendanceDao extends AttendanceDao {
     String? from,
     String? to,
   ) async {
+    totalFeeQueryCount++;
     return 0;
   }
 }
 
 class _FakePaymentDao extends PaymentDao {
-  _FakePaymentDao() : super(DatabaseHelper.instance);
+  static int listQueryCount = 0;
+
+  final Completer<List<Payment>>? pendingPayments;
+
+  _FakePaymentDao({this.pendingPayments}) : super(DatabaseHelper.instance);
 
   @override
   Future<List<Payment>> getByStudentAndDateRange(
@@ -348,6 +485,10 @@ class _FakePaymentDao extends PaymentDao {
     String? from,
     String? to,
   ) async {
+    listQueryCount++;
+    if (pendingPayments case final completer?) {
+      return completer.future;
+    }
     return const [];
   }
 

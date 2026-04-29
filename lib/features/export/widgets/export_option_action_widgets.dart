@@ -127,6 +127,7 @@ class ExportSwitchTile extends StatelessWidget {
 
 class ExportActionPanel extends StatelessWidget {
   final bool loading;
+  final ExportActionType? activeAction;
   final VoidCallback onPreview;
   final VoidCallback onSharePdf;
   final VoidCallback onExportExcel;
@@ -134,10 +135,25 @@ class ExportActionPanel extends StatelessWidget {
   const ExportActionPanel({
     super.key,
     required this.loading,
+    this.activeAction,
     required this.onPreview,
     required this.onSharePdf,
     required this.onExportExcel,
   });
+
+  bool get _isLoading => loading || activeAction != null;
+
+  String _labelFor(ExportActionType action, String idleLabel) {
+    if (!_isLoading) return idleLabel;
+    if (activeAction == null) return '处理中...';
+    return activeAction == action ? activeAction!._buttonLabel : '等待中...';
+  }
+
+  Widget _iconFor(ExportActionType action, IconData idleIcon) {
+    if (!_isLoading) return Icon(idleIcon);
+    if (activeAction != null) return Icon(idleIcon);
+    return const _ExportActionLoadingIcon();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -166,6 +182,10 @@ class ExportActionPanel extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
+        if (_isLoading) ...[
+          _ExportLoadingNotice(activeAction: activeAction),
+          const SizedBox(height: 12),
+        ],
         LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
@@ -184,11 +204,14 @@ class ExportActionPanel extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed: loading ? null : onPreview,
-                    icon: loading
-                        ? const _ExportActionLoadingIcon()
-                        : const Icon(Icons.preview_outlined),
-                    label: Text(loading ? '处理中...' : '预览 PDF'),
+                    onPressed: _isLoading ? null : onPreview,
+                    icon: _iconFor(
+                      ExportActionType.previewPdf,
+                      Icons.preview_outlined,
+                    ),
+                    label: Text(
+                      _labelFor(ExportActionType.previewPdf, '预览 PDF'),
+                    ),
                   ),
                 ),
                 SizedBox(
@@ -200,11 +223,12 @@ class ExportActionPanel extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed: loading ? null : onSharePdf,
-                    icon: loading
-                        ? const _ExportActionLoadingIcon()
-                        : const Icon(Icons.share_outlined),
-                    label: Text(loading ? '处理中...' : '分享 PDF'),
+                    onPressed: _isLoading ? null : onSharePdf,
+                    icon: _iconFor(
+                      ExportActionType.sharePdf,
+                      Icons.share_outlined,
+                    ),
+                    label: Text(_labelFor(ExportActionType.sharePdf, '分享 PDF')),
                   ),
                 ),
                 SizedBox(
@@ -218,11 +242,14 @@ class ExportActionPanel extends StatelessWidget {
                       side: BorderSide(color: kGreen.withValues(alpha: 0.5)),
                       foregroundColor: kGreen,
                     ),
-                    onPressed: loading ? null : onExportExcel,
-                    icon: loading
-                        ? const _ExportActionLoadingIcon()
-                        : const Icon(Icons.table_view_outlined),
-                    label: Text(loading ? '处理中...' : '导出 Excel'),
+                    onPressed: _isLoading ? null : onExportExcel,
+                    icon: _iconFor(
+                      ExportActionType.exportExcel,
+                      Icons.table_view_outlined,
+                    ),
+                    label: Text(
+                      _labelFor(ExportActionType.exportExcel, '导出 Excel'),
+                    ),
                   ),
                 ),
               ],
@@ -230,6 +257,86 @@ class ExportActionPanel extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+enum ExportActionType { previewPdf, sharePdf, exportExcel }
+
+extension _ExportActionTypeCopy on ExportActionType {
+  String get _noticeTitle {
+    return switch (this) {
+      ExportActionType.previewPdf => '正在准备 PDF 预览，请稍候',
+      ExportActionType.sharePdf => '正在准备 PDF 分享，请稍候',
+      ExportActionType.exportExcel => '正在导出 Excel，请稍候',
+    };
+  }
+
+  String get _buttonLabel {
+    return switch (this) {
+      ExportActionType.previewPdf => '生成预览中...',
+      ExportActionType.sharePdf => '准备分享中...',
+      ExportActionType.exportExcel => '导出 Excel 中...',
+    };
+  }
+}
+
+class _ExportLoadingNotice extends StatelessWidget {
+  final ExportActionType? activeAction;
+
+  const _ExportLoadingNotice({this.activeAction});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final title = activeAction?._noticeTitle ?? '正在生成导出文件，请稍候';
+    const subtitle = '预览、分享和 Excel 导出会在当前任务完成后恢复。';
+
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '$title。$subtitle',
+      child: ExcludeSemantics(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: kPrimaryBlue.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kPrimaryBlue.withValues(alpha: 0.14)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: kPrimaryBlue,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

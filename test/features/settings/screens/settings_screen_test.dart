@@ -102,6 +102,7 @@ void main() {
     await _pumpScreen(tester);
     await _openTeacherNameSheet(tester);
     await tester.enterText(find.byType(TextField), '李老师');
+    await tester.pump();
 
     await tester.tap(find.text('保存修改'));
     await tester.pump();
@@ -128,6 +129,87 @@ void main() {
     expect(_FakeSettingsNotifier.seededSettings['teacher_name'], '李老师');
   });
 
+  testWidgets('text edit sheet starts in reviewable no-change state', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+
+    await _pumpScreen(tester);
+    await _openTeacherNameSheet(tester);
+
+    expect(find.byTooltip('关闭编辑'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '取消'), findsOneWidget);
+    expect(
+      tester
+          .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, '保存修改'))
+          .onPressed,
+      isNull,
+    );
+
+    await tester.enterText(find.byType(TextField), '李老师');
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, '保存修改'))
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('text edit sheet keeps save disabled for trimmed no-op edits', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+
+    await _pumpScreen(tester);
+    await _openTeacherNameSheet(tester);
+    await tester.enterText(find.byType(TextField), ' 王老师 ');
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, '保存修改'))
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('text edit sheet disables external dismissal while saving', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+    final saveCompleter = Completer<void>();
+    _FakeSettingsNotifier.pendingSave = saveCompleter;
+
+    await _pumpScreen(tester);
+    await _openTeacherNameSheet(tester);
+    await tester.enterText(find.byType(TextField), '李老师');
+    await tester.pump();
+
+    expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, isTrue);
+
+    await tester.tap(find.text('保存修改'));
+    await tester.pump();
+    expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, isFalse);
+    expect(
+      tester.widget<BottomSheet>(find.byType(BottomSheet)).enableDrag,
+      isFalse,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is ModalBarrier && widget.dismissible,
+      ),
+      findsNothing,
+    );
+
+    expect(find.byType(SettingsTextEditSheet), findsOneWidget);
+    expect(_FakeSettingsNotifier.setCallCount, 1);
+
+    saveCompleter.complete();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('text edit save failure keeps input and shows error', (
     tester,
   ) async {
@@ -137,6 +219,7 @@ void main() {
     await _pumpScreen(tester);
     await _openTeacherNameSheet(tester);
     await tester.enterText(find.byType(TextField), '李老师');
+    await tester.pump();
 
     await tester.tap(find.text('保存修改'));
     await tester.pumpAndSettle();

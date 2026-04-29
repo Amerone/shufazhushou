@@ -395,6 +395,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }) {
     showModalBottomSheet(
       context: context,
+      isDismissible: false,
+      enableDrag: false,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) => SettingsTextEditSheet(

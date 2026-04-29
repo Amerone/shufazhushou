@@ -73,13 +73,24 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
   final _msgCtrl = TextEditingController();
   bool _watermark = true;
   bool _includeAiAnalysis = false;
-  bool _loading = false;
+  ExportActionType? _activeExportAction;
   Student? _latestStudentSnapshot;
   late ExportTemplateId _template;
   Future<ExportParentSnapshot>? _parentSnapshotFuture;
   String? _parentSnapshotKey;
 
+  bool get _loading => _activeExportAction != null;
+
   String _fmt(DateTime date) => formatDate(date);
+
+  String get _exportStatusLabel {
+    return switch (_activeExportAction) {
+      ExportActionType.previewPdf => 'PDF 预览中',
+      ExportActionType.sharePdf => 'PDF 分享中',
+      ExportActionType.exportExcel => 'Excel 导出中',
+      null => '就绪',
+    };
+  }
 
   @override
   void initState() {
@@ -154,10 +165,12 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
   Future<StudentFeeSummary> _loadFeeSummary() {
     final from = _fmt(_from);
     final to = _fmt(_to);
-    return ref.read(
-      feeSummaryProvider(
-        FeeSummaryParams(widget.studentId, from: from, to: to),
-      ).future,
+    return FeeCalculator.calcSummary(
+      widget.studentId,
+      ref.read(attendanceDaoProvider),
+      ref.read(paymentDaoProvider),
+      from: from,
+      to: to,
     );
   }
 
@@ -225,6 +238,17 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
     return AiAnalysisNoteCodec.latestProgressContentForExport(note);
   }
 
+  bool _beginExport(ExportActionType action) {
+    if (_loading || !_validateRange()) return false;
+    FocusScope.of(context).unfocus();
+    setState(() => _activeExportAction = action);
+    return true;
+  }
+
+  void _endExport() {
+    if (mounted) setState(() => _activeExportAction = null);
+  }
+
   Future<ShareResult?> _shareFile(
     BuildContext feedbackContext,
     String path,
@@ -240,9 +264,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
   }
 
   Future<void> _previewPdf() async {
-    if (!_validateRange()) return;
-    FocusScope.of(context).unfocus();
-    setState(() => _loading = true);
+    if (!_beginExport(ExportActionType.previewPdf)) return;
     String? tempPath;
     try {
       final preparedPdf = await _buildPdf();
@@ -396,14 +418,12 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
       await deleteExportTempFile(tempPath);
-      if (mounted) setState(() => _loading = false);
+      _endExport();
     }
   }
 
   Future<void> _sharePdf() async {
-    if (!_validateRange()) return;
-    FocusScope.of(context).unfocus();
-    setState(() => _loading = true);
+    if (!_beginExport(ExportActionType.sharePdf)) return;
     String? tempPath;
     try {
       final preparedPdf = await _buildPdf();
@@ -425,19 +445,20 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
       await deleteExportTempFile(tempPath);
-      if (mounted) setState(() => _loading = false);
+      _endExport();
     }
   }
 
   Future<void> _exportExcel() async {
-    if (!_validateRange()) return;
-    FocusScope.of(context).unfocus();
-    setState(() => _loading = true);
+    if (!_beginExport(ExportActionType.exportExcel)) return;
     String? tempPath;
     try {
-      final data = await _loadData();
-      final student = await _loadStudent();
-      final feeSummary = await _loadFeeSummary();
+      final dataFuture = _loadData();
+      final studentFuture = _loadStudent();
+      final feeSummaryFuture = _loadFeeSummary();
+      final data = await dataFuture;
+      final student = await studentFuture;
+      final feeSummary = await feeSummaryFuture;
       if (student == null) {
         throw Exception(
           '\u672a\u627e\u5230\u5b66\u751f\uff0c\u8bf7\u8fd4\u56de\u540e\u91cd\u8bd5\u3002',
@@ -478,7 +499,7 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
       if (mounted) AppToast.showError(context, e.toString());
     } finally {
       await deleteExportTempFile(tempPath);
-      if (mounted) setState(() => _loading = false);
+      _endExport();
     }
   }
 
@@ -694,11 +715,12 @@ class _ExportConfigScreenState extends ConsumerState<ExportConfigScreen> {
                 title: '\u5bfc\u51fa\u64cd\u4f5c',
                 subtitle:
                     '\u53ef\u5148\u9884\u89c8 PDF\uff0c\u518d\u5206\u4eab\uff0c\u6216\u76f4\u63a5\u5bfc\u51fa Excel\u3002',
-                trailing: _loading ? '\u5904\u7406\u4e2d' : '\u5c31\u7eea',
+                trailing: _exportStatusLabel,
               ),
               const SizedBox(height: 12),
               ExportActionPanel(
                 loading: _loading,
+                activeAction: _activeExportAction,
                 onPreview: _previewPdf,
                 onSharePdf: _sharePdf,
                 onExportExcel: _exportExcel,
