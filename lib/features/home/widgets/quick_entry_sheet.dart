@@ -45,14 +45,20 @@ bool isQuickEntryValidTimeValue(String? value) {
   return hour >= 0 && hour < 24 && minute >= 0 && minute < 60;
 }
 
-Set<String> parseQuickEntryRecentStudentIds(Map<String, String> settings) {
-  final raw = settings[quickEntryRecentStudentIdsSettingKey]?.trim();
+Set<String> parseQuickEntryRecentStudentIdsValue(String? rawValue) {
+  final raw = rawValue?.trim();
   if (raw == null || raw.isEmpty) return const <String>{};
   return raw
       .split(',')
       .map((item) => item.trim())
       .where((item) => item.isNotEmpty)
       .toSet();
+}
+
+Set<String> parseQuickEntryRecentStudentIds(Map<String, String> settings) {
+  return parseQuickEntryRecentStudentIdsValue(
+    settings[quickEntryRecentStudentIdsSettingKey],
+  );
 }
 
 String quickEntryStatusLabel(String? status) {

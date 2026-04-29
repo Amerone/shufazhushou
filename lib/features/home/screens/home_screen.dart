@@ -37,9 +37,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _attendanceSectionKey = GlobalKey();
 
-  int _teacherProfileReadyCount(Map<String, String> settings) {
-    final teacherName = settings['teacher_name']?.trim() ?? '';
-    final institutionName = settings['institution_name']?.trim() ?? '';
+  int _teacherProfileReadyCount({
+    required String teacherName,
+    required String institutionName,
+  }) {
     return [
       teacherName.isNotEmpty && teacherName != kDefaultTeacherName,
       institutionName.isNotEmpty && institutionName != kDefaultInstitutionName,
@@ -93,9 +94,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       builder: (_) => const StudentPickerSheet(
-        title: '\u9009\u62e9\u7f34\u8d39\u5b66\u751f',
-        subtitle:
-            '\u5148\u9009\u5b66\u751f\uff0c\u518d\u76f4\u63a5\u5f55\u5165\u672c\u6b21\u7f34\u8d39\u91d1\u989d\u3002',
+        title: '选择缴费学生',
+        subtitle: '选择学生，录入本次缴费。',
         actionLabel: '\u8bb0\u5f55\u7f34\u8d39',
       ),
     );
@@ -130,7 +130,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
     final studentSummary = ref.watch(studentRosterSummaryProvider);
-    final settings = ref.watch(settingsProvider).valueOrNull ?? const {};
+    final homeSettings = ref.watch(
+      settingsProvider.select((value) {
+        final settings = value.valueOrNull ?? const <String, String>{};
+        return (
+          teacherName: settings['teacher_name']?.trim() ?? '',
+          institutionName: settings['institution_name']?.trim() ?? '',
+          recentStudentIds:
+              settings[quickEntryRecentStudentIdsSettingKey]?.trim() ?? '',
+          recentStartTime: settings[quickEntryDefaultStartTimeSettingKey]
+              ?.trim(),
+          recentEndTime: settings[quickEntryDefaultEndTimeSettingKey]?.trim(),
+          recentStatus: settings[quickEntryDefaultStatusSettingKey]?.trim(),
+        );
+      }),
+    );
     final today = DateTime.now();
 
     final studentCount = studentSummary.count;
@@ -163,14 +177,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final templates = hasStudents
         ? ref.watch(classTemplateProvider).valueOrNull ?? const []
         : const [];
-    final teacherProfileReadyCount = _teacherProfileReadyCount(settings);
-    final recentSelectedIds = parseQuickEntryRecentStudentIds(
-      settings,
+    final teacherProfileReadyCount = _teacherProfileReadyCount(
+      teacherName: homeSettings.teacherName,
+      institutionName: homeSettings.institutionName,
+    );
+    final recentSelectedIds = parseQuickEntryRecentStudentIdsValue(
+      homeSettings.recentStudentIds,
     ).intersection(studentSummary.ids);
-    final recentStartTime = settings[quickEntryDefaultStartTimeSettingKey]
-        ?.trim();
-    final recentEndTime = settings[quickEntryDefaultEndTimeSettingKey]?.trim();
-    final recentStatus = settings[quickEntryDefaultStatusSettingKey]?.trim();
+    final recentStartTime = homeSettings.recentStartTime;
+    final recentEndTime = homeSettings.recentEndTime;
+    final recentStatus = homeSettings.recentStatus;
     final showQuickLaunchPanel =
         hasStudents && (recentSelectedIds.isNotEmpty || templates.isNotEmpty);
     final showInitialSetupBanner =

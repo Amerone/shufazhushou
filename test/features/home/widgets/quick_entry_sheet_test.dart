@@ -33,6 +33,15 @@ void main() {
     _FakeStudentNotifier.seededStudents = _seededStudents;
   });
 
+  test('recent student id parser accepts raw setting value', () {
+    expect(
+      parseQuickEntryRecentStudentIdsValue(' student-1, ,student-2,student-1 '),
+      {'student-1', 'student-2'},
+    );
+    expect(parseQuickEntryRecentStudentIdsValue('   '), isEmpty);
+    expect(parseQuickEntryRecentStudentIdsValue(null), isEmpty);
+  });
+
   testWidgets('shows loading state while student list is pending', (
     tester,
   ) async {
