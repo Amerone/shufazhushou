@@ -74,7 +74,7 @@ void main() {
     expect(find.text('张三'), findsOneWidget);
     expect(find.text('已 24 天未出勤'), findsOneWidget);
     expect(find.textContaining('建议尽快回访'), findsWidgets);
-    expect(find.textContaining('计算逻辑：最近一次正式出勤'), findsOneWidget);
+    expect(find.textContaining('依据：最近一次正式出勤'), findsOneWidget);
 
     final actionButton = find.text('查看档案');
     expect(actionButton, findsOneWidget);
@@ -119,8 +119,8 @@ void main() {
     expect(find.text('李四'), findsOneWidget);
     expect(find.text('近 3 次评分持续提升：笔画质量、结构准确'), findsOneWidget);
     expect(find.textContaining('建议生成成长快照'), findsOneWidget);
-    expect(find.textContaining('计算逻辑：在最近 3 次有效评分记录中'), findsOneWidget);
-    expect(find.text('数据截至 2026-03-26 18:30'), findsOneWidget);
+    expect(find.textContaining('依据：在最近 3 次有效评分记录中'), findsOneWidget);
+    expect(find.text('截至 2026-03-26 18:30'), findsOneWidget);
   });
 }
 

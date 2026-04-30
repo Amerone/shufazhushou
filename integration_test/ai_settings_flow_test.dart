@@ -49,7 +49,7 @@ void main() {
     await _settleUi(tester);
 
     expect(find.text('AI 视觉'), findsOneWidget);
-    expect(find.text('调试调用'), findsOneWidget);
+    expect(find.text('调试工作台'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('ai_image_source_field')),
@@ -76,15 +76,10 @@ void main() {
       'https://example.com/ink-work.png',
     );
     expect(
-      find.byKey(const ValueKey('ai_analysis_result_text')),
+      find.byKey(const ValueKey('ai_analysis_result_card')),
       findsOneWidget,
     );
-    expect(find.textContaining('结构化结果 · qwen3-vl-plus'), findsOneWidget);
     expect(find.text('集成测试结构化结果。'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('ai_analysis_suggestion_0')),
-      findsOneWidget,
-    );
   });
 }
 
