@@ -292,8 +292,11 @@ void main() {
     expect(find.text('正在导出 Excel'), findsOneWidget);
     expect(find.text('请稍候。'), findsOneWidget);
     expect(find.text('Excel 导出中'), findsOneWidget);
-    expect(find.text('导出 Excel 中...'), findsOneWidget);
-    expect(find.text('等待中...'), findsNWidgets(2));
+    expect(find.text('预览 PDF'), findsOneWidget);
+    expect(find.text('分享 PDF'), findsOneWidget);
+    expect(find.text('导出 Excel'), findsOneWidget);
+    expect(find.text('导出 Excel 中...'), findsNothing);
+    expect(find.text('等待中...'), findsNothing);
     expect(
       find.descendant(
         of: find.byType(ExportActionPanel),
@@ -382,7 +385,17 @@ void main() {
 
     expect(find.text('正在生成导出文件'), findsOneWidget);
     expect(find.text('请稍候。'), findsOneWidget);
-    expect(find.text('处理中...'), findsNWidgets(3));
+    expect(find.text('预览 PDF'), findsOneWidget);
+    expect(find.text('分享 PDF'), findsOneWidget);
+    expect(find.text('导出 Excel'), findsOneWidget);
+    expect(find.text('处理中...'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(ExportActionPanel),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
   });
 }
 

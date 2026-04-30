@@ -65,6 +65,8 @@ void main() {
     await _settleUi(tester);
 
     expect(find.text('查看开课引导'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '新增学生'), findsOneWidget);
+    expect(find.byType(FloatingActionButton), findsNothing);
 
     await tester.tap(find.text('查看开课引导'));
     await _settleUi(tester);

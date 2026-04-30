@@ -49,7 +49,7 @@ class SettingsOverviewPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -66,11 +66,11 @@ class SettingsOverviewPanel extends StatelessWidget {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: kPrimaryBlue.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(13),
                     ),
                     child: const Icon(Icons.tune_outlined, color: kPrimaryBlue),
                   ),
@@ -98,7 +98,7 @@ class SettingsOverviewPanel extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
-                        vertical: 8,
+                        vertical: 7,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.68),
@@ -119,20 +119,16 @@ class SettingsOverviewPanel extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           LayoutBuilder(
             builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 720
-                  ? 4
-                  : constraints.maxWidth >= 420
-                  ? 2
-                  : 1;
+              final columns = _overviewColumnCount(constraints.maxWidth);
               final itemWidth =
-                  (constraints.maxWidth - 12 * (columns - 1)) / columns;
+                  (constraints.maxWidth - 10 * (columns - 1)) / columns;
 
               return Wrap(
-                spacing: 12,
-                runSpacing: 12,
+                spacing: 10,
+                runSpacing: 10,
                 children: [
                   SizedBox(
                     width: itemWidth,
@@ -174,12 +170,12 @@ class SettingsOverviewPanel extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.52),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(color: kInkSecondary.withValues(alpha: 0.08)),
             ),
             child: Column(
@@ -203,7 +199,7 @@ class SettingsOverviewPanel extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
@@ -212,7 +208,7 @@ class SettingsOverviewPanel extends StatelessWidget {
                     backgroundColor: kInkSecondary.withValues(alpha: 0.12),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(
                   priorityHint,
                   style: Theme.of(context).textTheme.bodySmall,
@@ -220,22 +216,18 @@ class SettingsOverviewPanel extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           const SettingsSectionTitle(title: '常用入口', subtitle: '高频设置。'),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           LayoutBuilder(
             builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 720
-                  ? 4
-                  : constraints.maxWidth >= 420
-                  ? 2
-                  : 1;
+              final columns = _overviewColumnCount(constraints.maxWidth);
               final itemWidth =
-                  (constraints.maxWidth - 12 * (columns - 1)) / columns;
+                  (constraints.maxWidth - 10 * (columns - 1)) / columns;
 
               return Wrap(
-                spacing: 12,
-                runSpacing: 12,
+                spacing: 10,
+                runSpacing: 10,
                 children: [
                   SizedBox(
                     width: itemWidth,
@@ -297,6 +289,12 @@ class SettingsOverviewPanel extends StatelessWidget {
   }
 }
 
+int _overviewColumnCount(double maxWidth) {
+  if (maxWidth >= 720) return 4;
+  if (maxWidth >= 320) return 2;
+  return 1;
+}
+
 class SettingsSectionTitle extends StatelessWidget {
   final String title;
   final String? subtitle;
@@ -344,22 +342,22 @@ class SettingsSnapshot extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.58),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: kInkSecondary.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 10),
+          Icon(icon, size: 17, color: color),
+          const SizedBox(height: 8),
           Text(
             label,
             style: theme.textTheme.bodySmall?.copyWith(color: kInkSecondary),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             value,
             maxLines: 2,
@@ -398,39 +396,39 @@ class SettingsShortcutCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         mouseCursor: SystemMouseCursors.click,
         onTap: () {
           unawaited(InteractionFeedback.selection(context));
           onTap();
         },
         child: Ink(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: color.withValues(alpha: 0.16)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(11),
                 ),
                 child: Icon(icon, color: color),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Text(
                 title,
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(subtitle, style: theme.textTheme.bodySmall),
             ],
           ),

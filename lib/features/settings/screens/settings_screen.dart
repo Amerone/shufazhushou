@@ -81,6 +81,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final now = DateTime.now();
     final viewPaddingBottom = MediaQuery.of(context).viewPadding.bottom;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
+    final scrollToTopBottomPadding = viewPaddingBottom + 128;
+    final scrollEndPadding = viewPaddingBottom + 184;
     final horizontalPadding = MediaQuery.sizeOf(context).width < 390
         ? 16.0
         : 24.0;
@@ -90,7 +92,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: IgnorePointer(
         ignoring: !_showScrollToTop,
         child: Padding(
-          padding: EdgeInsets.only(bottom: viewPaddingBottom + 80),
+          padding: EdgeInsets.only(bottom: scrollToTopBottomPadding),
           child: Semantics(
             button: true,
             label: '返回设置页顶部',
@@ -191,7 +193,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       horizontalPadding,
                       4,
                       horizontalPadding,
-                      120,
+                      scrollEndPadding,
                     ),
                     children: [
                       if (priority != null) ...[

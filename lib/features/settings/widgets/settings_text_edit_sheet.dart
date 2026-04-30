@@ -161,6 +161,9 @@ class _SettingsTextEditSheetState extends State<SettingsTextEditSheet> {
                   16,
             ),
             padding: const EdgeInsets.all(24),
+            enableBlur: true,
+            blurSigma: 18,
+            surfaceOpacity: 0.96,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -222,7 +225,7 @@ class _SettingsTextEditSheetState extends State<SettingsTextEditSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.56),
+                    fillColor: Colors.white.withValues(alpha: 0.94),
                   ),
                 ),
                 const SizedBox(height: 20),

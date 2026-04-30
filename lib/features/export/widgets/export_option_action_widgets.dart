@@ -143,16 +143,12 @@ class ExportActionPanel extends StatelessWidget {
 
   bool get _isLoading => loading || activeAction != null;
 
-  String _labelFor(ExportActionType action, String idleLabel) {
-    if (!_isLoading) return idleLabel;
-    if (activeAction == null) return '处理中...';
-    return activeAction == action ? activeAction!._buttonLabel : '等待中...';
+  String _labelFor(String idleLabel) {
+    return idleLabel;
   }
 
-  Widget _iconFor(ExportActionType action, IconData idleIcon) {
-    if (!_isLoading) return Icon(idleIcon);
-    if (activeAction != null) return Icon(idleIcon);
-    return const _ExportActionLoadingIcon();
+  Widget _iconFor(IconData idleIcon) {
+    return Icon(idleIcon);
   }
 
   @override
@@ -205,13 +201,8 @@ class ExportActionPanel extends StatelessWidget {
                       ),
                     ),
                     onPressed: _isLoading ? null : onPreview,
-                    icon: _iconFor(
-                      ExportActionType.previewPdf,
-                      Icons.preview_outlined,
-                    ),
-                    label: Text(
-                      _labelFor(ExportActionType.previewPdf, '预览 PDF'),
-                    ),
+                    icon: _iconFor(Icons.preview_outlined),
+                    label: Text(_labelFor('预览 PDF')),
                   ),
                 ),
                 SizedBox(
@@ -224,11 +215,8 @@ class ExportActionPanel extends StatelessWidget {
                       ),
                     ),
                     onPressed: _isLoading ? null : onSharePdf,
-                    icon: _iconFor(
-                      ExportActionType.sharePdf,
-                      Icons.share_outlined,
-                    ),
-                    label: Text(_labelFor(ExportActionType.sharePdf, '分享 PDF')),
+                    icon: _iconFor(Icons.share_outlined),
+                    label: Text(_labelFor('分享 PDF')),
                   ),
                 ),
                 SizedBox(
@@ -243,13 +231,8 @@ class ExportActionPanel extends StatelessWidget {
                       foregroundColor: kGreen,
                     ),
                     onPressed: _isLoading ? null : onExportExcel,
-                    icon: _iconFor(
-                      ExportActionType.exportExcel,
-                      Icons.table_view_outlined,
-                    ),
-                    label: Text(
-                      _labelFor(ExportActionType.exportExcel, '导出 Excel'),
-                    ),
+                    icon: _iconFor(Icons.table_view_outlined),
+                    label: Text(_labelFor('导出 Excel')),
                   ),
                 ),
               ],
@@ -269,14 +252,6 @@ extension _ExportActionTypeCopy on ExportActionType {
       ExportActionType.previewPdf => '准备 PDF 预览',
       ExportActionType.sharePdf => '准备 PDF 分享',
       ExportActionType.exportExcel => '正在导出 Excel',
-    };
-  }
-
-  String get _buttonLabel {
-    return switch (this) {
-      ExportActionType.previewPdf => '生成预览中...',
-      ExportActionType.sharePdf => '准备分享中...',
-      ExportActionType.exportExcel => '导出 Excel 中...',
     };
   }
 }
@@ -337,19 +312,6 @@ class _ExportLoadingNotice extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ExportActionLoadingIcon extends StatelessWidget {
-  const _ExportActionLoadingIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 18,
-      height: 18,
-      child: CircularProgressIndicator(strokeWidth: 2),
     );
   }
 }

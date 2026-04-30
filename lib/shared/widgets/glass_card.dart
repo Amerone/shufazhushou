@@ -12,6 +12,7 @@ class GlassCard extends StatelessWidget {
   final String? semanticLabel;
   final bool enableBlur;
   final double blurSigma;
+  final double surfaceOpacity;
 
   const GlassCard({
     super.key,
@@ -24,23 +25,34 @@ class GlassCard extends StatelessWidget {
     this.semanticLabel,
     this.enableBlur = false,
     this.blurSigma = 8,
-  });
+    this.surfaceOpacity = 0.84,
+  }) : assert(surfaceOpacity >= 0 && surfaceOpacity <= 1);
 
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(18);
+    final gradientStartOpacity = (surfaceOpacity + 0.06)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final gradientEndOpacity = (surfaceOpacity - 0.06)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final borderOpacity = (surfaceOpacity + 0.04).clamp(0.0, 1.0).toDouble();
     final decoration = BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.84),
+      color: Colors.white.withValues(alpha: surfaceOpacity),
       gradient: LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Colors.white.withValues(alpha: 0.9),
-          Colors.white.withValues(alpha: 0.78),
+          Colors.white.withValues(alpha: gradientStartOpacity),
+          Colors.white.withValues(alpha: gradientEndOpacity),
         ],
       ),
       borderRadius: radius,
-      border: Border.all(color: Colors.white.withValues(alpha: 0.88), width: 1),
+      border: Border.all(
+        color: Colors.white.withValues(alpha: borderOpacity),
+        width: 1,
+      ),
       boxShadow: [
         BoxShadow(
           color: const Color(0xFF8B7D6B).withValues(alpha: 0.05),

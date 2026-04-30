@@ -423,13 +423,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButton: studentLoading || studentLoadFailed
+      floatingActionButton: studentLoading || studentLoadFailed || !hasStudents
           ? null
           : Padding(
               padding: EdgeInsets.only(bottom: fabBottomPadding),
-              child: hasStudents
-                  ? HomeQuickEntryAction(onPressed: _openQuickEntrySheet)
-                  : HomeSetupAction(onPressed: _openCreateStudent),
+              child: HomeQuickEntryAction(onPressed: _openQuickEntrySheet),
             ),
     );
   }

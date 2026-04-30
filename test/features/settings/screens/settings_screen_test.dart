@@ -6,8 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moyun/core/providers/package_info_provider.dart';
 import 'package:moyun/core/providers/settings_provider.dart';
 import 'package:moyun/features/settings/screens/settings_screen.dart';
+import 'package:moyun/features/settings/widgets/settings_overview_panel.dart';
 import 'package:moyun/features/settings/widgets/settings_text_edit_sheet.dart';
+import 'package:moyun/shared/theme.dart';
 import 'package:moyun/shared/utils/interaction_feedback.dart';
+import 'package:moyun/shared/widgets/glass_card.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 void main() {
@@ -39,6 +42,59 @@ void main() {
     expect(find.byIcon(Icons.draw_outlined), findsWidgets);
     expect(find.byIcon(Icons.view_quilt_outlined), findsWidgets);
     expect(find.byIcon(Icons.psychology_alt_outlined), findsWidgets);
+  });
+
+  testWidgets('settings overview stays compact on phone width', (tester) async {
+    tester.view.physicalSize = const Size(390, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 390,
+              child: SettingsOverviewPanel(
+                version: '1.2.3',
+                teacherName: '王老师',
+                backupSummary: '今天 09:30',
+                isBackupOverdue: false,
+                watermarkEnabled: true,
+                hasDefaultMessage: true,
+                setupReadyCount: 4,
+                setupCompletion: 1,
+                priorityHint: '配置完整，可直接导出作品。',
+                hasSignature: true,
+                hasSeal: true,
+                hasAiConfig: true,
+                onOpenBackup: () {},
+                onOpenSignature: () {},
+                onOpenTemplates: () {},
+                onOpenSeal: () {},
+                onOpenAi: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final snapshots = find.byType(SettingsSnapshot);
+    expect(snapshots, findsNWidgets(4));
+    final firstSnapshotTop = tester.getTopLeft(snapshots.at(0)).dy;
+    final secondSnapshotTop = tester.getTopLeft(snapshots.at(1)).dy;
+
+    expect(secondSnapshotTop, firstSnapshotTop);
+
+    final shortcuts = find.byType(SettingsShortcutCard);
+    expect(shortcuts, findsNWidgets(5));
+    final firstShortcutTop = tester.getTopLeft(shortcuts.at(0)).dy;
+    final secondShortcutTop = tester.getTopLeft(shortcuts.at(1)).dy;
+
+    expect(secondShortcutTop, firstShortcutTop);
   });
 
   testWidgets('switch rows toggle from the full setting tile', (tester) async {
@@ -157,6 +213,29 @@ void main() {
     );
   });
 
+  testWidgets('text edit sheet uses a dense readable surface', (tester) async {
+    _setLargeViewport(tester);
+
+    await _pumpScreen(tester);
+    await _openTeacherNameSheet(tester);
+
+    final sheetCard = tester.widget<GlassCard>(
+      find.descendant(
+        of: find.byType(SettingsTextEditSheet),
+        matching: find.byType(GlassCard),
+      ),
+    );
+
+    expect(sheetCard.enableBlur, isTrue);
+    expect(sheetCard.blurSigma, greaterThanOrEqualTo(16));
+    expect(sheetCard.surfaceOpacity, greaterThanOrEqualTo(0.94));
+
+    final textField = tester.widget<TextField>(find.byType(TextField));
+    final fillColor = textField.decoration?.fillColor;
+
+    expect(fillColor?.a, greaterThanOrEqualTo(0.9));
+  });
+
   testWidgets('text edit sheet keeps save disabled for trimmed no-op edits', (
     tester,
   ) async {
@@ -208,6 +287,30 @@ void main() {
 
     saveCompleter.complete();
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('scroll-to-top action reserves bottom navigation space', (
+    tester,
+  ) async {
+    _setLargeViewport(tester);
+
+    await _pumpScreen(tester);
+
+    final action = find.byTooltip('回到顶部');
+    expect(action, findsOneWidget);
+
+    final paddings = find
+        .ancestor(of: action, matching: find.byType(Padding))
+        .evaluate()
+        .map((element) => element.widget)
+        .whereType<Padding>();
+    var bottomPadding = 0.0;
+    for (final padding in paddings) {
+      final resolved = padding.padding.resolve(TextDirection.ltr).bottom;
+      if (resolved > bottomPadding) bottomPadding = resolved;
+    }
+
+    expect(bottomPadding, greaterThanOrEqualTo(128));
   });
 
   testWidgets('text edit save failure keeps input and shows error', (
